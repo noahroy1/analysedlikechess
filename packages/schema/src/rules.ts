@@ -22,8 +22,8 @@ export interface HoldTiming {
 }
 
 /**
- * About 1 s per 12 words with a 3 s floor.
- * TODO(open-decision): the theme supplies these once the creator's hold timing is known.
+ * About 1 s per 12 words with a 3 s floor. Themes carry their own copy in `timing.hold`.
+ * TODO(open-decision): tune once the creator's hold timing is known.
  */
 export const DEFAULT_HOLD_TIMING: HoldTiming = { floorSec: 3, wordsPerSec: 12 };
 

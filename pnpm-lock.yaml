@@ -208,15 +208,27 @@ importers:
 
   apps/web:
     dependencies:
+      '@als/composition':
+        specifier: workspace:*
+        version: link:../../packages/composition
       '@als/schema':
         specifier: workspace:*
         version: link:../../packages/schema
+      '@als/theme':
+        specifier: workspace:*
+        version: link:../../packages/theme
+      '@remotion/player':
+        specifier: 4.0.534
+        version: 4.0.534(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       react:
         specifier: 19.3.0
         version: 19.3.0
       react-dom:
         specifier: 19.3.0
         version: 19.3.0(react@19.3.0)
+      remotion:
+        specifier: 4.0.534
+        version: 4.0.534(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
     devDependencies:
       '@tailwindcss/vite':
         specifier: 4.3.3
@@ -237,7 +249,27 @@ importers:
         specifier: 8.3.4
         version: 8.3.4(@types/node@26.6.4)(jiti@2.7.0)
 
-  packages/composition: {}
+  packages/composition:
+    dependencies:
+      '@als/schema':
+        specifier: workspace:*
+        version: link:../schema
+      '@als/theme':
+        specifier: workspace:*
+        version: link:../theme
+      '@remotion/media':
+        specifier: 4.0.534
+        version: 4.0.534(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      react:
+        specifier: 19.3.0
+        version: 19.3.0
+      remotion:
+        specifier: 4.0.534
+        version: 4.0.534(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+    devDependencies:
+      '@types/react':
+        specifier: 19.3.0
+        version: 19.3.0
 
   packages/schema:
     dependencies:
@@ -245,7 +277,18 @@ importers:
         specifier: 4.6.5
         version: 4.6.5
 
-  packages/theme: {}
+  packages/theme:
+    dependencies:
+      '@als/schema':
+        specifier: workspace:*
+        version: link:../schema
+      react:
+        specifier: 19.3.0
+        version: 19.3.0
+    devDependencies:
+      '@types/react':
+        specifier: 19.3.0
+        version: 19.3.0
 
 packages:
 
@@ -414,6 +457,18 @@ packages:
 
   '@oxc-project/types@0.153.0':
     resolution: {integrity: sha512-jSNrRIyvPVLL5E1z/tS5zLAprosGz/FuI1PWwEOz59j3E4TTTzSpqKb/RDGqJhhW0QHYISGXxq582wGx6T11Tw==}
+
+  '@remotion/media@4.0.534':
+    resolution: {integrity: sha512-xdipJG5ApdwIeu5YS1+iYzUxKybFwsKIjYKPtM5ywBUZiAiaBwK8nMiGRU73xchiLygBlxCpnPQ33a7L3+btMg==}
+    peerDependencies:
+      react: '>=16.8.0'
+      react-dom: '>=16.8.0'
+
+  '@remotion/player@4.0.534':
+    resolution: {integrity: sha512-uXkg9qsuYP85eykXTayr8jjSzFJYwtPzYprMfjxnAx9u5C/H726wTE800wGUcDPCDn1SPf6TAg71pmo882Z+jA==}
+    peerDependencies:
+      react: '>=16.8.0'
+      react-dom: '>=16.8.0'
 
   '@rolldown/binding-android-arm-eabi@1.2.13':
     resolution: {integrity: sha512-Vu/NICrgdRvUOeaJZIyB2FP63s6fO/4ud5l8dXmxDx9yDyn+mN0y+gsvsVviSli+T361Aqo0h46EuMoobrwawA==}
@@ -613,6 +668,12 @@ packages:
 
   '@types/deep-eql@4.0.2':
     resolution: {integrity: sha512-c9h9dVVMigMPc4bwTvC5dxqtqJZwQPePsWjPlpSOnojbor6pGqdk541lfA7AqFQr5pB1BRdq0juY9db81BwyFw==}
+
+  '@types/dom-mediacapture-transform@0.1.12':
+    resolution: {integrity: sha512-d7/QsLRwF864A5mgIM/YrfiglHoYn7zgCcAoJgW404r+2DwnNr7EBbLnCWpmOMgH8y0te73L1AV6H1bmauaWFw==}
+
+  '@types/dom-webcodecs@0.1.13':
+    resolution: {integrity: sha512-O5hkiFIcjjszPIYyUSyvScyvrBoV3NOEEZx/pMlsu44TKzWNkLVBBxnxJz42in5n3QIolYOcBYFCPZZ0h8SkwQ==}
 
   '@types/esrecurse@4.3.1':
     resolution: {integrity: sha512-xJBAbDifo5hpffDBuHl0Y8ywswbiAp/Wi7Y/GtAgSlZyIABppyurxVueOPE8LUQOxdlgi6Zqce7uoEpqNTeiUw==}
@@ -1152,6 +1213,9 @@ packages:
   magic-string@1.4.3:
     resolution: {integrity: sha512-z12OxmaPGE0F4xlpGdjuAUckipLpQlTAuAmyGhNoD7ODpYUzvDfvtxUbjM/jwznyP178oju/KDdyi220wNJ0RQ==}
 
+  mediabunny@1.56.1:
+    resolution: {integrity: sha512-DNOm0bRBmeOxJgCK/g3LxNWbxY5morTauNdlychujGmJ9L37ezVezkNoI1WtO2Xdb4WlWWJlYfIKnOEzd5phRw==}
+
   minimatch@10.2.6:
     resolution: {integrity: sha512-vpLQEs+VLCr1nU0BXS07maYoFwlDAH0gngQuuttxIwutDFEMHq2blX+8vpgxDdK3J1PwjCJiep77OitTZ4Ll1A==}
     engines: {node: 18 || 20 || >=22}
@@ -1226,6 +1290,12 @@ packages:
   react@19.3.0:
     resolution: {integrity: sha512-E8LUcbtBWt20bbl2YoHfx4ZDBdxVTfOKtCZn9cDSJ4l6/nuoApcpIBcj47t2wZoVX8g2ZHuMHbiShgCR1T5Sog==}
     engines: {node: '>=0.10.0'}
+
+  remotion@4.0.534:
+    resolution: {integrity: sha512-gSfMreFJgncWEHGsIWksicmEGsTrGMIAgZ87WS4e+bIB+nVsAN67UXWbQ88xGwUONm3xzwu9Ty786kFDcgZoaQ==}
+    peerDependencies:
+      react: '>=16.8.0'
+      react-dom: '>=16.8.0'
 
   rolldown@1.2.13:
     resolution: {integrity: sha512-/5apOkwWxtACcQtZ5WlrAsKS4JwXVThQPJZ3RqIruRY9UG9M8e0VlXN068xum/JRKA4aIUoJ13ghe/kGCvidiQ==}
@@ -1422,6 +1492,9 @@ packages:
     engines: {node: '>=18.0.0'}
     peerDependencies:
       zod: ^3.25.0 || ^4.0.0
+
+  zod@4.5.4:
+    resolution: {integrity: sha512-sC95tT5iHHH9gtpj6A81kh+NEaRAUFN+qlUPDUbRfOMvNf5QCBqsb3WgvnpVtK5Y+4UfA6KqufotuTvMGiTlsA==}
 
   zod@4.6.5:
     resolution: {integrity: sha512-v5l/aFXZQeai4awLbOpSoHecE9UiMrnfx75tEXLjNonXVARxQ5mOeipTjROUchszUNCqnE+hqAMujRsRHsut2Q==}
@@ -1623,6 +1696,20 @@ snapshots:
 
   '@oxc-project/types@0.153.0': {}
 
+  '@remotion/media@4.0.534(react-dom@19.3.0(react@19.3.0))(react@19.3.0)':
+    dependencies:
+      mediabunny: 1.56.1
+      react: 19.3.0
+      react-dom: 19.3.0(react@19.3.0)
+      remotion: 4.0.534(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      zod: 4.5.4
+
+  '@remotion/player@4.0.534(react-dom@19.3.0(react@19.3.0))(react@19.3.0)':
+    dependencies:
+      react: 19.3.0
+      react-dom: 19.3.0(react@19.3.0)
+      remotion: 4.0.534(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+
   '@rolldown/binding-android-arm-eabi@1.2.13':
     optional: true
 
@@ -1744,6 +1831,12 @@ snapshots:
       assertion-error: 2.0.1
 
   '@types/deep-eql@4.0.2': {}
+
+  '@types/dom-mediacapture-transform@0.1.12':
+    dependencies:
+      '@types/dom-webcodecs': 0.1.13
+
+  '@types/dom-webcodecs@0.1.13': {}
 
   '@types/esrecurse@4.3.1': {}
 
@@ -2232,6 +2325,11 @@ snapshots:
     dependencies:
       '@jridgewell/sourcemap-codec': 1.6.0
 
+  mediabunny@1.56.1:
+    dependencies:
+      '@types/dom-mediacapture-transform': 0.1.12
+      '@types/dom-webcodecs': 0.1.13
+
   minimatch@10.2.6:
     dependencies:
       brace-expansion: 5.0.12
@@ -2291,6 +2389,11 @@ snapshots:
       scheduler: 0.28.0
 
   react@19.3.0: {}
+
+  remotion@4.0.534(react-dom@19.3.0(react@19.3.0))(react@19.3.0):
+    dependencies:
+      react: 19.3.0
+      react-dom: 19.3.0(react@19.3.0)
 
   rolldown@1.2.13:
     dependencies:
@@ -2423,5 +2526,7 @@ snapshots:
   zod-validation-error@4.0.2(zod@4.6.5):
     dependencies:
       zod: 4.6.5
+
+  zod@4.5.4: {}
 
   zod@4.6.5: {}

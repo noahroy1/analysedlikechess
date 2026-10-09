@@ -9,9 +9,13 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@als/composition": "workspace:*",
     "@als/schema": "workspace:*",
+    "@als/theme": "workspace:*",
+    "@remotion/player": "4.0.534",
     "react": "19.3.0",
-    "react-dom": "19.3.0"
+    "react-dom": "19.3.0",
+    "remotion": "4.0.534"
   },
   "devDependencies": {
     "@tailwindcss/vite": "4.3.3",

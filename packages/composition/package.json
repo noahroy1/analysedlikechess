@@ -8,5 +8,15 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@als/schema": "workspace:*",
+    "@als/theme": "workspace:*",
+    "@remotion/media": "4.0.534",
+    "react": "19.3.0",
+    "remotion": "4.0.534"
+  },
+  "devDependencies": {
+    "@types/react": "19.3.0"
   }
 }

@@ -175,3 +175,14 @@ describe('toJsonSchema', () => {
     expect(json.required).not.toContain('bestMove');
   });
 });
+
+describe('demo moments', () => {
+  it('are valid moments within the text caps', () => {
+    const url = new URL('../../../fixtures/demo/doakes-moments.json', import.meta.url);
+    const demo = JSON.parse(readFileSync(url, 'utf8')) as { moments: unknown[] };
+    for (const raw of demo.moments) {
+      const moment = MomentSchema.parse(raw);
+      expect(momentWarnings(moment)).toEqual([]);
+    }
+  });
+});

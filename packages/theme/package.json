@@ -8,5 +8,12 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/react": "19.3.0"
+  },
+  "dependencies": {
+    "@als/schema": "workspace:*",
+    "react": "19.3.0"
   }
 }

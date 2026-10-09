@@ -12,7 +12,9 @@
     "test:watch": "vitest",
     "lint": "eslint .",
     "typecheck": "pnpm -r typecheck",
-    "check": "pnpm lint && pnpm typecheck && pnpm test"
+    "check": "pnpm lint && pnpm typecheck && pnpm test",
+    "seed:sample": "node apps/server/src/seed.ts sample",
+    "seed:moments": "node apps/server/src/seed.ts moments"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
