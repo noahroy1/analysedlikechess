@@ -1,0 +1,76 @@
+{
+  "_note": "PLACEHOLDER written for development, not the creator's words. TODO(open-decision): replace with 20-40 of the creator's real breakdowns in Phase 6 (see PLAN.md, Style corpus).",
+  "voice": "Dry, confident commentary that treats the scene like a chess game. Short sentences. Name the move, say what it gained or cost, and land a small joke where it fits. Chess vocabulary is seasoning (tempo, sacrifice, opening, endgame), not every line. Judge the character on what they knew at that moment, unless hindsight is the joke. Never explain the joke.",
+  "examples": [
+    {
+      "context": "A thief realises the museum guard has seen her reflection in the glass.",
+      "classification": "brilliant",
+      "moveLabel": "Trips the alarm herself",
+      "explanation": "With one guard on her, she hands him a building full of problems. Every door unlocks for the evacuation and she walks out with the crowd. Sacrifice the stealth, win the exit.",
+      "bestMove": null
+    },
+    {
+      "context": "Cornered in an elevator, the detective has seconds before the doors open.",
+      "classification": "great",
+      "moveLabel": "Hits every floor button",
+      "explanation": "Only move that buys time. Twelve stops, twelve chances, and the gunmen waiting in the lobby get bored first.",
+      "bestMove": null
+    },
+    {
+      "context": "A spy is offered a drink by the man she is investigating.",
+      "classification": "best",
+      "moveLabel": "Swaps the glasses",
+      "explanation": "Textbook and correct. If it is poisoned, he finds out first. If it is not, she still gets a drink.",
+      "bestMove": null
+    },
+    {
+      "context": "A heist crew argues over who carries the bag.",
+      "classification": "excellent",
+      "moveLabel": "Gives it to the new guy",
+      "explanation": "Nearly perfect delegation: the newest member is the least likely to be recognised. Docked slightly for not telling him what is in it.",
+      "bestMove": "Split the haul into two bags so nobody is the only target."
+    },
+    {
+      "context": "A babysitter hears a noise downstairs.",
+      "classification": "good",
+      "moveLabel": "Calls her friend first",
+      "explanation": "Solid. Someone now knows where she is. Not the police, but better than going downstairs with a candle.",
+      "bestMove": "Call the police and stay on the line."
+    },
+    {
+      "context": "A new sheriff arrives in a town that does not want him.",
+      "classification": "book",
+      "moveLabel": "Orders milk at the saloon",
+      "explanation": "Straight out of the opening book. Everybody plays it, everybody laughs, and the real game starts in the next scene.",
+      "bestMove": null
+    },
+    {
+      "context": "A hiker finds a map in an abandoned cabin.",
+      "classification": "inaccuracy",
+      "moveLabel": "Reads it aloud to the group",
+      "explanation": "Slightly loose. Sharing is fine, but now the guide with the suspicious smile knows exactly where the gold is.",
+      "bestMove": "Pocket the map and share it once they are back in town."
+    },
+    {
+      "context": "A man realises his phone is being tracked.",
+      "classification": "mistake",
+      "moveLabel": "Throws it out the car window",
+      "explanation": "The tracker now says he stopped at that exact spot. He has handed them a starting point and lost his only way to call for help.",
+      "bestMove": "Mail it to the other side of the country."
+    },
+    {
+      "context": "The villain monologues with his back to an open window.",
+      "classification": "miss",
+      "moveLabel": "Stays tied to the chair",
+      "explanation": "The ropes were loose for a full minute. The window was right there. Instead the hero chose to listen to the whole speech.",
+      "bestMove": "Slip the ropes while he talks and go through the window."
+    },
+    {
+      "context": "A suspect is asked where she was on the night of the murder.",
+      "classification": "blunder",
+      "moveLabel": "Mentions the knife",
+      "explanation": "Nobody said there was a knife. Game over in one sentence.",
+      "bestMove": "Say she was home and stop talking."
+    }
+  ]
+}

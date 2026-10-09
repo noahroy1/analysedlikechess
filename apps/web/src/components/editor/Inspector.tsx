@@ -5,6 +5,7 @@ import { deleteMoment, retime, updateMoment } from '../../editor/doc.ts';
 import { useEditor, useEditorStore, usePlayback } from '../../editor/context.tsx';
 import { formatTime } from '../../lib/format.ts';
 import { ClassificationPicker } from './ClassificationPicker.tsx';
+import { RegeneratePanel } from './RegeneratePanel.tsx';
 
 const ANCHOR_LABELS: Record<Moment['card']['anchor'], string> = {
   'top-left': 'Top left',
@@ -44,6 +45,8 @@ export function Inspector() {
 
   return (
     <div className="space-y-4 text-sm" data-testid="inspector">
+      <RegeneratePanel key={moment.id} momentId={moment.id} />
+
       <Field label="Rating">
         <ClassificationPicker theme={theme} value={moment.classification} onPick={(classification) => set({ classification })} />
       </Field>

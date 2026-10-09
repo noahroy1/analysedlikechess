@@ -1,7 +1,13 @@
 import {
+  AnalysisEventSchema,
   ApiErrorSchema,
   HistoryEntrySchema,
+  RegenerateResultSchema,
   SaveResultSchema,
+  type AnalysisEvent,
+  type AnalyzeRequest,
+  type Moment,
+  type RegenerateResult,
   type HistoryEntry,
   type ProjectEdit,
   IngestEventSchema,
@@ -66,6 +72,8 @@ export const fileUrl = (id: string, file: string, version?: number) =>
 export interface UploadContext {
   movieTitle?: string;
   sceneNote?: string;
+  /** Comma-separated names; they guide speaker naming and transcription. */
+  characters?: string;
 }
 
 /** Streams the file to the server as the raw request body, reporting 0-1 progress. */
@@ -73,6 +81,7 @@ export function uploadClip(file: File, context: UploadContext, onProgress: (p: n
   const params = new URLSearchParams({ name: file.name });
   if (context.movieTitle) params.set('movieTitle', context.movieTitle);
   if (context.sceneNote) params.set('sceneNote', context.sceneNote);
+  if (context.characters) params.set('characters', context.characters);
 
   // XHR rather than fetch: fetch cannot report upload progress.
   return new Promise((resolve, reject) => {
@@ -93,12 +102,50 @@ export function uploadClip(file: File, context: UploadContext, onProgress: (p: n
   });
 }
 
-/** Subscribes to live ingest progress for every project. Returns an unsubscribe function. */
-export function subscribeIngest(onEvent: (event: IngestEvent) => void): () => void {
+export interface ProjectEventHandlers {
+  ingest?: (event: IngestEvent) => void;
+  analysis?: (event: AnalysisEvent) => void;
+}
+
+/** Subscribes to live ingest and analysis progress for every project. Returns an unsubscribe function. */
+export function subscribeProjectEvents(handlers: ProjectEventHandlers): () => void {
   const source = new EventSource('/api/events');
   source.addEventListener('ingest', (e) => {
     const parsed = IngestEventSchema.safeParse(JSON.parse((e as MessageEvent<string>).data));
-    if (parsed.success) onEvent(parsed.data);
+    if (parsed.success) handlers.ingest?.(parsed.data);
+  });
+  source.addEventListener('analysis', (e) => {
+    const parsed = AnalysisEventSchema.safeParse(JSON.parse((e as MessageEvent<string>).data));
+    if (parsed.success) handlers.analysis?.(parsed.data);
   });
   return () => source.close();
 }
+
+export interface AnalysisConfigInfo {
+  missingKeys: string[];
+  models: Record<string, string>;
+  autoAnalyze: boolean;
+  replay: boolean;
+}
+
+export const getAnalysisConfig = async () => (await request('/analysis/config')) as AnalysisConfigInfo;
+
+export const startAnalysis = (id: string, body: AnalyzeRequest = {}) =>
+  request(`/projects/${id}/analyze`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+
+/** Pass B for one moment; returns a proposal and saves nothing. */
+export const regenerateMoment = async (id: string, moment: Moment, instruction?: string): Promise<RegenerateResult> =>
+  RegenerateResultSchema.parse(
+    await request(`/projects/${id}/regenerate`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ moment, ...(instruction ? { instruction } : {}) }),
+    }),
+  );
+
+export const getUsage = async (id: string) =>
+  (await request(`/projects/${id}/usage`)) as { regenerate: { count: number; costUsd: number } };

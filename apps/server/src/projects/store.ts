@@ -94,13 +94,17 @@ export class ProjectStore {
     return this.locked(project.id, () => this.write(ProjectSchema.parse(project)));
   }
 
-  /** Read, change, validate and write back with `version` + 1. */
-  update(id: string, change: (project: Project) => Project | void): Promise<Project> {
+  /**
+   * Read, change, validate and write back with `version` + 1. With `snapshot`,
+   * the current version goes into history first (e.g. before an AI run replaces drafts).
+   */
+  update(id: string, change: (project: Project) => Project | void, options: { snapshot?: boolean } = {}): Promise<Project> {
     return this.locked(id, async () => {
       const current = await this.read(id);
       const draft = structuredClone(current);
-      const next = change(draft) ?? draft;
-      return this.write(ProjectSchema.parse({ ...next, version: current.version + 1 }));
+      const next = ProjectSchema.parse({ ...(change(draft) ?? draft), version: current.version + 1 });
+      if (options.snapshot) await this.snapshot(current);
+      return this.write(next);
     });
   }
 

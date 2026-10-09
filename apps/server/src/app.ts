@@ -9,14 +9,17 @@ import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
 import { ZodError } from 'zod';
 import {
+  AnalyzeRequestSchema,
   ProjectEditSchema,
+  RegenerateRequestSchema,
   SERVABLE_FILE,
   UPLOAD_EXTENSIONS,
   shotThumbnailFile,
-  type IngestEvent,
   type Project,
   type ProjectSummary,
 } from '@als/schema';
+import { ProviderError } from './analysis/providers/index.ts';
+import { AnalysisBusyError, type AnalysisService } from './analysis/service.ts';
 import { pendingIngest } from './ingest/ingest.ts';
 import type { IngestQueue } from './ingest/queue.ts';
 import { NotAVideoError, probe } from './media/probe.ts';
@@ -25,6 +28,7 @@ import { ProjectNotFoundError, VersionConflictError, type ProjectStore } from '.
 export interface AppDeps {
   store: ProjectStore;
   queue: IngestQueue;
+  analysis: AnalysisService;
 }
 
 const SSE_HEARTBEAT_MS = 15_000;
@@ -44,14 +48,20 @@ export function summarize(project: Project): ProjectSummary {
     createdAt: project.createdAt,
     source: project.source,
     ingest: project.ingest,
+    analysis: project.analysis,
     shotCount: shots.length,
     momentCount: project.moments.length,
     ...(thumbsReady && posterIndex >= 0 ? { poster: shotThumbnailFile(posterIndex) } : {}),
   };
 }
 
-export function createApp({ store, queue }: AppDeps) {
+export function createApp({ store, queue, analysis }: AppDeps) {
   const app = new Hono().basePath('/api');
+
+  // A clip that finishes ingest goes straight on to analysis (when keys are set).
+  queue.on('update', ({ projectId, state }) => {
+    if (state.status === 'done') void analysis.autoStart(projectId);
+  });
 
   app.onError((error, c) => {
     if (error instanceof ProjectNotFoundError) return c.json({ error: 'project not found' }, 404);
@@ -59,6 +69,8 @@ export function createApp({ store, queue }: AppDeps) {
       return c.json({ error: 'the project changed since it was loaded', current: error.current }, 409);
     }
     if (error instanceof ZodError) return c.json({ error: error.message }, 400);
+    if (error instanceof AnalysisBusyError) return c.json({ error: error.message }, 409);
+    if (error instanceof ProviderError) return c.json({ error: error.message }, 502);
     console.error(error);
     return c.json({ error: error.message }, 500);
   });
@@ -90,6 +102,8 @@ export function createApp({ store, queue }: AppDeps) {
       const probed = await probe(join(store.dir(id), file));
       const movieTitle = c.req.query('movieTitle')?.trim();
       const sceneNote = c.req.query('sceneNote')?.trim();
+      // Characters typed at upload: they guide speaker naming and transcription spelling.
+      const names = [...new Set((c.req.query('characters') ?? '').split(',').map((n) => n.trim()).filter(Boolean))];
       const project = await store.create({
         id,
         version: 1,
@@ -98,12 +112,12 @@ export function createApp({ store, queue }: AppDeps) {
         context: {
           ...(movieTitle ? { movieTitle } : {}),
           ...(sceneNote ? { sceneNote } : {}),
-          characters: [],
+          characters: names.map((name, i) => ({ id: `c-${i + 1}`, name, speakerLabels: [] })),
         },
         moments: [],
         themeId: 'default',
         ingest: pendingIngest(),
-        analysis: { status: 'idle', stages: [], models: {} },
+        analysis: { status: 'idle', stages: [], models: {}, secondsPerMove: 20 },
       });
       queue.enqueue(id);
       return c.json(project, 201);
@@ -154,9 +168,38 @@ export function createApp({ store, queue }: AppDeps) {
     return c.json({ ok: true }, 202);
   });
 
+  /** What analysis can do here: which keys are missing and which models run. */
+  app.get('/analysis/config', (c) =>
+    c.json({
+      missingKeys: analysis.missingKeys(),
+      models: analysis.config.models,
+      autoAnalyze: analysis.config.autoAnalyze,
+      replay: Boolean(analysis.config.replayDir),
+    }),
+  );
+
+  /** Start analysis, or re-run it (`rerun: 'analyst'` keeps the transcript and scene notes). */
+  app.post('/projects/:id/analyze', async (c) => {
+    const missing = analysis.missingKeys();
+    if (missing.length) return c.json({ error: `Add ${missing.join(', ')} to apps/server/.env` }, 400);
+    const request = AnalyzeRequestSchema.parse(await c.req.json().catch(() => ({})));
+    await analysis.start(c.req.param('id'), request);
+    return c.json({ ok: true }, 202);
+  });
+
+  /** Pass B for one moment. Returns a proposal; the editor decides whether to keep it. */
+  app.post('/projects/:id/regenerate', async (c) => {
+    const { moment, instruction } = RegenerateRequestSchema.parse(await c.req.json());
+    return c.json(await analysis.regenerate(c.req.param('id'), moment, instruction));
+  });
+
+  /** Spend on Regenerate, logged beside the project so it never forces an editor reload. */
+  app.get('/projects/:id/usage', async (c) => c.json({ regenerate: await analysis.regenUsage(c.req.param('id')) }));
+
   app.delete('/projects/:id', async (c) => {
     const id = c.req.param('id');
     if (queue.has(id)) return c.json({ error: 'wait for ingest to finish before deleting' }, 409);
+    if (analysis.queue.has(id)) return c.json({ error: 'wait for analysis to finish before deleting' }, 409);
     await store.read(id);
     await store.remove(id);
     return c.body(null, 204);
@@ -176,21 +219,29 @@ export function createApp({ store, queue }: AppDeps) {
     })(c, next);
   });
 
-  /** Live ingest progress for every project. */
+  /** Live ingest and analysis progress for every project. */
   app.get('/events', (c) =>
     streamSSE(c, async (stream) => {
-      const send = (event: IngestEvent) =>
-        stream.writeSSE({ event: 'ingest', data: JSON.stringify(event) }).catch(() => undefined);
-      for (const event of queue.snapshot()) await send(event);
-      queue.on('update', send);
-      stream.onAbort(() => {
-        queue.off('update', send);
-      });
+      const write = (event: string, data: unknown) =>
+        stream.writeSSE({ event, data: JSON.stringify(data) }).catch(() => undefined);
+      const sendIngest = ({ projectId, state }: { projectId: string; state: Project['ingest'] }) =>
+        write('ingest', { projectId, ingest: state });
+      const sendAnalysis = ({ projectId, state }: { projectId: string; state: Project['analysis'] }) =>
+        write('analysis', { projectId, analysis: state });
+      for (const update of queue.snapshot()) await sendIngest(update);
+      for (const update of analysis.queue.snapshot()) await sendAnalysis(update);
+      queue.on('update', sendIngest);
+      analysis.queue.on('update', sendAnalysis);
+      const detach = () => {
+        queue.off('update', sendIngest);
+        analysis.queue.off('update', sendAnalysis);
+      };
+      stream.onAbort(detach);
       while (!stream.aborted) {
         await stream.sleep(SSE_HEARTBEAT_MS);
         if (!stream.aborted) await stream.writeSSE({ event: 'ping', data: '' }).catch(() => undefined);
       }
-      queue.off('update', send);
+      detach();
     }),
   );
 

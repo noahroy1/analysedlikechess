@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import { CharacterSchema, IngestSchema, MomentSchema, SourceSchema } from './project.ts';
+import { MoveDraftSchema } from './analyst.ts';
+import { AnalysisSchema, CharacterSchema, IngestSchema, MomentSchema, SourceSchema, UsageSchema } from './project.ts';
 
 /** Containers the upload accepts. The proxy makes any of them browser-safe. */
 export const UPLOAD_EXTENSIONS = ['mp4', 'mov', 'mkv'] as const;
@@ -18,6 +19,7 @@ export const ProjectSummarySchema = z.object({
   createdAt: z.iso.datetime(),
   source: SourceSchema,
   ingest: IngestSchema,
+  analysis: AnalysisSchema,
   shotCount: z.int().nonnegative(),
   momentCount: z.int().nonnegative(),
   /** Folder-relative thumbnail for list views, once shots exist. */
@@ -31,6 +33,35 @@ export const IngestEventSchema = z.object({
   ingest: IngestSchema,
 });
 export type IngestEvent = z.infer<typeof IngestEventSchema>;
+
+/** Server-sent event: live state of a project's analysis job. */
+export const AnalysisEventSchema = z.object({
+  projectId: z.string(),
+  analysis: AnalysisSchema,
+});
+export type AnalysisEvent = z.infer<typeof AnalysisEventSchema>;
+
+/** Start analysis. `rerun: 'analyst'` re-drafts with the cached transcript and scene notes. */
+export const AnalyzeRequestSchema = z.object({
+  rerun: z.enum(['analyst', 'all']).optional(),
+  secondsPerMove: z.number().positive().optional(),
+});
+export type AnalyzeRequest = z.infer<typeof AnalyzeRequestSchema>;
+
+/** Regenerate one moment's text (Pass B alone). The moment may not be saved yet. */
+export const RegenerateRequestSchema = z.object({
+  moment: MomentSchema,
+  instruction: z.string().max(500).optional(),
+});
+export type RegenerateRequest = z.infer<typeof RegenerateRequestSchema>;
+
+export const RegenerateResultSchema = z.object({
+  draft: MoveDraftSchema,
+  model: z.string(),
+  usage: UsageSchema,
+  costUsd: z.number().nonnegative(),
+});
+export type RegenerateResult = z.infer<typeof RegenerateResultSchema>;
 
 export const ApiErrorSchema = z.object({ error: z.string() });
 export type ApiError = z.infer<typeof ApiErrorSchema>;

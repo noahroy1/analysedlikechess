@@ -5,7 +5,7 @@ import { UploadPanel } from '../components/UploadPanel.tsx';
 import { fileUrl, listProjects } from '../lib/api.ts';
 import { formatDate, formatFps, formatTime } from '../lib/format.ts';
 import { projectHref } from '../lib/router.ts';
-import { useIngestEvents } from '../lib/useIngestEvents.ts';
+import { useProjectEvents } from '../lib/useProjectEvents.ts';
 
 export function ProjectsPage() {
   const [projects, setProjects] = useState<ProjectSummary[] | null>(null);
@@ -20,10 +20,16 @@ export function ProjectsPage() {
     void load();
   }, []);
 
-  useIngestEvents((event) => {
-    // Finished jobs change the poster and shot count, so refetch; otherwise patch progress in place.
-    if (event.ingest.status === 'done' || event.ingest.status === 'error') void load();
-    else setProjects((list) => list?.map((p) => (p.id === event.projectId ? { ...p, ingest: event.ingest } : p)) ?? null);
+  useProjectEvents({
+    ingest: (event) => {
+      // Finished jobs change the poster and shot count, so refetch; otherwise patch progress in place.
+      if (event.ingest.status === 'done' || event.ingest.status === 'error') void load();
+      else setProjects((list) => list?.map((p) => (p.id === event.projectId ? { ...p, ingest: event.ingest } : p)) ?? null);
+    },
+    analysis: (event) => {
+      if (event.analysis.status === 'done' || event.analysis.status === 'error') void load();
+      else setProjects((list) => list?.map((p) => (p.id === event.projectId ? { ...p, analysis: event.analysis } : p)) ?? null);
+    },
   });
 
   return (
@@ -54,11 +60,12 @@ export function ProjectsPage() {
                 <div className="p-3">
                   <div className="flex items-start justify-between gap-2">
                     <h3 className="truncate text-sm font-medium text-neutral-100">{p.name}</h3>
-                    <StatusBadge ingest={p.ingest} />
+                    <StatusBadge ingest={p.ingest} analysis={p.analysis} />
                   </div>
                   <p className="mt-1 text-xs text-neutral-500 tabular-nums">
                     {formatTime(p.source.durationSec, 0)} · {p.source.height}p{formatFps(p.source.fps)}
                     {p.shotCount > 0 && ` · ${p.shotCount} shots`}
+                    {p.momentCount > 0 && ` · ${p.momentCount} moves`}
                   </p>
                   <p className="mt-0.5 text-xs text-neutral-600">{formatDate(p.createdAt)}</p>
                 </div>

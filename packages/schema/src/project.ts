@@ -43,9 +43,14 @@ export const UtteranceSchema = z
   });
 export type Utterance = z.infer<typeof UtteranceSchema>;
 
+/** A non-speech sound the transcriber tagged, e.g. "(gunshot)" or "(laughter)". */
+export const AudioEventSchema = z.object({ start: Seconds, end: Seconds, text: z.string() });
+export type AudioEvent = z.infer<typeof AudioEventSchema>;
+
 export const TranscriptSchema = z.object({
   words: z.array(WordSchema),
   utterances: z.array(UtteranceSchema),
+  events: z.array(AudioEventSchema).optional(),
 });
 export type Transcript = z.infer<typeof TranscriptSchema>;
 
@@ -123,6 +128,16 @@ export type Source = z.infer<typeof SourceSchema>;
 
 export const STAGE_STATUSES = ['pending', 'running', 'done', 'cached', 'skipped', 'error'] as const;
 
+export const UsageSchema = z.object({
+  inputTokens: z.int().nonnegative().optional(),
+  outputTokens: z.int().nonnegative().optional(),
+  cacheReadTokens: z.int().nonnegative().optional(),
+  cacheWriteTokens: z.int().nonnegative().optional(),
+  /** Audio billed by duration (speech-to-text). */
+  audioSec: z.number().nonnegative().optional(),
+});
+export type Usage = z.infer<typeof UsageSchema>;
+
 /** One step of a staged job. `cached` means its inputs were unchanged, so it did no work. */
 export const StageSchema = z.object({
   name: z.string(),
@@ -131,6 +146,11 @@ export const StageSchema = z.object({
   progress: Unit.optional(),
   error: z.string().optional(),
   durationMs: z.number().nonnegative().optional(),
+  /** Provider and model that did the work, e.g. "anthropic/claude-opus-5-5". */
+  model: z.string().optional(),
+  usage: UsageSchema.optional(),
+  /** Estimated from the provider's published prices. */
+  costUsd: z.number().nonnegative().optional(),
 });
 export type Stage = z.infer<typeof StageSchema>;
 
@@ -142,10 +162,15 @@ export const IngestSchema = z.object({
 export type Ingest = z.infer<typeof IngestSchema>;
 
 export const AnalysisSchema = z.object({
-  status: z.enum(['idle', 'running', 'done', 'error']),
+  status: z.enum(['idle', 'pending', 'running', 'done', 'error']),
   stages: z.array(StageSchema),
   /** Which model produced what. */
   models: z.record(z.string(), z.string()),
+  /** Target density for Pass B: about one move per this many seconds. */
+  secondsPerMove: z.number().positive().default(20),
+  /** Sum of every stage's cost in the last run (cached stages cost nothing). */
+  costUsd: z.number().nonnegative().optional(),
+  error: z.string().optional(),
 });
 export type Analysis = z.infer<typeof AnalysisSchema>;
 

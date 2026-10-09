@@ -3,6 +3,7 @@ import { sourceFrameToOut, timeMapFrame } from '@als/composition';
 import { useCallback, useState } from 'react';
 import { EditError, addMoment } from '../../editor/doc.ts';
 import { useEditor, useEditorStore, usePlayback } from '../../editor/context.tsx';
+import { draftNewMove } from '../../editor/regenerate.ts';
 import { formatTime } from '../../lib/format.ts';
 import { speakerColor } from './speakers.ts';
 
@@ -48,8 +49,9 @@ export function TranscriptDrawer() {
         id = added.id;
         return added.doc;
       });
-      // TODO(phase-4): run Pass B on the new moment to draft its text.
       store.getState().select(id);
+      // Pass B drafts its text; the card fills in when it arrives.
+      void draftNewMove(store, id);
       window.getSelection()?.removeAllRanges();
       setSelection(null);
       requestAnimationFrame(() => {

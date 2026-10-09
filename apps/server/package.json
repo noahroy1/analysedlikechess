@@ -10,6 +10,9 @@
   },
   "dependencies": {
     "@als/schema": "workspace:*",
+    "@als/theme": "workspace:*",
+    "@anthropic-ai/sdk": "0.133.0",
+    "@google/genai": "2.28.0",
     "@hono/node-server": "2.1.4",
     "hono": "4.13.13",
     "zod": "4.6.5"

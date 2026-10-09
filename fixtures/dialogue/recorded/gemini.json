@@ -1,0 +1,69 @@
+{
+ "raw": {
+  "notes": [
+   {
+    "startSec": 0,
+    "endSec": 4.5,
+    "onScreen": [
+     "Red",
+     "Blue"
+    ],
+    "text": "Red and Blue stand in a dark hallway holding flashlights. Red points toward two separate corridors."
+   },
+   {
+    "startSec": 4.5,
+    "endSec": 9,
+    "onScreen": [
+     "Blue"
+    ],
+    "text": "Blue folds her arms and gives Red a flat, unimpressed look."
+   },
+   {
+    "startSec": 9,
+    "endSec": 13.5,
+    "onScreen": [
+     "Red"
+    ],
+    "text": "Red shrugs and heads for the basement stairs, waving Blue toward the kitchen."
+   },
+   {
+    "startSec": 13.5,
+    "endSec": 18,
+    "onScreen": [
+     "Blue"
+    ],
+    "text": "Blue crosses the kitchen and turns the deadbolt on the back door, checking the handle twice."
+   },
+   {
+    "startSec": 18,
+    "endSec": 22.5,
+    "onScreen": [
+     "Red"
+    ],
+    "text": "Red freezes on the stairs and looks up at the ceiling as dust falls."
+   },
+   {
+    "startSec": 22.5,
+    "endSec": 27,
+    "onScreen": [
+     "Blue",
+     "Red"
+    ],
+    "text": "Blue flips every light switch on and edges back toward the front door, motioning Red to follow."
+   },
+   {
+    "startSec": 27,
+    "endSec": 30.78,
+    "onScreen": [
+     "Red",
+     "Blue"
+    ],
+    "text": "Red turns away from Blue and climbs toward the upstairs landing; Blue reaches after him."
+   }
+  ]
+ },
+ "usageMetadata": {
+  "promptTokenCount": 9354,
+  "candidatesTokenCount": 412
+ }
+}

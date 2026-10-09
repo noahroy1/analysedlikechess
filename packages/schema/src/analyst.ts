@@ -1,0 +1,81 @@
+import { z } from 'zod';
+import { ClassificationSchema } from './classification.ts';
+
+// Structured outputs for the analysis pipeline. They are built per clip so the
+// cast, the candidate ids and the transcript's utterance ids are enums: the
+// model cannot cite evidence that does not exist. Text caps are given in the
+// prompt rather than as maxLength, because structured outputs drop length
+// constraints; the editor flags anything over (momentWarnings).
+
+/** Fallback when a list would be empty: enums need at least one value. */
+const enumOf = (values: readonly string[], fallback: string) =>
+  z.enum((values.length ? [...new Set(values)] : [fallback]) as [string, ...string[]]);
+
+/** Speaker naming: one name per diarization label. */
+export const speakerNamingSchema = (labels: readonly string[]) =>
+  z.object({
+    speakers: z.array(
+      z.object({
+        label: enumOf(labels, 'A'),
+        name: z.string().describe('Character name as the film uses it, or a short description such as "Security guard"'),
+        confidence: z.number().describe('0-1'),
+      }),
+    ),
+  });
+
+/** Pass A: every decision point, over-generated on purpose. */
+export const decisionPointsSchema = (cast: readonly string[], utteranceIds: readonly string[]) =>
+  z.object({
+    candidates: z.array(
+      z.object({
+        id: z.string().describe('Short unique id, e.g. "c1"'),
+        actor: enumOf(cast, 'Unknown'),
+        kind: z.enum(['spoken', 'visual']).describe('spoken: the choice is made in dialogue; visual: in action on screen'),
+        action: z.string().describe('What the character did, in a sentence'),
+        alternatives: z.array(z.string()).describe('Other options that were open to them'),
+        evidenceUtteranceIds: z.array(enumOf(utteranceIds, 'none')).describe('Utterances that show the choice; empty for purely visual moves'),
+        visualTimeSec: z.number().nullable().describe('For visual moves, when the action happens (seconds); null for spoken moves'),
+      }),
+    ),
+  });
+export type DecisionPoints = z.infer<ReturnType<typeof decisionPointsSchema>>;
+export type Candidate = DecisionPoints['candidates'][number];
+
+const moveFields = {
+  classification: ClassificationSchema,
+  moveLabel: z.string().describe('What they did, short (40 characters at most)'),
+  explanation: z.string().describe('Why it earned this rating (220 characters at most)'),
+  bestMove: z
+    .string()
+    .nullable()
+    .describe('What they should have done (160 characters at most); null for brilliant, great, best and book'),
+  confidence: z.number().describe('0-1: how sure you are this belongs in the episode as rated'),
+};
+
+/** Pass B: the final moves, rated and written. */
+export const annotationSchema = (candidateIds: readonly string[]) =>
+  z.object({
+    moves: z.array(z.object({ candidateId: enumOf(candidateIds, 'none'), ...moveFields })),
+  });
+export type Annotation = z.infer<ReturnType<typeof annotationSchema>>;
+
+/** Pass B for one moment (Regenerate, and "Make this a move"). */
+export const MoveDraftSchema = z.object(moveFields);
+export type MoveDraft = z.infer<typeof MoveDraftSchema>;
+
+/** The creator's breakdowns, used as few-shot examples, plus a short voice guide. */
+export const StyleCorpusSchema = z.object({
+  /** How the creator writes: humour, sentence length, recurring phrasings. */
+  voice: z.string(),
+  examples: z.array(
+    z.object({
+      context: z.string().describe('One line of scene context'),
+      classification: ClassificationSchema,
+      moveLabel: z.string(),
+      explanation: z.string(),
+      bestMove: z.string().nullable().optional(),
+    }),
+  ),
+});
+export type StyleCorpus = z.infer<typeof StyleCorpusSchema>;
+

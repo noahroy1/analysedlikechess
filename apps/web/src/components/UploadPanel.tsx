@@ -9,6 +9,7 @@ export function UploadPanel() {
   const input = useRef<HTMLInputElement>(null);
   const [movieTitle, setMovieTitle] = useState('');
   const [sceneNote, setSceneNote] = useState('');
+  const [characters, setCharacters] = useState('');
   const [dragging, setDragging] = useState(false);
   const [progress, setProgress] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -18,7 +19,11 @@ export function UploadPanel() {
     setError(null);
     setProgress(0);
     try {
-      const project = await uploadClip(file, { movieTitle: movieTitle.trim(), sceneNote: sceneNote.trim() }, setProgress);
+      const project = await uploadClip(
+        file,
+        { movieTitle: movieTitle.trim(), sceneNote: sceneNote.trim(), characters: characters.trim() },
+        setProgress,
+      );
       window.location.hash = projectHref(project.id);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -51,6 +56,15 @@ export function UploadPanel() {
             value={sceneNote}
             onChange={(e) => setSceneNote(e.target.value)}
             placeholder="Doakes catches Dexter, season 2"
+            className="mt-1 w-full rounded-md border border-neutral-700 bg-neutral-950 px-3 py-2 text-sm text-neutral-100 placeholder:text-neutral-600 focus:border-neutral-500 focus:outline-none"
+          />
+        </label>
+        <label className="block text-xs text-neutral-400 sm:col-span-2">
+          Characters <span className="text-neutral-600">(optional, comma-separated: helps name the speakers)</span>
+          <input
+            value={characters}
+            onChange={(e) => setCharacters(e.target.value)}
+            placeholder="Dexter, Doakes"
             className="mt-1 w-full rounded-md border border-neutral-700 bg-neutral-950 px-3 py-2 text-sm text-neutral-100 placeholder:text-neutral-600 focus:border-neutral-500 focus:outline-none"
           />
         </label>

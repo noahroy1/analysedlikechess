@@ -1,4 +1,4 @@
-import { ProjectSchema, type Moment, type Project, type Theme } from '@als/schema';
+import { ProjectSchema, type Moment, type MoveDraft, type Project, type Theme } from '@als/schema';
 import { getTheme } from '@als/theme';
 import { createStore, type StoreApi } from 'zustand/vanilla';
 import { normalize, type Doc } from './doc.ts';
@@ -29,8 +29,19 @@ export interface EditorState {
   saveStatus: SaveStatus;
   saveError: string | null;
   toast: Toast | null;
+  /** A Regenerate result waiting for the creator to accept or discard. */
+  proposal: Proposal | null;
   /** Asks the edit layer to put the cursor in a card field (e.g. after adding a move). */
   focusRequest: { id: string; field: 'moveLabel' | 'explanation' | 'bestMove'; n: number } | null;
+}
+
+export interface Proposal {
+  momentId: string;
+  status: 'loading' | 'ready' | 'error';
+  instruction?: string;
+  draft?: MoveDraft;
+  costUsd?: number;
+  error?: string;
 }
 
 export interface EditOptions {
@@ -60,6 +71,7 @@ export interface EditorActions {
   select: (id: string | null) => void;
   notify: (text: string, tone?: Toast['tone']) => void;
   requestFocus: (id: string, field: 'moveLabel' | 'explanation' | 'bestMove') => void;
+  setProposal: (proposal: Proposal | null) => void;
   dismissToast: () => void;
   /** Saves now if anything is pending. */
   flush: () => Promise<void>;
@@ -113,6 +125,7 @@ export function createEditorStore(initial: Project, deps: EditorDeps): EditorSto
       saveError: null,
       toast: null,
       focusRequest: null,
+      proposal: null,
 
       edit: (recipe, options) => commit(normalize(recipe(get().doc), get().theme), options?.coalesce),
 
@@ -159,6 +172,7 @@ export function createEditorStore(initial: Project, deps: EditorDeps): EditorSto
       select: (id) => set({ selectedId: id }),
       notify: (text, tone = 'info') => set({ toast: { id: ++toastId, text, tone } }),
       dismissToast: () => set({ toast: null }),
+      setProposal: (proposal) => set({ proposal }),
       requestFocus: (id, field) => set((s) => ({ focusRequest: { id, field, n: (s.focusRequest?.n ?? 0) + 1 } })),
 
       flush: async () => {

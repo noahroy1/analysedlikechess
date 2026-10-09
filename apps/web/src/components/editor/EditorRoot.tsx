@@ -1,4 +1,4 @@
-import type { HistoryEntry, Ingest, Project } from '@als/schema';
+import type { Analysis, HistoryEntry, Ingest, Project } from '@als/schema';
 import { useEffect, useRef, useState } from 'react';
 import { EditorProvider, useEditor, useEditorStore } from '../../editor/context.tsx';
 import { createEditorStore, type EditorStore, type SaveStatus } from '../../editor/store.ts';
@@ -6,6 +6,7 @@ import { getProject, listHistory, restoreVersion, saveProject } from '../../lib/
 import { formatFps, formatTime } from '../../lib/format.ts';
 import { projectsHref } from '../../lib/router.ts';
 import { StageList, StatusBadge } from '../StageList.tsx';
+import { AnalysisPanel } from './AnalysisPanel.tsx';
 import { CharactersPanel } from './CharactersPanel.tsx';
 import { Inspector } from './Inspector.tsx';
 import { MomentsPanel } from './MomentsPanel.tsx';
@@ -15,12 +16,15 @@ export interface EditorRootProps {
   project: Project;
   /** Live ingest state, which may be newer than the project's. */
   ingest: Ingest;
+  /** Live analysis state. */
+  analysis: Analysis;
+  onAnalysisChange: (analysis: Analysis) => void;
   onRerunIngest: () => void;
   onDelete: () => void;
 }
 
 /** The editor for one project: owns the store for as long as the page is open. */
-export function EditorRoot({ project, ingest, onRerunIngest, onDelete }: EditorRootProps) {
+export function EditorRoot({ project, ingest, analysis, onAnalysisChange, onRerunIngest, onDelete }: EditorRootProps) {
   const [store] = useState<EditorStore>(() =>
     createEditorStore(project, {
       save: (edit) => saveProject(project.id, edit),
@@ -56,12 +60,39 @@ export function EditorRoot({ project, ingest, onRerunIngest, onDelete }: EditorR
     lastIngest.current = ingest.status;
   }, [ingest.status, store]);
 
+  // Finished analysis wrote drafts into the project: save anything pending, then load them.
+  const lastAnalysis = useRef(analysis.status);
+  useEffect(() => {
+    const was = lastAnalysis.current;
+    lastAnalysis.current = analysis.status;
+    if ((was === 'running' || was === 'pending') && (analysis.status === 'done' || analysis.status === 'error')) {
+      void store
+        .getState()
+        .flush()
+        .then(() => store.getState().reload())
+        .then(() => {
+          if (analysis.status === 'done') {
+            const count = store.getState().doc.moments.filter((m) => m.origin === 'ai' && m.status === 'draft').length;
+            store.getState().notify(`Drafts ready: ${count} move${count === 1 ? '' : 's'} to review.`);
+          }
+        });
+    }
+  }, [analysis.status, store]);
+
   return (
     <EditorProvider store={store}>
       <div className="px-4 py-4 sm:px-6">
-        <Header ingest={ingest} onRerunIngest={onRerunIngest} onDelete={onDelete} />
+        <Header ingest={ingest} analysis={analysis} onRerunIngest={onRerunIngest} onDelete={onDelete} />
+        {(analysis.status === 'pending' || analysis.status === 'running') && (
+          <p className="mt-3 rounded-md border border-sky-900/60 bg-sky-950/30 px-3 py-1.5 text-xs text-sky-200" data-testid="analysis-banner">
+            Drafting moves… The drafts load here when they are ready. Edits you make meanwhile may be replaced, except approved moves and moves you add.
+          </p>
+        )}
         <div className="mt-4">
-          <Workspace left={<MomentsPanel />} right={<RightPanel ingest={ingest} />} />
+          <Workspace
+            left={<MomentsPanel />}
+            right={<RightPanel ingest={ingest} analysis={analysis} onAnalysisChange={onAnalysisChange} />}
+          />
         </div>
         <ToastView />
       </div>
@@ -69,7 +100,7 @@ export function EditorRoot({ project, ingest, onRerunIngest, onDelete }: EditorR
   );
 }
 
-function Header({ ingest, onRerunIngest, onDelete }: Omit<EditorRootProps, 'project'>) {
+function Header({ ingest, analysis, onRerunIngest, onDelete }: Omit<EditorRootProps, 'project' | 'onAnalysisChange'>) {
   const store = useEditorStore();
   const project = useEditor((s) => s.project);
   const canUndo = useEditor((s) => s.past.length > 0);
@@ -87,7 +118,7 @@ function Header({ ingest, onRerunIngest, onDelete }: Omit<EditorRootProps, 'proj
           <h1 className="truncate text-lg font-semibold tracking-tight">
             {project.context.movieTitle || source.originalName || project.id}
           </h1>
-          <StatusBadge ingest={ingest} />
+          <StatusBadge ingest={ingest} analysis={analysis} />
         </div>
         <p className="text-xs text-neutral-500 tabular-nums">
           {project.context.sceneNote && <span className="text-neutral-400">{project.context.sceneNote} · </span>}
@@ -205,11 +236,12 @@ function HistoryMenu() {
   );
 }
 
-function RightPanel({ ingest }: { ingest: Ingest }) {
-  const [tab, setTab] = useState<'move' | 'cast' | 'ingest'>('move');
+function RightPanel({ ingest, analysis, onAnalysisChange }: { ingest: Ingest; analysis: Analysis; onAnalysisChange: (a: Analysis) => void }) {
+  const [tab, setTab] = useState<'move' | 'cast' | 'analysis' | 'ingest'>('move');
   const tabs = [
     ['move', 'Move'],
     ['cast', 'Cast'],
+    ['analysis', 'Analysis'],
     ['ingest', 'Ingest'],
   ] as const;
   return (
@@ -222,7 +254,7 @@ function RightPanel({ ingest }: { ingest: Ingest }) {
             role="tab"
             aria-selected={tab === id}
             onClick={() => setTab(id)}
-            className={`-mb-px rounded-t-md border-b-2 px-3 py-1.5 text-xs font-medium ${
+            className={`-mb-px rounded-t-md border-b-2 px-2.5 py-1.5 text-xs font-medium ${
               tab === id ? 'border-sky-400 text-neutral-100' : 'border-transparent text-neutral-400 hover:text-neutral-200'
             }`}
           >
@@ -233,7 +265,8 @@ function RightPanel({ ingest }: { ingest: Ingest }) {
       <div className="min-h-0 flex-1 overflow-y-auto p-3">
         {tab === 'move' && <Inspector />}
         {tab === 'cast' && <CharactersPanel />}
-        {tab === 'ingest' && <StageList ingest={ingest} />}
+        {tab === 'analysis' && <AnalysisPanel analysis={analysis} onStarted={onAnalysisChange} />}
+        {tab === 'ingest' && <StageList job={ingest} />}
       </div>
     </section>
   );

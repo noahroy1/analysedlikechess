@@ -1,0 +1,98 @@
+{
+ "output": {
+  "candidates": [
+   {
+    "id": "c1",
+    "actor": "Red",
+    "kind": "spoken",
+    "action": "Suggests splitting up to search the house faster.",
+    "alternatives": [
+     "Search together",
+     "Leave the house"
+    ],
+    "evidenceUtteranceIds": [
+     "u1"
+    ],
+    "visualTimeSec": null
+   },
+   {
+    "id": "c2",
+    "actor": "Blue",
+    "kind": "spoken",
+    "action": "Calls out splitting up as a horror-movie mistake.",
+    "alternatives": [
+     "Agree to split up",
+     "Leave alone"
+    ],
+    "evidenceUtteranceIds": [
+     "u2"
+    ],
+    "visualTimeSec": null
+   },
+   {
+    "id": "c3",
+    "actor": "Red",
+    "kind": "spoken",
+    "action": "Takes the basement alone anyway.",
+    "alternatives": [
+     "Stay with Blue",
+     "Take the kitchen"
+    ],
+    "evidenceUtteranceIds": [
+     "u3"
+    ],
+    "visualTimeSec": null
+   },
+   {
+    "id": "c4",
+    "actor": "Blue",
+    "kind": "spoken",
+    "action": "Locks the back door before searching.",
+    "alternatives": [
+     "Search the kitchen first",
+     "Leave it open as an exit"
+    ],
+    "evidenceUtteranceIds": [
+     "u4"
+    ],
+    "visualTimeSec": null
+   },
+   {
+    "id": "c5",
+    "actor": "Blue",
+    "kind": "visual",
+    "action": "Turns every light on as she backs toward the exit.",
+    "alternatives": [
+     "Search in the dark",
+     "Run without the lights"
+    ],
+    "evidenceUtteranceIds": [
+     "u6"
+    ],
+    "visualTimeSec": 23.4
+   },
+   {
+    "id": "c6",
+    "actor": "Red",
+    "kind": "spoken",
+    "action": "Goes upstairs toward the noise.",
+    "alternatives": [
+     "Retreat to the car with Blue",
+     "Call for help"
+    ],
+    "evidenceUtteranceIds": [
+     "u5",
+     "u7"
+    ],
+    "visualTimeSec": null
+   }
+  ]
+ },
+ "model": "claude-opus-5-5",
+ "usage": {
+  "inputTokens": 2950,
+  "outputTokens": 1880,
+  "cacheReadTokens": 0,
+  "cacheWriteTokens": 3920
+ }
+}

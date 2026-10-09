@@ -1,0 +1,23 @@
+{
+ "output": {
+  "speakers": [
+   {
+    "label": "A",
+    "name": "Red",
+    "confidence": 0.93
+   },
+   {
+    "label": "B",
+    "name": "Blue",
+    "confidence": 0.91
+   }
+  ]
+ },
+ "model": "claude-haiku-5-5",
+ "usage": {
+  "inputTokens": 1210,
+  "outputTokens": 96,
+  "cacheReadTokens": 0,
+  "cacheWriteTokens": 0
+ }
+}

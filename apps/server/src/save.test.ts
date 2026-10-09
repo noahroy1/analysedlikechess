@@ -3,15 +3,13 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { HistoryEntrySchema, ProjectSchema, type Project } from '@als/schema';
-import { createApp } from './app.ts';
-import { IngestQueue } from './ingest/queue.ts';
-import { HISTORY_LIMIT, ProjectStore } from './projects/store.ts';
+import { HISTORY_LIMIT } from './projects/store.ts';
+import { makeTestApp } from './test-helpers.ts';
 
 const FIXTURE = new URL('../../../fixtures/sample/project.json', import.meta.url);
 
 const root = await mkdtemp(join(tmpdir(), 'als-save-'));
-const store = new ProjectStore(root);
-const app = createApp({ store, queue: new IngestQueue(store) });
+const { store, app } = await makeTestApp(root);
 let project: Project;
 
 afterAll(() => rm(root, { recursive: true, force: true }));

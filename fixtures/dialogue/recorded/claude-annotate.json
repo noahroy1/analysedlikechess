@@ -1,0 +1,37 @@
+{
+ "output": {
+  "moves": [
+   {
+    "candidateId": "c1",
+    "classification": "mistake",
+    "moveLabel": "Suggests splitting up",
+    "explanation": "Opening with the one plan every horror audience is shouting at the screen about. Two flashlights become one each, and nobody watches anybody's back.",
+    "bestMove": "Search together, room by room.",
+    "confidence": 0.84
+   },
+   {
+    "candidateId": "c4",
+    "classification": "great",
+    "moveLabel": "Locks the back door first",
+    "explanation": "Only move that stops the house from getting bigger. Whatever is here now has one way in, and Blue knows where it is.",
+    "bestMove": null,
+    "confidence": 0.77
+   },
+   {
+    "candidateId": "c6",
+    "classification": "blunder",
+    "moveLabel": "Goes upstairs toward the noise",
+    "explanation": "Hears the house move, then climbs straight toward it alone. The car was the whole plan, and Red resigns the game on the stairs.",
+    "bestMove": "Walk back to the car with Blue and call it in.",
+    "confidence": 0.88
+   }
+  ]
+ },
+ "model": "claude-opus-5-5",
+ "usage": {
+  "inputTokens": 3410,
+  "outputTokens": 2210,
+  "cacheReadTokens": 3920,
+  "cacheWriteTokens": 0
+ }
+}

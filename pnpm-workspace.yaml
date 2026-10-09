@@ -1,3 +1,10 @@
 packages:
   - apps/*
   - packages/*
+minimumReleaseAgeExclude:
+  - '@anthropic-ai/sdk@0.133.0'
+
+# Reviewed install scripts: neither is needed (a no-op preinstall and a CLI compatibility check).
+allowBuilds:
+  '@google/genai': false
+  protobufjs: false

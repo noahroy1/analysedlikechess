@@ -1,11 +1,11 @@
-import type { Ingest, Project } from '@als/schema';
+import type { Analysis, Ingest, Project } from '@als/schema';
 import { useCallback, useEffect, useState } from 'react';
 import { EditorRoot } from '../components/editor/EditorRoot.tsx';
 import { StageList, StatusBadge } from '../components/StageList.tsx';
 import { deleteProject, getProject, rerunIngest } from '../lib/api.ts';
 import { formatFps, formatTime } from '../lib/format.ts';
 import { projectsHref } from '../lib/router.ts';
-import { useIngestEvents } from '../lib/useIngestEvents.ts';
+import { useProjectEvents } from '../lib/useProjectEvents.ts';
 
 const isReady = (project: Project) =>
   project.ingest.status === 'done' &&
@@ -15,6 +15,7 @@ const isReady = (project: Project) =>
 export function ProjectPage({ id }: { id: string }) {
   const [project, setProject] = useState<Project | null>(null);
   const [ingest, setIngest] = useState<Ingest | null>(null);
+  const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(
@@ -23,6 +24,7 @@ export function ProjectPage({ id }: { id: string }) {
         .then((p) => {
           setProject(p);
           setIngest(p.ingest);
+          setAnalysis(p.analysis);
         })
         .catch((e: Error) => setError(e.message)),
     [id],
@@ -32,11 +34,16 @@ export function ProjectPage({ id }: { id: string }) {
     void load();
   }, [load]);
 
-  useIngestEvents((event) => {
-    if (event.projectId !== id) return;
-    setIngest(event.ingest);
-    // Before the editor opens, a finished ingest means there is now something to edit.
-    if (project && !isReady(project) && (event.ingest.status === 'done' || event.ingest.status === 'error')) void load();
+  useProjectEvents({
+    ingest: (event) => {
+      if (event.projectId !== id) return;
+      setIngest(event.ingest);
+      // Before the editor opens, a finished ingest means there is now something to edit.
+      if (project && !isReady(project) && (event.ingest.status === 'done' || event.ingest.status === 'error')) void load();
+    },
+    analysis: (event) => {
+      if (event.projectId === id) setAnalysis(event.analysis);
+    },
   });
 
   const rerun = async () => {
@@ -64,10 +71,19 @@ export function ProjectPage({ id }: { id: string }) {
       </div>
     );
   }
-  if (!project || !ingest) return null;
+  if (!project || !ingest || !analysis) return null;
 
   if (isReady(project)) {
-    return <EditorRoot project={project} ingest={ingest} onRerunIngest={() => void rerun()} onDelete={() => void remove()} />;
+    return (
+      <EditorRoot
+        project={project}
+        ingest={ingest}
+        analysis={analysis}
+        onAnalysisChange={setAnalysis}
+        onRerunIngest={() => void rerun()}
+        onDelete={() => void remove()}
+      />
+    );
   }
 
   const { source } = project;
@@ -80,7 +96,7 @@ export function ProjectPage({ id }: { id: string }) {
         <h1 className="truncate text-xl font-semibold tracking-tight">
           {project.context.movieTitle || source.originalName || project.id}
         </h1>
-        <StatusBadge ingest={ingest} />
+        <StatusBadge ingest={ingest} analysis={analysis} />
       </header>
       <p className="mt-1 text-sm text-neutral-400 tabular-nums">
         {formatTime(source.durationSec)} · {source.width}×{source.height} · {formatFps(source.fps)} fps
@@ -94,7 +110,7 @@ export function ProjectPage({ id }: { id: string }) {
         </div>
         <aside className="rounded-xl border border-neutral-800 bg-neutral-900/60 p-4">
           <h2 className="mb-3 text-xs font-medium tracking-wide text-neutral-400 uppercase">Ingest</h2>
-          <StageList ingest={ingest} />
+          <StageList job={ingest} />
           {ingest.status === 'error' && (
             <div className="mt-4 flex gap-2">
               <button type="button" onClick={() => void rerun()} className="rounded-md border border-neutral-700 px-3 py-1.5 text-xs text-neutral-200">

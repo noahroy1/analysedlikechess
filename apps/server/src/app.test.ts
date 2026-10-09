@@ -3,10 +3,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { ProjectSchema, ProjectSummarySchema, type Project } from '@als/schema';
-import { createApp } from './app.ts';
-import { IngestQueue } from './ingest/queue.ts';
+import type { createApp } from './app.ts';
+import type { IngestQueue } from './ingest/queue.ts';
 import { run } from './media/run.ts';
-import { ProjectStore } from './projects/store.ts';
+import type { ProjectStore } from './projects/store.ts';
+import { makeTestApp } from './test-helpers.ts';
 
 // End to end against real ffmpeg (local, no cloud calls) on the 10 s fixture clip,
 // which has hard cuts at 3.5 s and 7 s.
@@ -19,9 +20,7 @@ let app: ReturnType<typeof createApp>;
 
 beforeAll(async () => {
   root = await mkdtemp(join(tmpdir(), 'als-test-'));
-  store = new ProjectStore(root);
-  queue = new IngestQueue(store);
-  app = createApp({ store, queue });
+  ({ store, queue, app } = await makeTestApp(root));
 });
 
 afterAll(async () => {
