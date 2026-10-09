@@ -106,6 +106,7 @@ export const MomentSchema = z.object({
 export type Moment = z.infer<typeof MomentSchema>;
 
 export const SourceSchema = z.object({
+  /** File names inside the project folder. */
   file: z.string().min(1),
   proxy: z.string().min(1),
   fps: z.number().positive(),
@@ -113,18 +114,34 @@ export const SourceSchema = z.object({
   width: z.int().positive(),
   height: z.int().positive(),
   hasAudio: z.boolean(),
+  /** Name of the file as uploaded. */
+  originalName: z.string().optional(),
 });
 export type Source = z.infer<typeof SourceSchema>;
 
+export const STAGE_STATUSES = ['pending', 'running', 'done', 'cached', 'skipped', 'error'] as const;
+
+/** One step of a staged job. `cached` means its inputs were unchanged, so it did no work. */
+export const StageSchema = z.object({
+  name: z.string(),
+  status: z.enum(STAGE_STATUSES),
+  /** 0-1 while running, when the step can measure it. */
+  progress: Unit.optional(),
+  error: z.string().optional(),
+  durationMs: z.number().nonnegative().optional(),
+});
+export type Stage = z.infer<typeof StageSchema>;
+
+export const IngestSchema = z.object({
+  status: z.enum(['pending', 'running', 'done', 'error']),
+  stages: z.array(StageSchema),
+  error: z.string().optional(),
+});
+export type Ingest = z.infer<typeof IngestSchema>;
+
 export const AnalysisSchema = z.object({
   status: z.enum(['idle', 'running', 'done', 'error']),
-  stages: z.array(
-    z.object({
-      name: z.string(),
-      status: z.string(),
-      error: z.string().optional(),
-    }),
-  ),
+  stages: z.array(StageSchema),
   /** Which model produced what. */
   models: z.record(z.string(), z.string()),
 });
@@ -135,6 +152,8 @@ export const ProjectSchema = z
     id: Id,
     /** +1 on every save, used for conflict checks. */
     version: z.int().nonnegative(),
+    /** ISO 8601. */
+    createdAt: z.iso.datetime(),
     source: SourceSchema,
     /** Optional, typed by the creator at upload. */
     context: z.object({
@@ -150,6 +169,7 @@ export const ProjectSchema = z
     /** The annotation track, sorted by sourceTime. */
     moments: z.array(MomentSchema),
     themeId: Id,
+    ingest: IngestSchema,
     analysis: AnalysisSchema,
   })
   .superRefine((project, ctx) => {

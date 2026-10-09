@@ -17,12 +17,15 @@ Single-user local web app: upload a movie scene clip, draft chess-style move ann
 - `packages/composition`: Remotion `<Episode>`, `<MoveCard>`, `timeMap()`. Lint enforces purity.
 - `packages/theme`: classification tokens, badges, theme presets.
 - `fixtures/`: test data, including the sample project and recorded provider responses.
-- `projects/`: runtime project folders, gitignored.
+- `projects/`: runtime project folders, gitignored. `PROJECTS_DIR` overrides the location.
+- `media/`: local demo footage (copyrighted), gitignored. Never commit clips.
 
 ## Conventions
 
 - All times are source-clip seconds; frames are derived, never stored.
 - Hard invariants (moment spacing, ordering, references) live in `ProjectSchema`. Soft rules (text caps, `bestMove` on best/brilliant) are `momentWarnings()`, so the editor warns without blocking saves.
+- Ingest stages are cached by content hash in each project's `ingest.json`. Bump a step's `STEP_VERSION` in `apps/server/src/ingest/ingest.ts` when its command changes.
+- Cut detection uses ffmpeg `scdet` plus peak picking (`apps/server/src/media/cuts.ts`), tuned on dark film footage where real cuts score only 5-10. Check changes against a contact sheet of real footage, not just the synthetic fixture.
 - Dependencies are pinned to exact versions (`save-exact` in `.npmrc`). TypeScript stays below 6.1 until typescript-eslint supports newer versions.
 
 ## Working rules
