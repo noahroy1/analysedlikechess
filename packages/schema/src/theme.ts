@@ -70,7 +70,7 @@ export const ThemeSchema = z.object({
     pushIn: z.number().min(1).max(1.5),
   }),
   timing: z.object({
-    hold: z.object({ floorSec: z.number().positive(), wordsPerSec: z.number().positive() }),
+    hold: z.object({ charsPerSec: z.number().positive(), paddingSec: z.number().nonnegative() }),
     cardInSec: z.number().nonnegative(),
     cardOutSec: z.number().nonnegative(),
     /** Optional sound when a card appears: a URL the Player and the renderer can both load. */

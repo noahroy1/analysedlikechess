@@ -41,7 +41,7 @@ export const defaultTheme: Theme = {
     scale: 1,
     safeMargin: { x: 0.04, top: 0.06, bottom: 0.14 },
   },
-  freeze: { treatment: 'dim', dim: 0.3, pushIn: 1.04 },
+  freeze: { treatment: 'none', dim: 0.3, pushIn: 1.04 },
   timing: {
     hold: DEFAULT_HOLD_TIMING,
     cardInSec: 0.25,

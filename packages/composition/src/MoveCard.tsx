@@ -1,7 +1,26 @@
-import type { Moment, Theme } from '@als/schema';
+import { NO_BEST_MOVE, type Moment, type Theme } from '@als/schema';
 import { Badge } from '@als/theme';
-import type { CSSProperties } from 'react';
+import type { CSSProperties, HTMLAttributes, ReactNode, Ref } from 'react';
 import { cardRect, type FrameSize } from './card.ts';
+
+export type CardField = 'moveLabel' | 'explanation' | 'bestMove';
+
+/**
+ * Editor hooks. The render path never passes these, so they cannot change
+ * exported frames; the editor uses them to draw the same card with editable fields.
+ */
+export interface MoveCardEditing {
+  badge?: (badge: ReactNode) => ReactNode;
+  field?: (name: CardField, value: string) => ReactNode;
+  /** Show empty fields (as editing targets) instead of collapsing them. */
+  showEmptyFields?: boolean;
+  /** Show every explanation line while editing. */
+  unclamped?: boolean;
+  rootProps?: HTMLAttributes<HTMLDivElement>;
+  rootRef?: Ref<HTMLDivElement>;
+  /** Extra content inside the card, e.g. resize handles. */
+  children?: ReactNode;
+}
 
 export interface MoveCardProps {
   moment: Moment;
@@ -12,17 +31,23 @@ export interface MoveCardProps {
   visibility: number;
   /** 0-1 entrance. */
   enter: number;
+  editing?: MoveCardEditing;
 }
 
 /**
  * The move card. Its only inputs are the moment, the theme and animation values.
  * TODO(open-decision): match the creator's exact card look (fonts, layout, wording) in Phase 6.
  */
-export function MoveCard({ moment, actorName, theme, frame, visibility, enter }: MoveCardProps) {
+export function MoveCard({ moment, actorName, theme, frame, visibility, enter, editing }: MoveCardProps) {
   const rect = cardRect(moment.card, frame, theme);
   const u = rect.unit;
   const { card } = theme;
   const style = theme.classifications[moment.classification];
+  const text = (name: CardField, value: string) => editing?.field?.(name, value) ?? value;
+  const showEmpty = editing?.showEmptyFields ?? false;
+  const bestMove = moment.bestMove ?? '';
+  const showBestMove = bestMove !== '' || (showEmpty && !NO_BEST_MOVE.has(moment.classification));
+  const badge = <Badge badge={style.badge} color={style.color} size={card.badgeSize * u} fontFamily={card.fontFamily} />;
   const position: CSSProperties = {
     left: rect.left,
     right: rect.right,
@@ -32,8 +57,11 @@ export function MoveCard({ moment, actorName, theme, frame, visibility, enter }:
 
   return (
     <div
+      {...editing?.rootProps}
+      ref={editing?.rootRef}
       data-moment-id={moment.id}
       style={{
+        ...editing?.rootProps?.style,
         position: 'absolute',
         ...position,
         width: rect.width,
@@ -50,7 +78,7 @@ export function MoveCard({ moment, actorName, theme, frame, visibility, enter }:
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 18 * u }}>
-        <Badge badge={style.badge} color={style.color} size={card.badgeSize * u} fontFamily={card.fontFamily} />
+        {editing?.badge ? editing.badge(badge) : badge}
         <div style={{ minWidth: 0 }}>
           <div
             style={{
@@ -66,12 +94,12 @@ export function MoveCard({ moment, actorName, theme, frame, visibility, enter }:
           </div>
           <div style={{ fontSize: card.titleSize * u, fontWeight: 700, lineHeight: 1.18, marginTop: 4 * u }}>
             {actorName && <span style={{ color: card.mutedColor, fontWeight: 600 }}>{actorName}: </span>}
-            {moment.moveLabel}
+            {text('moveLabel', moment.moveLabel)}
           </div>
         </div>
       </div>
 
-      {moment.explanation && (
+      {(moment.explanation || showEmpty) && (
         <p
           style={{
             margin: `${16 * u}px 0 0`,
@@ -79,15 +107,15 @@ export function MoveCard({ moment, actorName, theme, frame, visibility, enter }:
             lineHeight: 1.36,
             display: '-webkit-box',
             WebkitBoxOrient: 'vertical',
-            WebkitLineClamp: card.lineClamp,
+            WebkitLineClamp: editing?.unclamped ? 'unset' : card.lineClamp,
             overflow: 'hidden',
           }}
         >
-          {moment.explanation}
+          {text('explanation', moment.explanation)}
         </p>
       )}
 
-      {moment.bestMove && (
+      {showBestMove && (
         <div
           style={{
             marginTop: 16 * u,
@@ -109,9 +137,10 @@ export function MoveCard({ moment, actorName, theme, frame, visibility, enter }:
           >
             Best move
           </span>
-          {moment.bestMove}
+          {text('bestMove', bestMove)}
         </div>
       )}
+      {editing?.children}
     </div>
   );
 }

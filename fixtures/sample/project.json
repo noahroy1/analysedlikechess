@@ -196,7 +196,7 @@
     {
       "id": "m1",
       "sourceTime": 2,
-      "holdSec": 3.5,
+      "holdSec": 14.1,
       "actorId": "c-red",
       "classification": "mistake",
       "moveLabel": "Suggests splitting up",
@@ -218,7 +218,7 @@
     {
       "id": "m2",
       "sourceTime": 5.2,
-      "holdSec": 3.5,
+      "holdSec": 10.3,
       "actorId": "c-blue",
       "classification": "book",
       "moveLabel": "Checks the back door",
@@ -239,7 +239,7 @@
     {
       "id": "m3",
       "sourceTime": 8.4,
-      "holdSec": 4,
+      "holdSec": 12.2,
       "actorId": "c-red",
       "classification": "brilliant",
       "moveLabel": "Leaves the lights on as bait",

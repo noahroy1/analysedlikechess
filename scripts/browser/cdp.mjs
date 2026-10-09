@@ -74,7 +74,9 @@ export async function launch({ port = 9333, profile, width = 1500, height = 1300
     },
     async key(key, { shift = false } = {}) {
       const codes = { ' ': ['Space', 32], n: ['KeyN', 78], p: ['KeyP', 80], k: ['KeyK', 75], j: ['KeyJ', 74], l: ['KeyL', 76], ArrowRight: ['ArrowRight', 39], ArrowLeft: ['ArrowLeft', 37], Home: ['Home', 36] };
-      const [code, keyCode] = codes[key];
+      const [code, keyCode] =
+        codes[key] ??
+        (/^[a-z]$/.test(key) ? [`Key${key.toUpperCase()}`, key.toUpperCase().charCodeAt(0)] : /^[0-9]$/.test(key) ? [`Digit${key}`, key.charCodeAt(0)] : [key, 0]);
       const base = { key, code, windowsVirtualKeyCode: keyCode, modifiers: shift ? 8 : 0 };
       await send('Input.dispatchKeyEvent', { type: 'keyDown', ...base, text: key === ' ' ? ' ' : undefined });
       await send('Input.dispatchKeyEvent', { type: 'keyUp', ...base });

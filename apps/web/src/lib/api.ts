@@ -1,5 +1,9 @@
 import {
   ApiErrorSchema,
+  HistoryEntrySchema,
+  SaveResultSchema,
+  type HistoryEntry,
+  type ProjectEdit,
   IngestEventSchema,
   ProjectSchema,
   ProjectSummarySchema,
@@ -24,6 +28,32 @@ export const listProjects = async (): Promise<ProjectSummary[]> =>
 
 export const getProject = async (id: string): Promise<Project> =>
   ProjectSchema.parse(await request(`/projects/${id}`));
+
+/** Autosave. A 409 means the project moved on since `edit.version`. */
+export async function saveProject(id: string, edit: ProjectEdit): Promise<{ kind: 'saved'; version: number } | { kind: 'conflict' }> {
+  const res = await fetch(`/api/projects/${id}`, {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(edit),
+  });
+  if (res.status === 409) return { kind: 'conflict' };
+  const body: unknown = await res.json().catch(() => undefined);
+  if (!res.ok) {
+    const parsed = ApiErrorSchema.safeParse(body);
+    throw new Error(parsed.success ? parsed.data.error : `save failed (${res.status})`);
+  }
+  return { kind: 'saved', version: SaveResultSchema.parse(body).version };
+}
+
+export const listHistory = async (id: string): Promise<HistoryEntry[]> =>
+  HistoryEntrySchema.array().parse(await request(`/projects/${id}/history`));
+
+export const restoreVersion = (id: string, version: number, baseVersion: number) =>
+  request(`/projects/${id}/history/${version}/restore`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ version: baseVersion }),
+  });
 
 export const rerunIngest = (id: string) => request(`/projects/${id}/ingest`, { method: 'POST' });
 

@@ -145,7 +145,7 @@ interface Moment {
 
 - Moments sit at least 0.5 s apart in source time and never inside another moment's hold.
 - Text has character caps so a card is readable during its hold. Start with `moveLabel` 40, `explanation` 220 and `bestMove` 160, then tune them against the creator's real videos.
-- `holdSec` defaults from the theme. A sensible default scales with text length, about 1 s per 12 words with a floor of 3 s.
+- `holdSec` follows the card's text: card-in time, plus every character on the card read at 17 characters a second, plus 1 s of padding for rereads, plus card-out time. The rates live in the theme. A hold the creator sets by hand is locked (`holdLocked`) and stops following the text until reset. *(Decided Oct 10, 2026.)*
 
 ## Analysis pipeline
 
@@ -198,7 +198,7 @@ Store 20 to 40 of the creator's real breakdowns in `style/examples.json`, each w
 
 **Stage 4: Snap (local, deterministic)**
 
-1. For a spoken move, freeze 0.15 s after the last word of the evidence utterance. For a visual move, freeze at the scene-note time and refine it with the shot boundaries.
+1. For a spoken move, freeze 0.15 s after the last word of the evidence utterance, on a frame in the same shot as that last word: if the padding would cross a cut, freeze on the shot's last clean frame instead (`freezeAfterSpeech` in `packages/schema`). For a visual move, freeze at the scene-note time and refine it with the shot boundaries.
 2. Never freeze within 2 frames of a cut, because a frozen transition frame looks broken. Push the freeze to the nearest clean frame.
 3. Enforce the spacing rules from the Data model section and save the moments as `origin: 'ai'`, `status: 'draft'`.
 
@@ -343,7 +343,7 @@ Ship original SVG badges built on the standard chess annotation glyphs, which no
 - Per classification: display name, badge asset and colour token
 - Card: font family and sizes, background, corner radius, padding, max width, line clamp
 - Layout defaults: anchor corner, scale, safe margins (keep cards clear of YouTube's player controls)
-- Freeze treatment: none, slight dim, or slow push-in on the frozen frame
+- Freeze treatment: none, slight dim, or slow push-in on the frozen frame (default theme: none, decided Oct 10, 2026)
 - Timing: default hold, card in and out durations, optional sting sound
 
 **Matching the creator**

@@ -83,6 +83,8 @@ export const MomentSchema = z.object({
   sourceTime: Seconds,
   /** Freeze length in the output. */
   holdSec: z.number().positive(),
+  /** True once the creator sets the hold by hand; otherwise it follows the text (autoHoldSec). */
+  holdLocked: z.boolean().optional(),
   /** Character who made the move. */
   actorId: Id.optional(),
   classification: ClassificationSchema,

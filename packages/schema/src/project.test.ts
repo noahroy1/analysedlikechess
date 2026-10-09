@@ -5,7 +5,6 @@ import {
   MomentSchema,
   ProjectSchema,
   TEXT_CAPS,
-  defaultHoldSec,
   momentWarnings,
   toJsonSchema,
   type Moment,
@@ -153,17 +152,6 @@ describe('momentWarnings', () => {
     expect(momentWarnings({ ...moment(), classification: 'best' })).toEqual([
       expect.objectContaining({ field: 'bestMove' }),
     ]);
-  });
-});
-
-describe('defaultHoldSec', () => {
-  it('has a 3 s floor', () => {
-    expect(defaultHoldSec({ moveLabel: 'Runs', explanation: 'Bad idea.' })).toBe(3);
-  });
-
-  it('scales at about 1 s per 12 words', () => {
-    const explanation = Array.from({ length: 59 }, () => 'word').join(' ');
-    expect(defaultHoldSec({ moveLabel: 'Runs', explanation })).toBe(5);
   });
 });
 

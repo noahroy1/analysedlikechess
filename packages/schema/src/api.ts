@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { IngestSchema, SourceSchema } from './project.ts';
+import { CharacterSchema, IngestSchema, MomentSchema, SourceSchema } from './project.ts';
 
 /** Containers the upload accepts. The proxy makes any of them browser-safe. */
 export const UPLOAD_EXTENSIONS = ['mp4', 'mov', 'mkv'] as const;
@@ -34,3 +34,25 @@ export type IngestEvent = z.infer<typeof IngestEventSchema>;
 
 export const ApiErrorSchema = z.object({ error: z.string() });
 export type ApiError = z.infer<typeof ApiErrorSchema>;
+
+/**
+ * Editor autosave: the parts of a project the editor changes, plus the
+ * version they are based on. A stale version gets a 409.
+ */
+export const ProjectEditSchema = z.object({
+  version: z.int().nonnegative(),
+  moments: z.array(MomentSchema),
+  characters: z.array(CharacterSchema),
+});
+export type ProjectEdit = z.infer<typeof ProjectEditSchema>;
+
+export const SaveResultSchema = z.object({ version: z.int().nonnegative() });
+
+export const ConflictSchema = z.object({ error: z.string(), current: z.int().nonnegative() });
+
+export const HistoryEntrySchema = z.object({
+  version: z.int().nonnegative(),
+  savedAt: z.iso.datetime(),
+  momentCount: z.int().nonnegative(),
+});
+export type HistoryEntry = z.infer<typeof HistoryEntrySchema>;

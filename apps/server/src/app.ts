@@ -9,6 +9,7 @@ import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
 import { ZodError } from 'zod';
 import {
+  ProjectEditSchema,
   SERVABLE_FILE,
   UPLOAD_EXTENSIONS,
   shotThumbnailFile,
@@ -19,7 +20,7 @@ import {
 import { pendingIngest } from './ingest/ingest.ts';
 import type { IngestQueue } from './ingest/queue.ts';
 import { NotAVideoError, probe } from './media/probe.ts';
-import { ProjectNotFoundError, type ProjectStore } from './projects/store.ts';
+import { ProjectNotFoundError, VersionConflictError, type ProjectStore } from './projects/store.ts';
 
 export interface AppDeps {
   store: ProjectStore;
@@ -54,6 +55,9 @@ export function createApp({ store, queue }: AppDeps) {
 
   app.onError((error, c) => {
     if (error instanceof ProjectNotFoundError) return c.json({ error: 'project not found' }, 404);
+    if (error instanceof VersionConflictError) {
+      return c.json({ error: 'the project changed since it was loaded', current: error.current }, 409);
+    }
     if (error instanceof ZodError) return c.json({ error: error.message }, 400);
     console.error(error);
     return c.json({ error: error.message }, 500);
@@ -113,6 +117,31 @@ export function createApp({ store, queue }: AppDeps) {
   });
 
   app.get('/projects/:id', async (c) => c.json(await store.read(c.req.param('id'))));
+
+  /** Editor autosave. Rejected with 409 unless based on the current version. */
+  app.put('/projects/:id', async (c) => {
+    const edit = ProjectEditSchema.parse(await c.req.json());
+    const saved = await store.save(c.req.param('id'), edit.version, (p) => {
+      p.moments = edit.moments;
+      p.context.characters = edit.characters;
+    });
+    return c.json({ version: saved.version });
+  });
+
+  /** The last saved versions, newest first. */
+  app.get('/projects/:id/history', async (c) => c.json(await store.history(c.req.param('id'))));
+
+  /** Bring back an earlier version's moments and characters as a new version. */
+  app.post('/projects/:id/history/:version/restore', async (c) => {
+    const id = c.req.param('id');
+    const { version } = ProjectEditSchema.pick({ version: true }).parse(await c.req.json());
+    const old = await store.readVersion(id, Number(c.req.param('version')));
+    const saved = await store.save(id, version, (p) => {
+      p.moments = old.moments;
+      p.context.characters = old.context.characters;
+    });
+    return c.json(saved);
+  });
 
   /** Re-run ingest. Steps whose inputs are unchanged are skipped. */
   app.post('/projects/:id/ingest', async (c) => {

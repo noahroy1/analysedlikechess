@@ -4,3 +4,26 @@
   color-scheme: dark;
   background: #0a0a0a;
 }
+
+@layer components {
+  .input {
+    @apply w-full rounded-md border border-neutral-700 bg-neutral-950 px-2 py-1.5 text-sm text-neutral-100 placeholder:text-neutral-600 focus:border-sky-500 focus:outline-none;
+  }
+}
+
+/* In-place card text: placeholder when empty, no focus ring (the card outline shows editing). */
+.als-editable {
+  outline: none;
+  cursor: text;
+  min-width: 1ch;
+  white-space: pre-wrap;
+}
+.als-editable:empty::before {
+  content: attr(data-placeholder);
+  opacity: 0.4;
+  font-style: italic;
+}
+.als-editable:focus {
+  background: rgba(125, 211, 252, 0.12);
+  border-radius: 0.15em;
+}

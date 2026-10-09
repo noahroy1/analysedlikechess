@@ -17,24 +17,34 @@ export const TEXT_CAPS = {
 export type CappedField = keyof typeof TEXT_CAPS;
 
 export interface HoldTiming {
-  floorSec: number;
-  wordsPerSec: number;
+  /** Reading speed for the card's text. */
+  charsPerSec: number;
+  /** Added once the text is read, for rereads. */
+  paddingSec: number;
 }
 
 /**
- * About 1 s per 12 words with a 3 s floor. Themes carry their own copy in `timing.hold`.
- * TODO(open-decision): tune once the creator's hold timing is known.
+ * 17 characters a second is the usual subtitle reading speed for adults, plus
+ * a second to reread. Themes carry their own copy in `timing.hold`.
+ * TODO(open-decision): tune against the creator's videos in Phase 6.
  */
-export const DEFAULT_HOLD_TIMING: HoldTiming = { floorSec: 3, wordsPerSec: 12 };
+export const DEFAULT_HOLD_TIMING: HoldTiming = { charsPerSec: 17, paddingSec: 1 };
 
-/** Default hold for a card, from the words it shows. Rounded to 0.1 s. */
-export function defaultHoldSec(
+/** Everything a viewer reads on the card. */
+export const cardTextLength = (moment: Pick<Moment, 'moveLabel' | 'explanation' | 'bestMove'>): number =>
+  moment.moveLabel.trim().length + moment.explanation.trim().length + (moment.bestMove?.trim().length ?? 0);
+
+/**
+ * Hold length that follows the card's text: the card animating in, reading
+ * time for every character, the reread padding, then the card animating out.
+ * Rounded to 0.1 s.
+ */
+export function autoHoldSec(
   moment: Pick<Moment, 'moveLabel' | 'explanation' | 'bestMove'>,
-  timing: HoldTiming = DEFAULT_HOLD_TIMING,
+  timing: { hold: HoldTiming; cardInSec: number; cardOutSec: number },
 ): number {
-  const text = [moment.moveLabel, moment.explanation, moment.bestMove ?? ''].join(' ');
-  const words = text.split(/\s+/).filter(Boolean).length;
-  const sec = Math.max(timing.floorSec, words / timing.wordsPerSec);
+  const sec =
+    timing.cardInSec + cardTextLength(moment) / timing.hold.charsPerSec + timing.hold.paddingSec + timing.cardOutSec;
   return Math.round(sec * 10) / 10;
 }
 

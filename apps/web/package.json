@@ -15,7 +15,8 @@
     "@remotion/player": "4.0.534",
     "react": "19.3.0",
     "react-dom": "19.3.0",
-    "remotion": "4.0.534"
+    "remotion": "4.0.534",
+    "zustand": "5.0.15"
   },
   "devDependencies": {
     "@tailwindcss/vite": "4.3.3",

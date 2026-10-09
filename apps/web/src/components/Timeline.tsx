@@ -1,29 +1,48 @@
-import type { Project, Theme } from '@als/schema';
+import type { Character, Moment, Shot, Theme, Transcript } from '@als/schema';
 import { shotThumbnailFile } from '@als/schema';
 import { sourceFrameToOut, type Hold, type Timeline as TimelineModel } from '@als/composition';
 import { Badge } from '@als/theme';
 import { useEffect, useMemo, useRef, useState, type PointerEvent } from 'react';
+import type { SnapKind } from '../editor/snapping.ts';
 import { fileUrl } from '../lib/api.ts';
 import { formatTime } from '../lib/format.ts';
+import { speakerColor } from './editor/speakers.ts';
 
-const SPEAKER_COLORS = ['#7dd3fc', '#fca5a5', '#c4b5fd', '#fcd34d', '#86efac', '#f9a8d4', '#fdba74', '#a5b4fc'];
 const TICK_STEPS = [1, 2, 5, 10, 15, 30, 60, 120, 300];
 const MIN_TICK_PX = 64;
+/** Screen distance within which a dragged block snaps to speech. */
+const SNAP_PX = 10;
+/** Pointer travel before a press on a block becomes a drag. */
+const DRAG_START_PX = 4;
+
+const SNAP_TEXT: Record<SnapKind, string> = { speech: 'end of speech', clean: 'clear of cut', free: 'free (Shift)' };
 
 export interface TimelineProps {
-  project: Project;
+  projectId: string;
+  version: number;
+  moments: Moment[];
+  characters: Character[];
+  shots: Shot[];
+  transcript: Transcript | undefined;
   timeline: TimelineModel;
   theme: Theme;
   frame: number;
+  selectedId: string | null;
   onSeek: (frame: number) => void;
   onSelectHold: (hold: Hold) => void;
   onScrubStart?: () => void;
+  onRetimeStart: (momentId: string) => void;
+  /** Moves a moment to (about) `rawSec`; returns where it actually landed. */
+  onRetime: (momentId: string, rawSec: number, options: { snap: boolean; toleranceSec: number }) => { sec: number; kind: SnapKind };
+  onRetimeEnd: () => void;
 }
 
 /** Output-time timeline: holds as blocks, with shot and speech lanes for context. */
-export function Timeline({ project, timeline, theme, frame, onSeek, onSelectHold, onScrubStart }: TimelineProps) {
+export function Timeline(props: TimelineProps) {
+  const { moments, characters, shots, transcript, timeline, theme, frame, onSeek, onScrubStart } = props;
   const track = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
+  const [drag, setDrag] = useState<{ id: string; sec: number; kind: SnapKind } | null>(null);
   const { fps, outFrames } = timeline;
   const pct = (outFrame: number) => `${(outFrame / outFrames) * 100}%`;
   const toOut = (sec: number) => sourceFrameToOut(timeline, Math.round(sec * fps));
@@ -42,14 +61,10 @@ export function Timeline({ project, timeline, theme, frame, onSeek, onSelectHold
     return Array.from({ length: Math.floor(totalSec / step) + 1 }, (_, i) => i * step);
   }, [outFrames, fps, width]);
 
-  const speakers = useMemo(() => {
-    const labels = [...new Set(project.transcript?.utterances.map((u) => u.speaker) ?? [])];
-    const names = new Map(project.context.characters.flatMap((c) => c.speakerLabels.map((l) => [l, c.name] as const)));
-    return new Map(labels.map((label, i) => [label, { color: SPEAKER_COLORS[i % SPEAKER_COLORS.length]!, name: names.get(label) ?? label }]));
-  }, [project.transcript, project.context.characters]);
-
-  const momentsById = useMemo(() => new Map(project.moments.map((m) => [m.id, m])), [project.moments]);
-  const actorNames = useMemo(() => new Map(project.context.characters.map((c) => [c.id, c.name])), [project.context.characters]);
+  const speakerLabels = useMemo(() => [...new Set(transcript?.utterances.map((u) => u.speaker) ?? [])], [transcript]);
+  const speakerName = (label: string) => characters.find((c) => c.speakerLabels.includes(label))?.name ?? `Speaker ${label}`;
+  const momentsById = useMemo(() => new Map(moments.map((m) => [m.id, m])), [moments]);
+  const actorNames = useMemo(() => new Map(characters.map((c) => [c.id, c.name])), [characters]);
 
   const frameAt = (clientX: number) => {
     const rect = track.current!.getBoundingClientRect();
@@ -66,8 +81,43 @@ export function Timeline({ project, timeline, theme, frame, onSeek, onSelectHold
     if (e.currentTarget.hasPointerCapture(e.pointerId)) onSeek(frameAt(e.clientX));
   };
 
-  const currentHold = timeline.holds.find((h) => frame >= h.outStart && frame < h.outStart + h.frames);
-  const shots = project.shots ?? [];
+  /** Press on a block: a click selects it, a drag retimes it (Shift: no snapping). */
+  const onBlockPointerDown = (e: PointerEvent<HTMLButtonElement>, hold: Hold, moment: Moment) => {
+    e.stopPropagation();
+    if (e.button !== 0) return;
+    const el = e.currentTarget;
+    el.setPointerCapture(e.pointerId);
+    const startX = e.clientX;
+    const pxPerSec = (track.current!.getBoundingClientRect().width / outFrames) * fps;
+    let dragging = false;
+    const move = (ev: globalThis.PointerEvent) => {
+      const dx = ev.clientX - startX;
+      if (!dragging && Math.abs(dx) < DRAG_START_PX) return;
+      if (!dragging) {
+        dragging = true;
+        props.onRetimeStart(moment.id);
+      }
+      const landed = props.onRetime(moment.id, moment.sourceTime + dx / pxPerSec, {
+        snap: !ev.shiftKey,
+        toleranceSec: SNAP_PX / pxPerSec,
+      });
+      setDrag({ id: moment.id, ...landed });
+    };
+    const up = () => {
+      el.removeEventListener('pointermove', move);
+      el.removeEventListener('pointerup', up);
+      el.removeEventListener('pointercancel', up);
+      if (dragging) {
+        props.onRetimeEnd();
+        setDrag(null);
+      } else {
+        props.onSelectHold(hold);
+      }
+    };
+    el.addEventListener('pointermove', move);
+    el.addEventListener('pointerup', up);
+    el.addEventListener('pointercancel', up);
+  };
 
   return (
     <div className="mt-3 flex select-none rounded-lg border border-neutral-800 bg-neutral-900/60 text-[11px]">
@@ -94,15 +144,17 @@ export function Timeline({ project, timeline, theme, frame, onSeek, onSelectHold
           ))}
         </div>
 
-        {/* Holds, one block per moment, as wide as the hold. */}
+        {/* Holds, one block per moment, as wide as the hold. Drag to retime. */}
         <div className="relative h-12">
           <div className="absolute inset-x-0 top-1/2 h-px bg-neutral-700" />
           {timeline.holds.map((hold) => {
-            const moment = momentsById.get(hold.momentId)!;
+            const moment = momentsById.get(hold.momentId);
+            if (!moment) return null;
             const style = theme.classifications[moment.classification];
             const draft = moment.status === 'draft';
             const actor = moment.actorId ? actorNames.get(moment.actorId) : undefined;
-            const active = currentHold === hold;
+            const active = props.selectedId === hold.momentId;
+            const dragging = drag?.id === hold.momentId;
             return (
               <button
                 key={hold.momentId}
@@ -111,9 +163,8 @@ export function Timeline({ project, timeline, theme, frame, onSeek, onSelectHold
                 data-moment-id={hold.momentId}
                 data-out-start={hold.outStart}
                 data-frames={hold.frames}
-                onPointerDown={(e) => e.stopPropagation()}
-                onClick={() => onSelectHold(hold)}
-                className={`group absolute top-3 bottom-1 rounded-sm outline-offset-1 ${active ? 'outline-2 outline-white' : ''}`}
+                onPointerDown={(e) => onBlockPointerDown(e, hold, moment)}
+                className={`group absolute top-3 bottom-1 cursor-grab rounded-sm outline-offset-1 active:cursor-grabbing ${active ? 'outline-2 outline-white' : ''}`}
                 style={{
                   left: pct(hold.outStart),
                   width: pct(hold.frames),
@@ -125,19 +176,25 @@ export function Timeline({ project, timeline, theme, frame, onSeek, onSelectHold
                 <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 rounded-full ring-2 ring-neutral-900">
                   <Badge badge={style.badge} color={style.color} size={18} />
                 </span>
-                <span className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-4 hidden w-max max-w-64 -translate-x-1/2 rounded-md border border-neutral-700 bg-neutral-950 px-2 py-1.5 text-left text-xs text-neutral-200 shadow-lg group-hover:block">
-                  <span className="font-semibold" style={{ color: style.color }}>
-                    {style.label}
+                {dragging ? (
+                  <span className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-4 w-max -translate-x-1/2 rounded-md border border-sky-700 bg-neutral-950 px-2 py-1 text-xs text-sky-200 tabular-nums" data-testid="drag-tip">
+                    {formatTime(drag.sec, 2)} · {SNAP_TEXT[drag.kind]}
                   </span>
-                  {draft && <span className="text-neutral-500"> · draft</span>}
-                  <br />
-                  {actor && <span className="text-neutral-400">{actor}: </span>}
-                  {moment.moveLabel}
-                  <br />
-                  <span className="text-neutral-500 tabular-nums">
-                    at {formatTime(moment.sourceTime)} · holds {(hold.frames / fps).toFixed(1)} s
+                ) : (
+                  <span className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-4 hidden w-max max-w-64 -translate-x-1/2 rounded-md border border-neutral-700 bg-neutral-950 px-2 py-1.5 text-left text-xs text-neutral-200 shadow-lg group-hover:block">
+                    <span className="font-semibold" style={{ color: style.color }}>
+                      {style.label}
+                    </span>
+                    {draft && <span className="text-neutral-500"> · draft</span>}
+                    <br />
+                    {actor && <span className="text-neutral-400">{actor}: </span>}
+                    {moment.moveLabel || <span className="text-neutral-500 italic">Untitled move</span>}
+                    <br />
+                    <span className="text-neutral-500 tabular-nums">
+                      at {formatTime(moment.sourceTime)} · holds {(hold.frames / fps).toFixed(1)} s · drag to move
+                    </span>
                   </span>
-                </span>
+                )}
               </button>
             );
           })}
@@ -155,7 +212,7 @@ export function Timeline({ project, timeline, theme, frame, onSeek, onSelectHold
                 style={{
                   left: pct(start),
                   width: pct(end - start),
-                  backgroundImage: `url(${fileUrl(project.id, shotThumbnailFile(i), project.version)})`,
+                  backgroundImage: `url(${fileUrl(props.projectId, shotThumbnailFile(i), props.version)})`,
                   backgroundSize: 'auto 100%',
                   backgroundRepeat: 'repeat-x',
                 }}
@@ -166,16 +223,15 @@ export function Timeline({ project, timeline, theme, frame, onSeek, onSelectHold
 
         {/* Speech, coloured by speaker. */}
         <div className="relative h-5">
-          {project.transcript ? (
-            project.transcript.utterances.map((u) => {
+          {transcript ? (
+            transcript.utterances.map((u) => {
               const start = toOut(u.start);
-              const speaker = speakers.get(u.speaker)!;
               return (
                 <div
                   key={u.id}
-                  title={`${speaker.name}: ${u.text}`}
+                  title={`${speakerName(u.speaker)}: ${u.text}`}
                   className="absolute top-1 h-3 rounded-sm opacity-80"
-                  style={{ left: pct(start), width: pct(Math.max(1, toOut(u.end) - start)), background: speaker.color }}
+                  style={{ left: pct(start), width: pct(Math.max(1, toOut(u.end) - start)), background: speakerColor(speakerLabels, u.speaker) }}
                 />
               );
             })
@@ -184,11 +240,7 @@ export function Timeline({ project, timeline, theme, frame, onSeek, onSelectHold
           )}
         </div>
 
-        <div
-          data-testid="playhead"
-          className="pointer-events-none absolute inset-y-0 z-10 w-px bg-white"
-          style={{ left: pct(frame) }}
-        />
+        <div data-testid="playhead" className="pointer-events-none absolute inset-y-0 z-10 w-px bg-white" style={{ left: pct(frame) }} />
       </div>
     </div>
   );
