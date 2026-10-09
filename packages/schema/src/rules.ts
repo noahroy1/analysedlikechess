@@ -24,11 +24,12 @@ export interface HoldTiming {
 }
 
 /**
- * 17 characters a second is the usual subtitle reading speed for adults, plus
- * a second to reread. Themes carry their own copy in `timing.hold`.
+ * Half the time per character of the usual 17 characters a second subtitle
+ * reading speed (the creator's call, Oct 10, 2026), plus a second to reread.
+ * Themes carry their own copy in `timing.hold`.
  * TODO(open-decision): tune against the creator's videos in Phase 6.
  */
-export const DEFAULT_HOLD_TIMING: HoldTiming = { charsPerSec: 17, paddingSec: 1 };
+export const DEFAULT_HOLD_TIMING: HoldTiming = { charsPerSec: 34, paddingSec: 1 };
 
 /** Everything a viewer reads on the card. */
 export const cardTextLength = (moment: Pick<Moment, 'moveLabel' | 'explanation' | 'bestMove'>): number =>

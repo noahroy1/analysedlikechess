@@ -145,7 +145,7 @@ interface Moment {
 
 - Moments sit at least 0.5 s apart in source time and never inside another moment's hold.
 - Text has character caps so a card is readable during its hold. Start with `moveLabel` 40, `explanation` 220 and `bestMove` 160, then tune them against the creator's real videos.
-- `holdSec` follows the card's text: card-in time, plus every character on the card read at 17 characters a second, plus 1 s of padding for rereads, plus card-out time. The rates live in the theme. A hold the creator sets by hand is locked (`holdLocked`) and stops following the text until reset. *(Decided Oct 10, 2026.)*
+- `holdSec` follows the card's text: card-in time, plus every character on the card read at 34 characters a second (half the time per character of the 17 per second subtitle norm, per the creator), plus 1 s of padding for rereads, plus card-out time. The rates live in the theme. A hold the creator sets by hand is locked (`holdLocked`) and stops following the text until reset. *(Decided Oct 10, 2026.)*
 
 ## Analysis pipeline
 

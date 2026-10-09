@@ -1,5 +1,6 @@
 import {
   MIN_MOMENT_GAP_SEC,
+  NO_BEST_MOVE,
   autoHoldSec,
   type Character,
   type Classification,
@@ -17,11 +18,18 @@ export class EditError extends Error {}
 
 const newId = (prefix: string) => `${prefix}-${crypto.randomUUID().slice(0, 8)}`;
 
-/** Keeps the track sorted and every unlocked hold following its text. */
+/**
+ * Keeps the track sorted, drops best moves from ratings that never have one,
+ * and keeps every unlocked hold following its text.
+ */
 export function normalize(doc: Doc, theme: Theme): Doc {
   const moments = [...doc.moments]
     .sort((a, b) => a.sourceTime - b.sourceTime)
     .map((m) => {
+      if (m.bestMove !== undefined && NO_BEST_MOVE.has(m.classification)) {
+        const { bestMove: _, ...rest } = m;
+        m = rest;
+      }
       if (m.holdLocked) return m;
       const holdSec = autoHoldSec(m, theme.timing);
       return holdSec === m.holdSec ? m : { ...m, holdSec };

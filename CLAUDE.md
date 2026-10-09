@@ -46,3 +46,19 @@ Single-user local web app: upload a movie scene clip, draft chess-style move ann
 7. Ask before adding a dependency that is not in the Stack table.
 8. Where the creator's format is unknown (exact card look, text length, hold timing), leave a `TODO(open-decision)` comment rather than guessing.
 9. Commit after each working step with a message that says what now works.
+
+## Status and handoff (updated Oct 10, 2026)
+
+Read this first in a new session, then the PLAN.md section for the next phase.
+
+- **Done:** Phases 0-3 (scaffold, ingest, player/overlay/timeline, editor), each with its checks passing, plus the creator's review iterations after Phase 3. Branches are stacked and **not merged into `main`**: `phase-0-scaffold` → `phase-1-ingest` → `phase-2-player` → `phase-3-editor` (current tip). Ask before merging.
+- **Next: Phase 4 (analysis).** Start with the plan's open decision: recommend a speech-to-text vendor after verifying word timestamps and diarization in its current docs, and ask the user before choosing. Then read the current Claude structured-outputs and Gemini video docs (rule 2), verify model IDs, and build Stages 1-4 with caching, SSE progress, the speaker naming screen, Pass A/B, snapping (use `freezeAfterSpeech`) and Regenerate. Hooks waiting for it: `TODO(phase-4)` in `TranscriptDrawer.tsx` ("Make this a move" should run Pass B); `analysis` in the project schema.
+- **Decisions from the creator's reviews** (also in PLAN.md):
+  - Holds follow the card text at 34 characters a second (half the time per character of the 17 cps subtitle norm) plus 1 s reread padding plus card in/out.
+  - Spoken moves freeze 0.15 s after the last word, in that word's shot, clear of cuts.
+  - No dim during holds in the default theme.
+  - Brilliant, Great, Best and Book moves never carry a best move (the editor clears it, cards never show it, the Analyst must not write one).
+  - The video is 80% of the centre column and capped to the viewport height so the frame and its card are always visible; nothing auto-scrolls the page.
+  - The creator liked the peripheral editor features (cast, evidence, live feedback); keep that level of polish.
+- **Demo data:** the creator's Dexter clip is local in `media/` (never commit it). Their project is `doakes-catching-dexter-b8f1` in `projects/`; seed demo moves with `pnpm seed:moments doakes-catching-dexter-b8f1 fixtures/demo/doakes-moments.json`. Those moves were hand-written by Claude from frames, not transcribed.
+- **How each phase has ended:** run `pnpm check`, run the phase's checks in headless Chrome (`scripts/browser/`, against `pnpm dev` with `PROJECTS_DIR` pointed at a scratch folder so the user's projects stay clean), look at screenshots, commit, then give the user a short numbered test walkthrough and stop.

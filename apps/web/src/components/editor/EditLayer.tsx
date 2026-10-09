@@ -225,7 +225,7 @@ function Toolbar(props: {
   // Above the card when there is room, otherwise below it.
   const above = props.top > 44;
   const counters = (Object.keys(TEXT_CAPS) as CardField[])
-    .filter((f) => f !== 'bestMove' || !NO_BEST_MOVE.has(moment.classification) || moment.bestMove)
+    .filter((f) => f !== 'bestMove' || !NO_BEST_MOVE.has(moment.classification))
     .map((f) => ({ f, n: (moment[f] ?? '').length, cap: TEXT_CAPS[f] }));
   const LABEL: Record<CardField, string> = { moveLabel: 'Label', explanation: 'Breakdown', bestMove: 'Best' };
 

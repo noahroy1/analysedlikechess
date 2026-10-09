@@ -76,18 +76,20 @@ export function Inspector() {
         />
       </Field>
 
-      <Field
-        label="Best move"
-        count={[moment.bestMove?.length ?? 0, TEXT_CAPS.bestMove]}
-        hint={NO_BEST_MOVE.has(moment.classification) ? 'Usually left empty for this rating.' : undefined}
-      >
-        <textarea
-          value={moment.bestMove ?? ''}
-          onChange={(e) => set({ bestMove: e.target.value ? e.target.value.replace(/\n/g, ' ') : undefined }, 'bestMove')}
-          rows={2}
-          className="input resize-y"
-        />
-      </Field>
+      {NO_BEST_MOVE.has(moment.classification) ? (
+        <p className="text-xs text-neutral-500">
+          {theme.classifications[moment.classification].label} moves have no best move.
+        </p>
+      ) : (
+        <Field label="Best move" count={[moment.bestMove?.length ?? 0, TEXT_CAPS.bestMove]}>
+          <textarea
+            value={moment.bestMove ?? ''}
+            onChange={(e) => set({ bestMove: e.target.value ? e.target.value.replace(/\n/g, ' ') : undefined }, 'bestMove')}
+            rows={2}
+            className="input resize-y"
+          />
+        </Field>
+      )}
 
       {warnings.length > 0 && (
         <ul className="rounded-md border border-amber-900/60 bg-amber-950/30 px-2 py-1.5 text-xs text-amber-300">
@@ -212,7 +214,7 @@ export function Inspector() {
   );
 }
 
-function Field({ label, count, hint, children }: { label: string; count?: [number, number]; hint?: string; children: ReactNode }) {
+function Field({ label, count, children }: { label: string; count?: [number, number]; children: ReactNode }) {
   return (
     <label className="block">
       <span className="mb-1 flex justify-between text-[11px] font-medium tracking-wide text-neutral-400 uppercase">
@@ -220,7 +222,6 @@ function Field({ label, count, hint, children }: { label: string; count?: [numbe
         {count && <span className={`tabular-nums normal-case ${count[0] > count[1] ? 'text-red-400' : 'text-neutral-500'}`}>{count[0]}/{count[1]}</span>}
       </span>
       {children}
-      {hint && <span className="mt-0.5 block text-[11px] text-neutral-500">{hint}</span>}
     </label>
   );
 }

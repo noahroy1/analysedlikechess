@@ -65,14 +65,15 @@ describe('speechSnapTargets', () => {
 });
 
 describe('autoHoldSec', () => {
-  const timing = { hold: DEFAULT_HOLD_TIMING, cardInSec: 0.25, cardOutSec: 0.2 };
+  // Card in and out total 0.5 s here, so expectations are exact.
+  const timing = { hold: DEFAULT_HOLD_TIMING, cardInSec: 0.3, cardOutSec: 0.2 };
 
   it('is the card animations plus the padding for an empty card', () => {
     expect(autoHoldSec({ moveLabel: '', explanation: '' }, timing)).toBe(1.5);
   });
 
-  it('adds reading time at 17 characters a second', () => {
-    expect(autoHoldSec({ moveLabel: 'x'.repeat(34), explanation: 'y'.repeat(136), bestMove: 'z'.repeat(17) }, timing)).toBe(12.5);
+  it('adds reading time at 34 characters a second', () => {
+    expect(autoHoldSec({ moveLabel: 'x'.repeat(34), explanation: 'y'.repeat(102), bestMove: 'z'.repeat(34) }, timing)).toBe(6.5);
   });
 
   it('ignores surrounding whitespace', () => {

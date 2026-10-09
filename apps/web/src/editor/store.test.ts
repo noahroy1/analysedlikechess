@@ -103,6 +103,17 @@ describe('holds follow the text', () => {
     expect(store.getState().doc.moments[0]!.holdSec).toBeGreaterThan(before);
   });
 
+  it('drops the best move when the rating changes to one that never has it', () => {
+    const { store } = setup();
+    expect(store.getState().doc.moments[0]!.bestMove).toBeDefined();
+    for (const classification of ['great', 'book', 'brilliant', 'best'] as const) {
+      store.getState().edit((d) => ops.setClassification(d, 'm1', classification));
+      expect(store.getState().doc.moments[0]!.bestMove).toBeUndefined();
+      store.getState().undo();
+      expect(store.getState().doc.moments[0]!.bestMove).toBeDefined();
+    }
+  });
+
   it('leaves a hold set by hand alone', () => {
     const { store, setLabel } = setup();
     store.getState().edit((d) => ops.updateMoment(d, 'm1', { holdSec: 5, holdLocked: true }));

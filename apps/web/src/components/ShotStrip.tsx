@@ -17,8 +17,15 @@ export function ShotStrip({ project, sourceSec, onSelect }: ShotStripProps) {
   const shots = project.shots ?? [];
   const current = shots.findIndex((s) => sourceSec >= s.start && sourceSec < s.end);
 
+  // Keep the current shot in view by scrolling the strip sideways only; the page never moves.
   useEffect(() => {
-    strip.current?.children[current]?.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
+    const el = strip.current;
+    const child = el?.children[current] as HTMLElement | undefined;
+    if (!el || !child) return;
+    const box = el.getBoundingClientRect();
+    const item = child.getBoundingClientRect();
+    if (item.left >= box.left && item.right <= box.right) return;
+    el.scrollTo({ left: el.scrollLeft + item.left - box.left - (box.width - item.width) / 2, behavior: 'smooth' });
   }, [current]);
 
   if (shots.length === 0) return null;

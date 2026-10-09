@@ -16,7 +16,7 @@
     {
       "id": "d1",
       "sourceTime": 5.5,
-      "holdSec": 11.7,
+      "holdSec": 6.6,
       "actorId": "c-dexter",
       "classification": "book",
       "moveLabel": "Late-night drop by boat",
@@ -35,7 +35,7 @@
     {
       "id": "d2",
       "sourceTime": 9.6,
-      "holdSec": 10.5,
+      "holdSec": 6,
       "actorId": "c-doakes",
       "classification": "great",
       "moveLabel": "Tails him into the swamp",
@@ -54,7 +54,7 @@
     {
       "id": "d3",
       "sourceTime": 42,
-      "holdSec": 14.6,
+      "holdSec": 8,
       "actorId": "c-doakes",
       "classification": "mistake",
       "moveLabel": "Stops to gloat",
@@ -74,7 +74,7 @@
     {
       "id": "d4",
       "sourceTime": 59,
-      "holdSec": 13,
+      "holdSec": 7.2,
       "actorId": "c-dexter",
       "classification": "good",
       "moveLabel": "Keeps his hands visible",
@@ -94,7 +94,7 @@
     {
       "id": "d5",
       "sourceTime": 86,
-      "holdSec": 10.7,
+      "holdSec": 6.1,
       "actorId": "c-dexter",
       "classification": "brilliant",
       "moveLabel": "Plays the beaten man",
@@ -113,7 +113,7 @@
     {
       "id": "d6",
       "sourceTime": 100.2,
-      "holdSec": 11.7,
+      "holdSec": 6.6,
       "actorId": "c-doakes",
       "classification": "blunder",
       "moveLabel": "Lets him walk into reach",

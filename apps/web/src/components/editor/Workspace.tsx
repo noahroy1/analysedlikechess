@@ -14,6 +14,11 @@ import { EditLayer } from './EditLayer.tsx';
 import { Kbd } from './Inspector.tsx';
 import { TranscriptDrawer } from './TranscriptDrawer.tsx';
 
+/** The video's share of the centre column. */
+const STAGE_WIDTH = 0.8;
+/** Height kept free above and below the video (header, padding, transport) so it fits the viewport. */
+const STAGE_VIEWPORT_RESERVE = '9.5rem';
+
 /** How close (s) a move added with M must be to speech to snap to its end. */
 const ADD_SNAP_SEC = 0.25;
 
@@ -268,7 +273,14 @@ export function Workspace({ left, right }: WorkspaceProps) {
         <div className="order-2 min-h-0 xl:order-none xl:max-h-[calc(100vh-7rem)]">{left}</div>
 
         <div className="min-w-0">
-          <div ref={stage} className="relative overflow-hidden rounded-lg bg-black" data-testid="stage">
+          {/* 80% of the column, and never taller than the viewport allows, so the whole
+              frame and its card are always visible without scrolling the page. */}
+          <div
+            ref={stage}
+            className="relative mx-auto overflow-hidden rounded-lg bg-black"
+            style={{ width: `min(${STAGE_WIDTH * 100}%, calc((100dvh - ${STAGE_VIEWPORT_RESERVE}) * ${source.width / source.height}))` }}
+            data-testid="stage"
+          >
             <Player
               ref={player}
               component={Episode}

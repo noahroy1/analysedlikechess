@@ -46,7 +46,7 @@ export function MoveCard({ moment, actorName, theme, frame, visibility, enter, e
   const text = (name: CardField, value: string) => editing?.field?.(name, value) ?? value;
   const showEmpty = editing?.showEmptyFields ?? false;
   const bestMove = moment.bestMove ?? '';
-  const showBestMove = bestMove !== '' || (showEmpty && !NO_BEST_MOVE.has(moment.classification));
+  const showBestMove = !NO_BEST_MOVE.has(moment.classification) && (bestMove !== '' || showEmpty);
   const badge = <Badge badge={style.badge} color={style.color} size={card.badgeSize * u} fontFamily={card.fontFamily} />;
   const position: CSSProperties = {
     left: rect.left,

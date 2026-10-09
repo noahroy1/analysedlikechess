@@ -27,7 +27,8 @@ export function EditableText({ value, placeholder, onChange, singleLine, field, 
 
   useLayoutEffect(() => {
     if (focusSignal === undefined || !ref.current) return;
-    ref.current.focus();
+    // Never scroll the page to reach the card.
+    ref.current.focus({ preventScroll: true });
     placeCaretAtEnd(ref.current);
   }, [focusSignal]);
 

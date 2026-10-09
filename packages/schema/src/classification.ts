@@ -17,5 +17,8 @@ export const CLASSIFICATIONS = [
 export const ClassificationSchema = z.enum(CLASSIFICATIONS);
 export type Classification = z.infer<typeof ClassificationSchema>;
 
-/** Ratings where the character already played the best move, so `bestMove` is omitted. */
-export const NO_BEST_MOVE: ReadonlySet<Classification> = new Set(['brilliant', 'best']);
+/**
+ * Ratings that never carry a `bestMove`: the character already played it, or
+ * the move was the expected one. The editor clears it and cards never show it.
+ */
+export const NO_BEST_MOVE: ReadonlySet<Classification> = new Set(['brilliant', 'great', 'best', 'book']);
