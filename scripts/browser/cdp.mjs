@@ -34,7 +34,8 @@ export async function launch({ port = 9333, profile, width = 1500, height = 1300
     if (msg.id && pending.has(msg.id)) {
       const { resolve, reject } = pending.get(msg.id);
       pending.delete(msg.id);
-      msg.error ? reject(new Error(JSON.stringify(msg.error))) : resolve(msg.result);
+      if (msg.error) reject(new Error(JSON.stringify(msg.error)));
+      else resolve(msg.result);
     } else if (msg.method === 'Runtime.consoleAPICalled') {
       logs.push(`[${msg.params.type}] ${msg.params.args.map((a) => a.value ?? a.description ?? '').join(' ')}`);
     } else if (msg.method === 'Runtime.exceptionThrown') {
