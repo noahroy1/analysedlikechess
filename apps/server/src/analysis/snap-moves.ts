@@ -2,6 +2,7 @@ import {
   MIN_MOMENT_GAP_SEC,
   NO_BEST_MOVE,
   autoHoldSec,
+  relabelLateBook,
   cleanFreezeTime,
   freezeAfterSpeech,
   type Annotation,
@@ -59,14 +60,15 @@ export function snapMoves(project: Project, candidates: Candidate[], moves: Anno
     sourceTime = Math.min(sourceTime, durationSec);
 
     const actorId = characterFor(candidate.actor);
-    const bestMove = NO_BEST_MOVE.has(move.classification) ? undefined : move.bestMove?.trim() || undefined;
+    const classification = relabelLateBook(move.classification, sourceTime);
+    const bestMove = NO_BEST_MOVE.has(classification) ? undefined : move.bestMove?.trim() || undefined;
     const text = { moveLabel: move.moveLabel.trim(), explanation: move.explanation.trim(), ...(bestMove ? { bestMove } : {}) };
     placed.push({
       id: `ai-${candidate.id}-${index + 1}`,
       sourceTime,
       holdSec: autoHoldSec(text, theme.timing),
       ...(actorId ? { actorId } : {}),
-      classification: move.classification,
+      classification,
       ...text,
       card: { anchor: theme.layout.anchor, scale: 1 },
       evidence: { utteranceIds: evidence.map((u) => u.id), note: candidate.action },

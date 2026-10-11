@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import {
+  BOOK_WINDOW_SEC,
   CUT_CLEARANCE_FRAMES,
   FREEZE_AFTER_SPEECH_SEC,
   NO_BEST_MOVE,
@@ -114,7 +115,7 @@ describe('snapMoves', () => {
     { id: 'c2', actor: 'Blue', kind: 'visual' as const, action: 'Lights on', alternatives: [], evidenceUtteranceIds: [], visualTimeSec: 22.51 },
     { id: 'c3', actor: 'Blue', kind: 'spoken' as const, action: 'Locks door', alternatives: [], evidenceUtteranceIds: ['u4'], visualTimeSec: null },
   ];
-  const move = (candidateId: string, classification: 'mistake' | 'great', confidence = 0.8) => ({
+  const move = (candidateId: string, classification: 'mistake' | 'great' | 'book', confidence = 0.8) => ({
     candidateId,
     classification,
     moveLabel: ' Label ',
@@ -144,6 +145,17 @@ describe('snapMoves', () => {
     const { moments } = snapMoves(await dialogueProject(), candidates, [move('c2', 'great')], defaultTheme);
     expect(NO_BEST_MOVE.has(moments[0]!.classification)).toBe(true);
     expect(moments[0]!.bestMove).toBeUndefined();
+  });
+
+  it('keeps book moves in the opening and relabels later ones good', async () => {
+    const project = await dialogueProject();
+    project.source.durationSec = 60;
+    const late = { ...candidates[1]!, id: 'c4', visualTimeSec: 45 };
+    const { moments } = snapMoves(project, [...candidates, late], [move('c2', 'book'), move('c4', 'book')], defaultTheme);
+    expect(moments.map((m) => [m.sourceTime > BOOK_WINDOW_SEC, m.classification])).toEqual([
+      [false, 'book'],
+      [true, 'good'],
+    ]);
   });
 
   it("keeps the creator's moves and drops drafts too close to them", async () => {

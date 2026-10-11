@@ -22,3 +22,10 @@ export type Classification = z.infer<typeof ClassificationSchema>;
  * the move was the expected one. The editor clears it and cards never show it.
  */
 export const NO_BEST_MOVE: ReadonlySet<Classification> = new Set(['brilliant', 'great', 'best', 'book']);
+
+/** Book moves belong to the scene's opening: none after this many source seconds. */
+export const BOOK_WINDOW_SEC = 30;
+
+/** A textbook move after the opening is just a good one. */
+export const relabelLateBook = (classification: Classification, sourceTime: number): Classification =>
+  classification === 'book' && sourceTime > BOOK_WINDOW_SEC ? 'good' : classification;

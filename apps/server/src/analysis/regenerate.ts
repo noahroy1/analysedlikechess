@@ -1,5 +1,5 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { NO_BEST_MOVE, MoveDraftSchema, type Moment, type Project, type RegenerateResult } from '@als/schema';
+import { NO_BEST_MOVE, MoveDraftSchema, relabelLateBook, type Moment, type Project, type RegenerateResult } from '@als/schema';
 import type { ProjectStore } from '../projects/store.ts';
 import type { AnalysisConfig } from './config.ts';
 import { regenerateTask, systemPrompt } from './prompts.ts';
@@ -34,7 +34,8 @@ export async function regenerateMoment(
     task: regenerateTask(moment, evidence, actor, instruction?.trim() || undefined),
     schema: MoveDraftSchema,
   });
-  const draft = { ...result.output, bestMove: NO_BEST_MOVE.has(result.output.classification) ? null : result.output.bestMove };
+  const classification = relabelLateBook(result.output.classification, moment.sourceTime);
+  const draft = { ...result.output, classification, bestMove: NO_BEST_MOVE.has(classification) ? null : result.output.bestMove };
   await logRegenUsage(deps.store, project.id, result.costUsd);
   return { draft, model: result.model, usage: result.usage, costUsd: result.costUsd };
 }

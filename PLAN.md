@@ -343,7 +343,7 @@ Ship original SVG badges built on the standard chess annotation glyphs, which no
 - Per classification: display name, badge asset and colour token
 - Card: font family and sizes, background, corner radius, padding, max width, line clamp
 - Layout defaults: anchor corner, scale, safe margins (keep cards clear of YouTube's player controls)
-- Freeze treatment: none, slight dim, or slow push-in on the frozen frame (default theme: none, decided Oct 10, 2026)
+- Freeze treatment: none, slight dim, or slow push-in on the frozen frame (default theme: 10% dim, decided Oct 12, 2026, replacing none)
 - Timing: default hold, card in and out durations, optional sting sound
 
 **Matching the creator**

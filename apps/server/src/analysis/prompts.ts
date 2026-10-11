@@ -1,4 +1,4 @@
-import { CLASSIFICATIONS, NO_BEST_MOVE, TEXT_CAPS, type Candidate, type Moment, type StyleCorpus } from '@als/schema';
+import { BOOK_WINDOW_SEC, CLASSIFICATIONS, NO_BEST_MOVE, TEXT_CAPS, type Candidate, type Moment, type StyleCorpus } from '@als/schema';
 
 // Prompts for the Analyst. The system prompt is shared by every Claude call on
 // a clip (and cached); each pass adds its own task after the cached timeline.
@@ -40,6 +40,7 @@ Rules:
 - Judge each move on what the character could know at that moment, unless hindsight is the joke.
 - A best move must be something the character could plausibly do with what they knew then.
 - ${noBest} moves never get a best move: leave it null.
+- Book is only for the scene's opening, the first ${BOOK_WINDOW_SEC} seconds. After that, rate a textbook move good.
 - Mix the ratings across the scene's arc; do not make every move a blunder.
 - Keep text short enough to read during a freeze: label at most ${TEXT_CAPS.moveLabel} characters, breakdown at most ${TEXT_CAPS.explanation}, best move at most ${TEXT_CAPS.bestMove}.
 - Credit moves only to the cast listed with the timeline.

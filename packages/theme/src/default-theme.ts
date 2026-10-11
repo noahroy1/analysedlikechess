@@ -41,7 +41,8 @@ export const defaultTheme: Theme = {
     scale: 1,
     safeMargin: { x: 0.04, top: 0.06, bottom: 0.14 },
   },
-  freeze: { treatment: 'none', dim: 0.3, pushIn: 1.04 },
+  // Holds darken the frozen frame by 10% (the creator's call, Oct 12, 2026).
+  freeze: { treatment: 'dim', dim: 0.1, pushIn: 1.04 },
   timing: {
     hold: DEFAULT_HOLD_TIMING,
     cardInSec: 0.25,

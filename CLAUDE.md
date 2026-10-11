@@ -52,7 +52,7 @@ Single-user local web app: upload a movie scene clip, draft chess-style move ann
 8. Where the creator's format is unknown (exact card look, text length, hold timing), leave a `TODO(open-decision)` comment rather than guessing.
 9. Commit after each working step with a message that says what now works.
 
-## Status and handoff (updated Oct 10, 2026)
+## Status and handoff (updated Oct 12, 2026)
 
 Read this first in a new session, then the PLAN.md section for the next phase.
 
@@ -64,10 +64,12 @@ Read this first in a new session, then the PLAN.md section for the next phase.
 - **Decisions from the creator's reviews** (also in PLAN.md):
   - Holds follow the card text at 34 characters a second plus 1 s reread padding plus card in/out.
   - Spoken moves freeze 0.15 s after the last word, in that word's shot, clear of cuts.
-  - No dim during holds in the default theme.
+  - Holds dim the frozen frame by 10% (Oct 12; replaces the Oct 10 "no dim").
+  - No Book moves after the first 30 s (`BOOK_WINDOW_SEC`): the Analyst is told, and later ones are relabelled Good in `snapMoves` and Regenerate. No editor warning, by the creator's choice.
   - Brilliant, Great, Best and Book moves never carry a best move (the editor clears it, cards never show it, the Analyst is told not to write one).
   - The video is 80% of the centre column and capped to the viewport height so the frame and its card are always visible; nothing auto-scrolls the page.
   - The creator liked the peripheral editor features (cast, evidence, live feedback); keep that level of polish.
+- **Format iterations (from Oct 12, branch `format-iterations` on `phase-4-analysis`):** the creator's list, in this order, one commit and walkthrough each: (1) 10% dim and the Book rule, done; (2) shorter, denser text (lower caps, stricter Analyst voice), judged by re-drafting BB1 through the hand-off; (3) type-out of the explanation only at about 2 words a second, with holds becoming typing time plus a reread pause; (4) a `creator` theme matching `media/creator-ref/` (screenshots and demo clips, gitignored); (5) sounds per move type plus a typing loop, shared by every theme (chess sounds, not creator sounds), and droppable if they block progress; (6) evaluation bar, last (`media/creator-ref/style-ref-evaluation-bar.png`). BB1 stays the reference clip until the format works, then BB2. `media/BB2.mov` is still the duplicate of BB1, so the real cut is needed then.
 - **Style corpus:** `style/corpus.json` is a placeholder written by Claude, not the creator's words; Phase 6 replaces it.
 - **Demo data:** the creator's Dexter clip is local in `media/` (never commit it). Their project is `doakes-catching-dexter-b8f1` in `projects/`; seed demo moves with `pnpm seed:moments doakes-catching-dexter-b8f1 fixtures/demo/doakes-moments.json`. Those moves were hand-written by Claude from frames, not transcribed.
 - **How each phase has ended:** run `pnpm check`, run the phase's checks in headless Chrome (`scripts/browser/`, against `pnpm dev` with `PROJECTS_DIR` pointed at a scratch folder so the user's projects stay clean), look at screenshots, commit, then give the user a short numbered test walkthrough and stop.
