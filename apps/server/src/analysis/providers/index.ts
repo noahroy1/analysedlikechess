@@ -2,7 +2,7 @@ import type { AnalysisConfig } from '../config.ts';
 import { claudeAnalyst } from './claude.ts';
 import { scribeTranscriber } from './elevenlabs.ts';
 import { geminiDescriber } from './gemini.ts';
-import { recorder, replayProviders } from './replay.ts';
+import { handoffAnalyst, recorder, replayProviders } from './replay.ts';
 import { ProviderError, type Providers } from './types.ts';
 
 export * from './types.ts';
@@ -26,7 +26,10 @@ export function makeProviders(config: AnalysisConfig): Providers {
         geminiDescriber({ apiKey: need(config.keys.gemini, 'GEMINI_API_KEY'), model: config.models.scene, fps: config.sceneFps, record }).describe(...args),
     },
     analyst: {
-      run: (call) => claudeAnalyst({ apiKey: need(config.keys.anthropic, 'ANTHROPIC_API_KEY'), record }).run(call),
+      run: (call) =>
+        config.handoffDir
+          ? handoffAnalyst(config.handoffDir).run(call)
+          : claudeAnalyst({ apiKey: need(config.keys.anthropic, 'ANTHROPIC_API_KEY'), record }).run(call),
     },
   };
 }

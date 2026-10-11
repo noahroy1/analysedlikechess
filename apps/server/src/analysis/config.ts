@@ -24,6 +24,12 @@ export interface AnalysisConfig {
   sceneFps: number;
   /** Replay recorded provider responses from this folder instead of calling the APIs. */
   replayDir?: string;
+  /**
+   * Dev only: instead of calling Claude, write each request to this folder and
+   * read the answer from `claude-<call>.json` beside it (hand-written, e.g. by a
+   * Claude Code session). Lets analysis run before an API balance exists.
+   */
+  handoffDir?: string;
   /** Record every provider response into this folder (to refresh fixtures). */
   recordDir?: string;
   styleCorpusPath: string;
@@ -47,6 +53,7 @@ export function loadAnalysisConfig(env: NodeJS.ProcessEnv = process.env): Analys
     autoAnalyze: (blank(env.AUTO_ANALYZE) ?? 'true') !== 'false',
     sceneFps: Number(blank(env.SCENE_FPS) ?? 1),
     replayDir: blank(env.ANALYSIS_REPLAY_DIR),
+    handoffDir: blank(env.ANALYST_HANDOFF_DIR),
     recordDir: blank(env.ANALYSIS_RECORD_DIR),
     styleCorpusPath: blank(env.STYLE_CORPUS) ?? fileURLToPath(new URL('../../../../style/corpus.json', import.meta.url)),
   };
@@ -58,6 +65,6 @@ export function missingKeys(config: AnalysisConfig): string[] {
   const missing: string[] = [];
   if (!config.keys.elevenlabs) missing.push('ELEVENLABS_API_KEY');
   if (!config.keys.gemini) missing.push('GEMINI_API_KEY');
-  if (!config.keys.anthropic) missing.push('ANTHROPIC_API_KEY');
+  if (!config.keys.anthropic && !config.handoffDir) missing.push('ANTHROPIC_API_KEY');
   return missing;
 }

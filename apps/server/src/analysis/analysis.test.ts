@@ -1,7 +1,8 @@
-import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { z } from 'zod';
 import {
   CUT_CLEARANCE_FRAMES,
   FREEZE_AFTER_SPEECH_SEC,
@@ -14,6 +15,7 @@ import { defaultTheme } from '@als/theme/themes';
 import { makeTestApp, DIALOGUE_RECORDING } from '../test-helpers.ts';
 import { AnalysisService } from './service.ts';
 import { makeProviders } from './providers/index.ts';
+import { handoffAnalyst } from './providers/replay.ts';
 import { ProviderError } from './providers/types.ts';
 import { parseScribe } from './providers/elevenlabs.ts';
 import { parseNotes } from './providers/gemini.ts';
@@ -331,4 +333,25 @@ describe('a failing vendor', () => {
       await rm(root, { recursive: true, force: true });
     }
   }, 120_000);
+});
+
+describe('hand-off analyst', () => {
+  const call = { name: 'speakers' as const, model: 'm', effort: 'low' as const, system: 's', context: 'c', task: 't', schema: z.object({ n: z.number() }) };
+
+  it('writes the request, waits for a hand-written answer, then validates it like a live one', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'als-handoff-'));
+    try {
+      const analyst = handoffAnalyst(dir);
+      await expect(analyst.run(call)).rejects.toThrow(/claude-speakers\.json/);
+      const request = JSON.parse(await readFile(join(dir, 'request-speakers.json'), 'utf8'));
+      expect(request).toMatchObject({ system: 's', context: 'c', task: 't', schema: { type: 'object' } });
+
+      await writeFile(join(dir, 'claude-speakers.json'), JSON.stringify({ output: { n: 'nope' } }));
+      await expect(analyst.run(call)).rejects.toThrow();
+      await writeFile(join(dir, 'claude-speakers.json'), JSON.stringify({ output: { n: 3 } }));
+      expect(await analyst.run(call)).toMatchObject({ output: { n: 3 }, model: 'hand-written/claude-code-session', costUsd: 0 });
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
 });
