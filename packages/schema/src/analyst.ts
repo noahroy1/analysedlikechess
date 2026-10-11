@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { ClassificationSchema } from './classification.ts';
+import { TEXT_CAPS } from './rules.ts';
 
 // Structured outputs for the analysis pipeline. They are built per clip so the
 // cast, the candidate ids and the transcript's utterance ids are enums: the
@@ -43,12 +44,16 @@ export type Candidate = DecisionPoints['candidates'][number];
 
 const moveFields = {
   classification: ClassificationSchema,
-  moveLabel: z.string().describe('What they did, short (40 characters at most)'),
-  explanation: z.string().describe('Why it earned this rating (220 characters at most)'),
+  moveLabel: z.string().describe(`Move name: two or three words in Title Case (${TEXT_CAPS.moveLabel} characters at most)`),
+  explanation: z
+    .string()
+    .describe(`Two sentences: what they did, then why it earned this rating (${TEXT_CAPS.explanation} characters at most)`),
   bestMove: z
     .string()
     .nullable()
-    .describe('What they should have done (160 characters at most); null for brilliant, great, best and book'),
+    .describe(
+      `The better move: a two to four word command in Title Case (${TEXT_CAPS.bestMove} characters at most); null for brilliant, great, best and book`,
+    ),
   confidence: z.number().describe('0-1: how sure you are this belongs in the episode as rated'),
 };
 
@@ -70,6 +75,8 @@ export const StyleCorpusSchema = z.object({
   examples: z.array(
     z.object({
       context: z.string().describe('One line of scene context'),
+      /** `creator`: transcribed from their videos; `placeholder`: written to match until more arrive. */
+      source: z.enum(['creator', 'placeholder']).optional(),
       classification: ClassificationSchema,
       moveLabel: z.string(),
       explanation: z.string(),

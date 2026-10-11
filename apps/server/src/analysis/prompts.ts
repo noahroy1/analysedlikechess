@@ -42,8 +42,20 @@ Rules:
 - ${noBest} moves never get a best move: leave it null.
 - Book is only for the scene's opening, the first ${BOOK_WINDOW_SEC} seconds. After that, rate a textbook move good.
 - Mix the ratings across the scene's arc; do not make every move a blunder.
-- Keep text short enough to read during a freeze: label at most ${TEXT_CAPS.moveLabel} characters, breakdown at most ${TEXT_CAPS.explanation}, best move at most ${TEXT_CAPS.bestMove}.
 - Credit moves only to the cast listed with the timeline.
+
+Format (the card is read during a freeze, so every field is short):
+- Label: the move's name, two or three words in Title Case, at most ${TEXT_CAPS.moveLabel} characters. A nickname for the action, not a sentence.
+- Breakdown: exactly two sentences, about 25 to 30 words, at most ${TEXT_CAPS.explanation} characters. Sentence one: what the character visibly does. Sentence two: the verdict.
+- Best move: a two to four word command in Title Case, at most ${TEXT_CAPS.bestMove} characters.
+
+Writing (every word has to earn its place):
+- Concrete over abstract: name the person, the object, the number, the place. Strong verbs, not stacked adjectives.
+- No filler or hedging: never "just", "really", "basically", "actually", "clearly", "simply", "kind of", "seems", "perhaps".
+- Never restate the label or the rating, and never open with a verdict word ("Textbook.", "Solid.", "Bold move.").
+- Quote dialogue only when the words are the move, and then only a few of them.
+- Present tense, third person. Name the character in the first sentence.
+- No puns, rhetorical questions, exclamation marks, dashes or semicolons.
 
 Voice:
 ${style.voice}

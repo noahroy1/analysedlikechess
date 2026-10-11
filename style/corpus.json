@@ -1,76 +1,94 @@
 {
-  "_note": "PLACEHOLDER written for development, not the creator's words. TODO(open-decision): replace with 20-40 of the creator's real breakdowns in Phase 6 (see PLAN.md, Style corpus).",
-  "voice": "Dry, confident commentary that treats the scene like a chess game. Short sentences. Name the move, say what it gained or cost, and land a small joke where it fits. Chess vocabulary is seasoning (tempo, sacrifice, opening, endgame), not every line. Judge the character on what they knew at that moment, unless hindsight is the joke. Never explain the joke.",
+  "_note": "Examples marked source: creator are the creator's cards, transcribed from media/creator-ref (Catch Me If You Can, the motel scene). Examples marked placeholder were written by Claude in the same format to cover the other ratings. TODO(open-decision): replace the placeholders with more of the creator's cards in Phase 6.",
+  "voice": "Plain, exact commentary that treats the scene as a chess game. The move name is a two or three word nickname in Title Case for what the character did (Talks Shop, Whole Wallet, Goes In Alone), or a name they use in the scene (Barry Allen). The breakdown is two sentences. The first says what the character visibly does, with the specific names, objects and numbers from the scene. The second gives the verdict: what the move does to the game (a forced mate appears, speeds up, slows down or disappears; material, tempo or the initiative changes hands) or why it works on the other character. The better move is a two to four word command in Title Case (Demand ID Now, Take Backup). The wit comes from exact observation and the chess framing, never from jokes, puns or commentary on the commentary.",
   "examples": [
     {
-      "context": "A thief realises the museum guard has seen her reflection in the glass.",
-      "classification": "brilliant",
-      "moveLabel": "Trips the alarm herself",
-      "explanation": "With one guard on her, she hands him a building full of problems. Every door unlocks for the evacuation and she walks out with the crowd. Sacrifice the stealth, win the exit.",
-      "bestMove": null
+      "context": "FBI agent Carl tracks the cheque forger to a motel and heads for room 201.",
+      "source": "creator",
+      "classification": "inaccuracy",
+      "moveLabel": "Goes In Alone",
+      "explanation": "Carl goes up to room 201 alone with his gun drawn, leaving his agents downstairs. He wants this collar himself, but without backup the mate takes longer.",
+      "bestMove": "Take Backup"
     },
     {
-      "context": "Cornered in an elevator, the detective has seconds before the doors open.",
-      "classification": "great",
-      "moveLabel": "Hits every floor button",
-      "explanation": "Only move that buys time. Twelve stops, twelve chances, and the gunmen waiting in the lobby get bored first.",
-      "bestMove": null
-    },
-    {
-      "context": "A spy is offered a drink by the man she is investigating.",
+      "context": "Carl, gun drawn, finds Frank in the motel bathroom among the forged cheques.",
+      "source": "creator",
       "classification": "best",
-      "moveLabel": "Swaps the glasses",
-      "explanation": "Textbook and correct. If it is poisoned, he finds out first. If it is not, she still gets a drink.",
+      "moveLabel": "Talks Shop",
+      "explanation": "Frank walks out of the bathroom and chats about the typewriter and the cheques like a colleague inspecting evidence. He ignores the gun, and the mate count holds.",
       "bestMove": null
     },
     {
-      "context": "A heist crew argues over who carries the bag.",
+      "context": "Carl has Frank at gunpoint and orders him to put his hands up.",
+      "source": "creator",
+      "classification": "great",
+      "moveLabel": "Barry Allen",
+      "explanation": "Instead of raising his hands, Frank scolds Carl for being late and claims to be Secret Service with the forger already in custody. The forced mate disappears.",
+      "bestMove": null
+    },
+    {
+      "context": "Frank, posing as Secret Service, says his partner already has the forger.",
+      "source": "creator",
+      "classification": "inaccuracy",
+      "moveLabel": "Pushes Back",
+      "explanation": "Carl says he has no idea what the man is talking about, but he keeps listening. Arguing instead of demanding proof gives Frank time to build his story.",
+      "bestMove": "Demand ID Now"
+    },
+    {
+      "context": "Carl, still unsure, asks to see Frank's identification.",
+      "source": "creator",
+      "classification": "brilliant",
+      "moveLabel": "Whole Wallet",
+      "explanation": "Frank hands over his whole wallet before Carl can ask twice, and even offers a gun he doesn't have. Giving up everything makes checking him feel rude.",
+      "bestMove": null
+    },
+    {
+      "context": "A heist crew argues over who carries the bag out past the guards.",
+      "source": "placeholder",
       "classification": "excellent",
-      "moveLabel": "Gives it to the new guy",
-      "explanation": "Nearly perfect delegation: the newest member is the least likely to be recognised. Docked slightly for not telling him what is in it.",
-      "bestMove": "Split the haul into two bags so nobody is the only target."
+      "moveLabel": "Picks The New Guy",
+      "explanation": "Danny hands the bag to the newest member of the crew, the one face no guard has seen. He never tells him what is inside, so the exit rests on luck.",
+      "bestMove": "Split The Haul"
     },
     {
       "context": "A babysitter hears a noise downstairs.",
+      "source": "placeholder",
       "classification": "good",
-      "moveLabel": "Calls her friend first",
-      "explanation": "Solid. Someone now knows where she is. Not the police, but better than going downstairs with a candle.",
-      "bestMove": "Call the police and stay on the line."
+      "moveLabel": "Calls A Friend",
+      "explanation": "Lena hears the noise and phones her friend before she moves an inch. Someone now knows where she is, just nobody who can come and help.",
+      "bestMove": "Call The Police"
     },
     {
-      "context": "A new sheriff arrives in a town that does not want him.",
+      "context": "A new sheriff walks into a saloon in a town that does not want him.",
+      "source": "placeholder",
       "classification": "book",
-      "moveLabel": "Orders milk at the saloon",
-      "explanation": "Straight out of the opening book. Everybody plays it, everybody laughs, and the real game starts in the next scene.",
+      "moveLabel": "Orders Milk",
+      "explanation": "The new sheriff steps up to the bar and asks for a glass of milk. Every stranger in a western opens this way, and the room laughs right on cue.",
       "bestMove": null
     },
     {
-      "context": "A hiker finds a map in an abandoned cabin.",
-      "classification": "inaccuracy",
-      "moveLabel": "Reads it aloud to the group",
-      "explanation": "Slightly loose. Sharing is fine, but now the guide with the suspicious smile knows exactly where the gold is.",
-      "bestMove": "Pocket the map and share it once they are back in town."
-    },
-    {
-      "context": "A man realises his phone is being tracked.",
+      "context": "A man on the run realises his phone is being tracked.",
+      "source": "placeholder",
       "classification": "mistake",
-      "moveLabel": "Throws it out the car window",
-      "explanation": "The tracker now says he stopped at that exact spot. He has handed them a starting point and lost his only way to call for help.",
-      "bestMove": "Mail it to the other side of the country."
+      "moveLabel": "Ditches The Phone",
+      "explanation": "Marco throws his phone out of the car window on the highway. The tracker now marks the exact spot he passed, and he has no way left to call for help.",
+      "bestMove": "Mail It Away"
     },
     {
       "context": "The villain monologues with his back to an open window.",
+      "source": "placeholder",
       "classification": "miss",
-      "moveLabel": "Stays tied to the chair",
-      "explanation": "The ropes were loose for a full minute. The window was right there. Instead the hero chose to listen to the whole speech.",
-      "bestMove": "Slip the ropes while he talks and go through the window."
+      "moveLabel": "Stays Seated",
+      "explanation": "The ropes have been loose for a full minute and the window is open behind the villain. Jack sits through the whole speech, and the free piece is gone.",
+      "bestMove": "Slip The Ropes"
     },
     {
       "context": "A suspect is asked where she was on the night of the murder.",
+      "source": "placeholder",
       "classification": "blunder",
-      "moveLabel": "Mentions the knife",
-      "explanation": "Nobody said there was a knife. Game over in one sentence.",
-      "bestMove": "Say she was home and stop talking."
+      "moveLabel": "Mentions The Knife",
+      "explanation": "Asked where she was that night, Ruth insists she never touched the knife. Nobody had mentioned a knife, and the interview is over in one move.",
+      "bestMove": "Answer The Question"
     }
   ]
 }

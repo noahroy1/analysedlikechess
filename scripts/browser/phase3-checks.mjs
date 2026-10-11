@@ -52,7 +52,7 @@ try {
     const samples = JSON.parse(await page.eval(`JSON.stringify(window.__typed)`));
     const ok = samples.length === 9 && samples.every((s) => s.rendered.includes(s.typed));
     const label = await page.eval(`${moment('m1')}.moveLabel`);
-    result('text typed during a hold shows in the card on the next frame', ok && label === 'Suggests splitting up at night',
+    result('text typed during a hold shows in the card on the next frame', ok && label === 'Splits Up at night',
       `${samples.length} keystrokes, each in the rendered card within ${Math.max(...samples.map((s) => s.ms)).toFixed(0)} ms; label "${label}"`);
     await page.eval(`document.activeElement.blur()`);
   }
@@ -98,7 +98,8 @@ try {
   {
     await waitSaved();
     await pauseOn('m3');
-    await page.eval(`(() => { const i = document.querySelector('[data-testid=inspector] input'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); })()`);
+    // The label input, found by its value: the Regenerate box sits above it.
+    await page.eval(`(() => { const i = [...document.querySelectorAll('[data-testid=inspector] input')].find((x) => x.value === ${moment('m3')}.moveLabel); i.focus(); i.setSelectionRange(i.value.length, i.value.length); })()`);
     await page.send('Input.insertText', { text: ' (typed)' });
     await sleep(100);
     await waitSaved();
@@ -106,7 +107,7 @@ try {
     const label = await page.eval(`${moment('m1')}.moveLabel`);
     const m2 = await page.eval(`${moment('m2')}.sourceTime`);
     const m3 = await page.eval(`${moment('m3')}.moveLabel`);
-    result('a reload keeps every edit', label === 'Suggests splitting up at night' && m2 === 5.2 && m3.endsWith('(typed)'), `m1 "${label}", m2 at ${m2} s, m3 "${m3}"`);
+    result('a reload keeps every edit', label === 'Splits Up at night' && m2 === 5.2 && m3.endsWith('(typed)'), `m1 "${label}", m2 at ${m2} s, m3 "${m3}"`);
   }
 
   // 4. A stale save gets a 409 and the editor reloads instead of overwriting.

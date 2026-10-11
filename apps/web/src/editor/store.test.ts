@@ -171,7 +171,7 @@ describe('autosave', () => {
     await store.getState().flush();
     expect(deps.reload).toHaveBeenCalled();
     expect(store.getState()).toMatchObject({ baseVersion: 2, saveStatus: 'saved', past: [] });
-    expect(store.getState().doc.moments[0]!.moveLabel).toBe('Suggests splitting up');
+    expect(store.getState().doc.moments[0]!.moveLabel).toBe('Splits Up');
     expect(store.getState().toast?.tone).toBe('warn');
   });
 

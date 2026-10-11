@@ -16,11 +16,11 @@
     {
       "id": "d1",
       "sourceTime": 5.5,
-      "holdSec": 6.6,
+      "holdSec": 5.8,
       "actorId": "c-dexter",
       "classification": "book",
-      "moveLabel": "Late-night drop by boat",
-      "explanation": "Bag it, boat it, dump it where nobody looks. Straight out of Dexter's opening repertoire, and it works every time nobody has been tailing him for weeks.",
+      "moveLabel": "Night Drop",
+      "explanation": "Dexter carries the bagged body down the dock and loads it onto his boat. Every disposal of his opens this way, and none has gone wrong yet.",
       "card": {
         "anchor": "top-left",
         "scale": 1
@@ -35,11 +35,11 @@
     {
       "id": "d2",
       "sourceTime": 9.6,
-      "holdSec": 6,
+      "holdSec": 5.9,
       "actorId": "c-doakes",
       "classification": "great",
-      "moveLabel": "Tails him into the swamp",
-      "explanation": "Everyone told Doakes to drop it. He followed his gut all the way to the Everglades, the only move that catches Dexter in the act.",
+      "moveLabel": "Follows His Gut",
+      "explanation": "Told by everyone to drop it, Doakes tails Dexter all the way into the Everglades. It is the only line that catches him with the evidence.",
       "card": {
         "anchor": "top-right",
         "scale": 1
@@ -54,12 +54,11 @@
     {
       "id": "d3",
       "sourceTime": 42,
-      "holdSec": 8,
+      "holdSec": 6.2,
       "actorId": "c-doakes",
       "classification": "mistake",
-      "moveLabel": "Stops to gloat",
-      "explanation": "He has the gun, the evidence and the angle. Every second spent enjoying it is a second Dexter spends thinking, and thinking is Dexter's best weapon.",
-      "bestMove": "Cuff him from a distance and call it in before saying a word.",
+      "moveLabel": "Stops To Gloat",
+      "explanation": "Doakes has the gun, the evidence and the angle, and spends the moment grinning. Every second he talks is a second Dexter spends planning.",
       "card": {
         "anchor": "bottom-left",
         "scale": 1
@@ -69,17 +68,17 @@
         "note": "Long close-up of Doakes grinning down the barrel."
       },
       "origin": "user",
-      "status": "draft"
+      "status": "draft",
+      "bestMove": "Cuff Him Now"
     },
     {
       "id": "d4",
       "sourceTime": 59,
-      "holdSec": 7.2,
+      "holdSec": 6,
       "actorId": "c-dexter",
       "classification": "good",
-      "moveLabel": "Keeps his hands visible",
-      "explanation": "Panic gets you shot. Dexter stays calm, keeps his hands where Doakes can see them and gives a nervous man nothing to react to.",
-      "bestMove": "Keep him talking and steer him toward the cuffs.",
+      "moveLabel": "Hands Visible",
+      "explanation": "Dexter stands still by the boat with his hands where Doakes can see them. A nervous man with a gun gets nothing to react to.",
       "card": {
         "anchor": "top-right",
         "scale": 1
@@ -89,16 +88,17 @@
         "note": "Dexter stands still by the boat."
       },
       "origin": "user",
-      "status": "draft"
+      "status": "draft",
+      "bestMove": "Keep Him Talking"
     },
     {
       "id": "d5",
       "sourceTime": 86,
-      "holdSec": 6.1,
+      "holdSec": 5.6,
       "actorId": "c-dexter",
       "classification": "brilliant",
-      "moveLabel": "Plays the beaten man",
-      "explanation": "Kneeling, slow, compliant. Looking defeated lowers Doakes' guard, and every step of the surrender brings Dexter a step closer to the gun.",
+      "moveLabel": "Plays Beaten",
+      "explanation": "Dexter kneels slowly and obeys every order, looking finished. The surrender lowers Doakes' guard and walks Dexter toward the gun.",
       "card": {
         "anchor": "bottom-right",
         "scale": 1
@@ -113,12 +113,11 @@
     {
       "id": "d6",
       "sourceTime": 100.2,
-      "holdSec": 6.6,
+      "holdSec": 5.6,
       "actorId": "c-doakes",
       "classification": "blunder",
-      "moveLabel": "Lets him walk into reach",
-      "explanation": "Rule one with an armed suspect: keep your distance. Doakes lets a serial killer close enough to grab the gun.",
-      "bestMove": "Order him to stop ten feet out and kneel.",
+      "moveLabel": "Lets Him Close",
+      "explanation": "Doakes lets Dexter walk up holding the cuffs, inside arm's reach of the gun. One lunge and the arrest is over.",
       "card": {
         "anchor": "custom",
         "x": 0.05,
@@ -130,7 +129,8 @@
         "note": "Dexter steps forward holding the cuffs."
       },
       "origin": "user",
-      "status": "draft"
+      "status": "draft",
+      "bestMove": "Keep Ten Feet Away"
     }
   ]
 }

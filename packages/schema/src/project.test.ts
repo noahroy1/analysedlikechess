@@ -144,7 +144,7 @@ describe('momentWarnings', () => {
     const long = { ...moment(), explanation: 'x'.repeat(TEXT_CAPS.explanation + 1) };
     expect(MomentSchema.safeParse(long).success).toBe(true);
     expect(momentWarnings(long)).toEqual([
-      { field: 'explanation', message: 'explanation is 221 characters, over the cap of 220' },
+      { field: 'explanation', message: `explanation is ${TEXT_CAPS.explanation + 1} characters, over the cap of ${TEXT_CAPS.explanation}` },
     ]);
   });
 

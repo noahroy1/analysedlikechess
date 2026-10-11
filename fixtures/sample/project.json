@@ -196,12 +196,12 @@
     {
       "id": "m1",
       "sourceTime": 2,
-      "holdSec": 7.8,
+      "holdSec": 6.2,
       "actorId": "c-red",
       "classification": "mistake",
-      "moveLabel": "Suggests splitting up",
-      "explanation": "Splitting up in a dark house is the oldest mistake in the genre. Together they cover each other; alone, Red just volunteered to go first.",
-      "bestMove": "Stay together and leave by the door they came in through.",
+      "moveLabel": "Splits Up",
+      "explanation": "Red suggests they search the dark house in two directions. Alone, each of them is a loose piece, and Red has just volunteered to go first.",
+      "bestMove": "Stay Together",
       "card": {
         "anchor": "top-left",
         "scale": 1
@@ -218,11 +218,11 @@
     {
       "id": "m2",
       "sourceTime": 5.2,
-      "holdSec": 5.9,
+      "holdSec": 6,
       "actorId": "c-blue",
       "classification": "book",
-      "moveLabel": "Checks the back door",
-      "explanation": "Securing the exits before settling in is straight out of the opening book. Nobody gets credit for it, nobody gets punished for it.",
+      "moveLabel": "Checks The Door",
+      "explanation": "Blue walks to the back door and makes sure it is locked before anything else. Every house scene opens this way, and nothing is lost by it.",
       "card": {
         "anchor": "bottom-right",
         "scale": 1
@@ -239,11 +239,11 @@
     {
       "id": "m3",
       "sourceTime": 8.4,
-      "holdSec": 6.8,
+      "holdSec": 6.3,
       "actorId": "c-red",
       "classification": "brilliant",
-      "moveLabel": "Leaves the lights on as bait",
-      "explanation": "Red redeems the opening mistake: a lit room pulls whatever is in the house to the wrong place while they slip out the back. A real sacrifice that pays off.",
+      "moveLabel": "Lights As Bait",
+      "explanation": "Red leaves the lamp burning in the empty room and backs toward the exit. Whatever is in the house goes for the light, and the sacrifice buys the escape.",
       "card": {
         "anchor": "custom",
         "x": 0.08,

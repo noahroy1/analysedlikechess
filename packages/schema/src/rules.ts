@@ -5,13 +5,14 @@ import type { Moment } from './project.ts';
 export const MIN_MOMENT_GAP_SEC = 0.5;
 
 /**
- * Character caps that keep a card readable during its hold.
- * TODO(open-decision): tune against the creator's real videos in Phase 6.
+ * Character caps from the creator's cards (five reference clips, Oct 12, 2026):
+ * a two or three word move name, a two-sentence breakdown of 150 to 160
+ * characters, and a better move of two to four words.
  */
 export const TEXT_CAPS = {
-  moveLabel: 40,
-  explanation: 220,
-  bestMove: 160,
+  moveLabel: 24,
+  explanation: 170,
+  bestMove: 32,
 } as const;
 
 export type CappedField = keyof typeof TEXT_CAPS;
