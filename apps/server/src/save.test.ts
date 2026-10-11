@@ -31,6 +31,7 @@ const edit = (version: number, label: string) => ({
   version,
   moments: project.moments.map((m, i) => (i === 0 ? { ...m, moveLabel: label } : m)),
   characters: project.context.characters,
+  themeId: project.themeId,
 });
 
 describe('autosave', () => {
@@ -53,7 +54,7 @@ describe('autosave', () => {
 
   it('rejects edits that break the track rules', async () => {
     const [a, b, c] = project.moments;
-    const res = await put({ version: 1, moments: [a, { ...b, sourceTime: a!.sourceTime + 0.1 }, c], characters: [] });
+    const res = await put({ version: 1, moments: [a, { ...b, sourceTime: a!.sourceTime + 0.1 }, c], characters: [], themeId: project.themeId });
     expect(res.status).toBe(400);
     expect((await store.read(project.id)).version).toBe(1);
   });

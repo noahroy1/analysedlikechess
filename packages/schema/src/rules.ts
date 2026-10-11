@@ -14,6 +14,8 @@ export const TEXT_CAPS = {
   moveLabel: 24,
   explanation: 170,
   bestMove: 32,
+  /** The chess motif chip, e.g. "Zwischenzug". */
+  motif: 20,
 } as const;
 
 export type CappedField = keyof typeof TEXT_CAPS;
@@ -37,16 +39,21 @@ export function typeOutSec(explanation: string, typeOut: TypeOut): number {
   return words === 0 ? 0 : (words - 1) / typeOut.wordsPerSec + typeOut.wordFadeSec;
 }
 
+/** Seconds into a hold when the first word starts: the badge pops, then the card animates in. */
+export const typeOutStartSec = (timing: Pick<Theme['timing'], 'badgeDelaySec' | 'badgePopSec' | 'cardInSec'>): number =>
+  timing.badgeDelaySec + timing.badgePopSec + timing.cardInSec;
+
 /**
- * Hold length that follows the card's text: the card animating in, the
+ * Hold length that follows the card's text: the badge and card animating in, the
  * explanation typing out, the reread, then the card animating out.
  * Rounded to 0.1 s.
  */
 export function autoHoldSec(
   moment: Pick<Moment, 'explanation'>,
-  timing: Pick<Theme['timing'], 'cardInSec' | 'typeOut' | 'rereadSec' | 'cardOutSec'>,
+  timing: Pick<Theme['timing'], 'badgeDelaySec' | 'badgePopSec' | 'cardInSec' | 'typeOut' | 'rereadSec' | 'cardOutSec'>,
 ): number {
-  const sec = timing.cardInSec + typeOutSec(moment.explanation, timing.typeOut) + timing.rereadSec + timing.cardOutSec;
+  const sec =
+    typeOutStartSec(timing) + typeOutSec(moment.explanation, timing.typeOut) + timing.rereadSec + timing.cardOutSec;
   return Math.round(sec * 10) / 10;
 }
 

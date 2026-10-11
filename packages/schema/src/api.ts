@@ -74,6 +74,7 @@ export const ProjectEditSchema = z.object({
   version: z.int().nonnegative(),
   moments: z.array(MomentSchema),
   characters: z.array(CharacterSchema),
+  themeId: z.string().min(1),
 });
 export type ProjectEdit = z.infer<typeof ProjectEditSchema>;
 

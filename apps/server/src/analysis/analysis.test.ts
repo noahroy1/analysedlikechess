@@ -20,6 +20,7 @@ import { handoffAnalyst } from './providers/replay.ts';
 import { ProviderError } from './providers/types.ts';
 import { parseScribe } from './providers/elevenlabs.ts';
 import { parseNotes } from './providers/gemini.ts';
+import { assignSides } from './sides.ts';
 import { snapMoves } from './snap-moves.ts';
 import { castNames, timelineText } from './timeline-text.ts';
 
@@ -109,6 +110,31 @@ describe('timelineText', () => {
   });
 });
 
+describe('assignSides', () => {
+  const cast = [
+    { id: 'hero', name: 'Walter White', speakerLabels: ['A'] },
+    { id: 'foil', name: 'Hank Schrader', speakerLabels: ['B'] },
+    { id: 'extra', name: 'Skyler', speakerLabels: [] },
+  ];
+  const moves = [{ actorId: 'hero' }, { actorId: 'foil' }] as Project['moments'];
+  const sides = (cs: Project['context']['characters']) => Object.fromEntries(cs.map((c) => [c.id, c.side]));
+
+  it('gives the protagonist White and everyone else Black', () => {
+    expect(sides(assignSides(cast, moves, 'walter white'))).toEqual({ hero: 'white', foil: 'black', extra: 'black' });
+    expect(sides(assignSides(cast, moves, 'Speaker B'))).toEqual({ hero: 'black', foil: 'white', extra: 'black' });
+  });
+
+  it('flips a coin among the characters with moves when no one stands out', () => {
+    expect(sides(assignSides(cast, moves, null, () => 0.99))).toEqual({ hero: 'black', foil: 'white', extra: 'black' });
+    expect(sides(assignSides(cast, moves, null, () => 0))).toEqual({ hero: 'white', foil: 'black', extra: 'black' });
+  });
+
+  it('keeps sides that are already set', () => {
+    const set = [{ ...cast[0]!, side: 'black' as const }, cast[1]!];
+    expect(assignSides(set, moves, 'Walter White')).toEqual(set);
+  });
+});
+
 describe('snapMoves', () => {
   const candidates = [
     { id: 'c1', actor: 'Red', kind: 'spoken' as const, action: 'Splits up', alternatives: [], evidenceUtteranceIds: ['u1'], visualTimeSec: null },
@@ -121,6 +147,7 @@ describe('snapMoves', () => {
     moveLabel: ' Label ',
     explanation: 'Why.',
     bestMove: 'Do better.',
+    motif: ' Sacrifice ',
     confidence,
   });
 
@@ -131,7 +158,7 @@ describe('snapMoves', () => {
     const [m] = moments;
     expect(m!.sourceTime).toBeGreaterThan(lastWord.end);
     expect(m!.sourceTime).toBeLessThanOrEqual(lastWord.end + FREEZE_AFTER_SPEECH_SEC + 1 / 24);
-    expect(m).toMatchObject({ actorId: 'c-red', origin: 'ai', status: 'draft', moveLabel: 'Label', evidence: { utteranceIds: ['u1'] } });
+    expect(m).toMatchObject({ actorId: 'c-red', origin: 'ai', status: 'draft', moveLabel: 'Label', motif: 'Sacrifice', evidence: { utteranceIds: ['u1'] } });
   });
 
   it('places visual moves on a clean frame, never beside a cut', async () => {
@@ -214,6 +241,14 @@ describe('analysis pipeline', () => {
     expect(project.moments.map((m) => project.context.characters.find((c) => c.id === m.actorId)?.name)).toEqual(['Red', 'Blue', 'Red']);
   });
 
+  it('gives the protagonist White and writes motif chips', () => {
+    expect(project.context.characters.map((c) => [c.name, c.side])).toEqual([
+      ['Red', 'black'],
+      ['Blue', 'white'],
+    ]);
+    expect(project.moments.map((m) => m.motif)).toEqual([undefined, 'Prophylaxis', 'Decoy']);
+  });
+
   it("cites only evidence that exists in the transcript", () => {
     const ids = new Set(project.transcript!.utterances.map((u) => u.id));
     for (const m of project.moments) {
@@ -263,6 +298,7 @@ describe('analysis pipeline', () => {
         version: project.version,
         moments: project.moments.map((m) => (m.id === approved.id ? { ...m, status: 'approved', moveLabel: 'Approved edit' } : m)),
         characters: project.context.characters,
+        themeId: project.themeId,
       }),
     });
     expect(save.status).toBe(200);

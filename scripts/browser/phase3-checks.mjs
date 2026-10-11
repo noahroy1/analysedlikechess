@@ -118,7 +118,7 @@ try {
       const p = await (await fetch('/api/projects/${projectId}')).json();
       p.moments[2].moveLabel = 'Changed in another tab';
       const res = await fetch('/api/projects/${projectId}', { method: 'PUT', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ version: p.version, moments: p.moments, characters: p.context.characters }) });
+        body: JSON.stringify({ version: p.version, moments: p.moments, characters: p.context.characters, themeId: p.themeId }) });
       return res.status;
     })()`);
     // Now this editor saves on top of its stale version.

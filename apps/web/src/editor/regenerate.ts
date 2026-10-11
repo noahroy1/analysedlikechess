@@ -28,6 +28,7 @@ export function applyDraft(store: EditorStore, momentId: string, draft: MoveDraf
       moveLabel: draft.moveLabel,
       explanation: draft.explanation,
       bestMove: NO_BEST_MOVE.has(draft.classification) ? undefined : (draft.bestMove ?? undefined),
+      motif: draft.motif?.trim() || undefined,
       confidence: Math.min(1, Math.max(0, draft.confidence)),
     }),
   );

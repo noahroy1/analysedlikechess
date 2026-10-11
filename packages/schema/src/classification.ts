@@ -29,3 +29,17 @@ export const BOOK_WINDOW_SEC = 30;
 /** A textbook move after the opening is just a good one. */
 export const relabelLateBook = (classification: Classification, sourceTime: number): Classification =>
   classification === 'book' && sourceTime > BOOK_WINDOW_SEC ? 'good' : classification;
+
+/** The annotation symbol written after a move, as in "Whole Wallet!!". */
+export const NOTATION: Record<Classification, string> = {
+  brilliant: '!!',
+  great: '!',
+  best: '',
+  excellent: '',
+  good: '',
+  book: '',
+  inaccuracy: '?!',
+  mistake: '?',
+  miss: '',
+  blunder: '??',
+};

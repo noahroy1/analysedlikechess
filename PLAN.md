@@ -348,7 +348,7 @@ Ship original SVG badges built on the standard chess annotation glyphs, which no
 
 **Matching the creator**
 
-In Phase 6, take 5 to 10 frames from the creator's videos where a card is on screen and build a `creator` theme that matches their fonts, colours, layout and wording conventions. A theme editor screen with live preview makes later tweaks fast for them.
+Built early, Oct 12, 2026, from four screenshots and five clips (`media/creator-ref/`): the `creator` theme matches their card layout ("<Move> is <phrase>", a move-number line with the annotation symbol, the breakdown typing out, "Better was", a motif chip), the round badge beside the card, Arial, measured sizes and four sampled rating colours, and their hold timing. The other six rating colours are placeholders until a video with those ratings is sampled. A theme editor screen with live preview would make later tweaks fast for them.
 
 ## Running costs and top-ups
 

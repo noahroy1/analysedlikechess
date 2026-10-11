@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { autoHoldSec, DEFAULT_REREAD_SEC, DEFAULT_TYPE_OUT, typeOutSec } from './rules.ts';
+import { autoHoldSec, DEFAULT_REREAD_SEC, DEFAULT_TYPE_OUT, typeOutSec, typeOutStartSec } from './rules.ts';
 import { cleanFrameRange, cleanFreezeTime, freezeAfterSpeech, speechSnapTargets } from './snap.ts';
 
 const FPS = 30;
@@ -64,11 +64,11 @@ describe('speechSnapTargets', () => {
   });
 });
 
-const defaultTiming = { cardInSec: 0.25, typeOut: DEFAULT_TYPE_OUT, rereadSec: DEFAULT_REREAD_SEC, cardOutSec: 0.2 };
+const defaultTiming = { badgeDelaySec: 0, badgePopSec: 0, cardInSec: 0.25, typeOut: DEFAULT_TYPE_OUT, rereadSec: DEFAULT_REREAD_SEC, cardOutSec: 0.2 };
 
 describe('autoHoldSec', () => {
   // Card in and out total 0.5 s and the reread is 4 s, so expectations are exact.
-  const timing = { cardInSec: 0.3, typeOut: { wordsPerSec: 5, wordFadeSec: 0.2 }, rereadSec: 4, cardOutSec: 0.2 };
+  const timing = { badgeDelaySec: 0, badgePopSec: 0, cardInSec: 0.3, typeOut: { wordsPerSec: 5, wordFadeSec: 0.2 }, rereadSec: 4, cardOutSec: 0.2 };
 
   it('is the card animations plus the reread for an empty explanation', () => {
     expect(autoHoldSec({ explanation: '' }, timing)).toBe(4.5);
@@ -84,5 +84,12 @@ describe('autoHoldSec', () => {
   it('matches the creator: a 27-word breakdown holds about 9.4 s', () => {
     const words = Array.from({ length: 27 }, (_, i) => `w${i}`).join(' ');
     expect(autoHoldSec({ explanation: words }, defaultTiming)).toBeCloseTo(9.3, 1);
+  });
+});
+
+describe('typeOutStartSec', () => {
+  it('waits for a badge beside the card to pop, then for the card', () => {
+    expect(typeOutStartSec({ badgeDelaySec: 0.3, badgePopSec: 0.2, cardInSec: 0.25 })).toBeCloseTo(0.75);
+    expect(typeOutStartSec({ badgeDelaySec: 0, badgePopSec: 0, cardInSec: 0.25 })).toBe(0.25);
   });
 });

@@ -20,14 +20,16 @@
         "name": "Red",
         "speakerLabels": [
           "A"
-        ]
+        ],
+        "side": "white"
       },
       {
         "id": "c-blue",
         "name": "Blue",
         "speakerLabels": [
           "B"
-        ]
+        ],
+        "side": "black"
       }
     ]
   },
@@ -234,7 +236,8 @@
       },
       "origin": "ai",
       "status": "draft",
-      "confidence": 0.64
+      "confidence": 0.64,
+      "motif": "Prophylaxis"
     },
     {
       "id": "m3",
@@ -257,7 +260,8 @@
         "note": "Red backs away from the lit doorway toward the exit."
       },
       "origin": "user",
-      "status": "draft"
+      "status": "draft",
+      "motif": "Sacrifice"
     }
   ],
   "themeId": "default",

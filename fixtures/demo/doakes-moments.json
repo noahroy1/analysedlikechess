@@ -4,12 +4,14 @@
     {
       "id": "c-dexter",
       "name": "Dexter",
-      "speakerLabels": []
+      "speakerLabels": [],
+      "side": "white"
     },
     {
       "id": "c-doakes",
       "name": "Doakes",
-      "speakerLabels": []
+      "speakerLabels": [],
+      "side": "black"
     }
   ],
   "moments": [
@@ -30,7 +32,8 @@
         "note": "Dexter carries the bags down the dock to the boat."
       },
       "origin": "user",
-      "status": "approved"
+      "status": "approved",
+      "motif": "Opening Theory"
     },
     {
       "id": "d2",
@@ -49,7 +52,8 @@
         "note": "Doakes steps out of the reeds with his gun drawn."
       },
       "origin": "user",
-      "status": "approved"
+      "status": "approved",
+      "motif": "Check"
     },
     {
       "id": "d3",
@@ -89,7 +93,8 @@
       },
       "origin": "user",
       "status": "draft",
-      "bestMove": "Keep Him Talking"
+      "bestMove": "Keep Him Talking",
+      "motif": "Quiet Move"
     },
     {
       "id": "d5",
@@ -108,7 +113,8 @@
         "note": "Dexter crouches by the boat."
       },
       "origin": "user",
-      "status": "draft"
+      "status": "draft",
+      "motif": "Decoy"
     },
     {
       "id": "d6",

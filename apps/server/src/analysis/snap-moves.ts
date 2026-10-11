@@ -11,6 +11,7 @@ import {
   type Project,
   type Theme,
 } from '@als/schema';
+import { characterByName } from './sides.ts';
 
 export interface SnapResult {
   moments: Moment[];
@@ -32,13 +33,7 @@ export function snapMoves(project: Project, candidates: Candidate[], moves: Anno
   const byId = new Map(candidates.map((c) => [c.id, c]));
   const dropped: SnapResult['dropped'] = [];
 
-  const characterFor = (name: string) => {
-    const lower = name.trim().toLowerCase();
-    const direct = project.context.characters.find((c) => c.name.trim().toLowerCase() === lower);
-    if (direct) return direct.id;
-    const label = /^speaker ([a-z]+)$/i.exec(name.trim())?.[1]?.toUpperCase();
-    return label ? project.context.characters.find((c) => c.speakerLabels.includes(label))?.id : undefined;
-  };
+  const characterFor = (name: string) => characterByName(project.context.characters, name)?.id;
 
   const placed: Moment[] = [];
   moves.forEach((move, index) => {
@@ -62,7 +57,13 @@ export function snapMoves(project: Project, candidates: Candidate[], moves: Anno
     const actorId = characterFor(candidate.actor);
     const classification = relabelLateBook(move.classification, sourceTime);
     const bestMove = NO_BEST_MOVE.has(classification) ? undefined : move.bestMove?.trim() || undefined;
-    const text = { moveLabel: move.moveLabel.trim(), explanation: move.explanation.trim(), ...(bestMove ? { bestMove } : {}) };
+    const motif = move.motif?.trim() || undefined;
+    const text = {
+      moveLabel: move.moveLabel.trim(),
+      explanation: move.explanation.trim(),
+      ...(bestMove ? { bestMove } : {}),
+      ...(motif ? { motif } : {}),
+    };
     placed.push({
       id: `ai-${candidate.id}-${index + 1}`,
       sourceTime,

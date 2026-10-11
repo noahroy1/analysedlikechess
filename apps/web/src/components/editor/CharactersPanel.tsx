@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { addCharacter, assignSpeaker, deleteCharacter, mergeCharacters, renameCharacter } from '../../editor/doc.ts';
+import { SIDES } from '@als/schema';
+import { addCharacter, assignSpeaker, deleteCharacter, mergeCharacters, renameCharacter, setSide } from '../../editor/doc.ts';
 import { useEditor, useEditorStore } from '../../editor/context.tsx';
 
-/** Rename, merge and reassign speakers. Names flow through to every card. */
+/** Rename, merge and reassign speakers, and pick who plays White. Names and move numbers flow through to every card. */
 export function CharactersPanel() {
   const store = useEditorStore();
   const characters = useEditor((s) => s.doc.characters);
@@ -32,6 +33,27 @@ export function CharactersPanel() {
                     onChange={(e) => edit((d) => renameCharacter(d, c.id, e.target.value), { coalesce: `${c.id}.name` })}
                     className="input flex-1 py-1"
                   />
+                  <div className="flex overflow-hidden rounded border border-neutral-700 text-[11px]" role="group" aria-label={`${c.name} plays`}>
+                    {SIDES.map((side) => (
+                      <button
+                        key={side}
+                        type="button"
+                        data-testid={`side-${side}`}
+                        aria-pressed={c.side === side}
+                        title={c.side === side ? 'Click again to clear' : `${c.name || 'They'} play${c.name ? 's' : ''} ${side === 'white' ? 'White' : 'Black'}`}
+                        onClick={() => edit((d) => setSide(d, c.id, c.side === side ? undefined : side))}
+                        className={`px-1.5 py-0.5 capitalize ${
+                          c.side === side
+                            ? side === 'white'
+                              ? 'bg-neutral-100 text-neutral-900'
+                              : 'bg-neutral-950 text-neutral-100 ring-1 ring-neutral-500 ring-inset'
+                            : 'text-neutral-500 hover:text-neutral-200'
+                        }`}
+                      >
+                        {side}
+                      </button>
+                    ))}
+                  </div>
                   <button
                     type="button"
                     title="Remove character"

@@ -1,6 +1,6 @@
 import { CARD_ANCHORS, NO_BEST_MOVE, TEXT_CAPS, type Card, type Moment } from '@als/schema';
-import { MoveCard, cardRect, type CardField } from '@als/composition';
-import { useLayoutEffect, useRef, useState, type PointerEvent } from 'react';
+import { MoveCard, cardRect, moveNumbers, type CardField } from '@als/composition';
+import { useLayoutEffect, useMemo, useRef, useState, type PointerEvent } from 'react';
 import { updateMoment } from '../../editor/doc.ts';
 import { useEditor, useEditorStore } from '../../editor/context.tsx';
 import { ClassificationPicker } from './ClassificationPicker.tsx';
@@ -10,6 +10,7 @@ const PLACEHOLDERS: Record<CardField, string> = {
   moveLabel: 'What they did',
   explanation: 'Why it earned this rating',
   bestMove: 'What they should have done',
+  motif: 'Motif',
 };
 
 /** Composition pixels within which a dragged card snaps back to a corner anchor. */
@@ -35,6 +36,8 @@ export function EditLayer({ moment, width, height, scale }: EditLayerProps) {
   const store = useEditorStore();
   const theme = useEditor((s) => s.theme);
   const characters = useEditor((s) => s.doc.characters);
+  const moments = useEditor((s) => s.doc.moments);
+  const moveNumber = useMemo(() => moveNumbers(moments, characters).get(moment.id), [moments, characters, moment.id]);
   const focusRequest = useEditor((s) => s.focusRequest);
   const cardEl = useRef<HTMLDivElement>(null);
   const [box, setBox] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
@@ -55,7 +58,7 @@ export function EditLayer({ moment, width, height, scale }: EditLayerProps) {
 
   const setField = (field: CardField, value: string) =>
     store.getState().edit(
-      (d) => updateMoment(d, moment.id, field === 'bestMove' && value === '' ? { bestMove: undefined } : { [field]: value }),
+      (d) => updateMoment(d, moment.id, (field === 'bestMove' || field === 'motif') && value === '' ? { [field]: undefined } : { [field]: value }),
       { coalesce: `${moment.id}.${field}` },
     );
 
@@ -69,8 +72,11 @@ export function EditLayer({ moment, width, height, scale }: EditLayerProps) {
     el.setPointerCapture(e.pointerId);
     const start = { x: e.clientX, y: e.clientY, left: el.offsetLeft, top: el.offsetTop, w: el.offsetWidth, h: el.offsetHeight };
     store.getState().beginGesture();
+    // A badge beside the card stays in the frame too.
+    const badgeRoom =
+      theme.card.layout === 'headline' ? (theme.card.badgeSize + theme.card.badgeGap) * cardRect(moment.card, frame, theme).unit : 0;
     const move = (ev: globalThis.PointerEvent) => {
-      const left = clamp(start.left + (ev.clientX - start.x) / scale, 0, width - start.w);
+      const left = clamp(start.left + (ev.clientX - start.x) / scale, badgeRoom, width - start.w);
       const top = clamp(start.top + (ev.clientY - start.y) / scale, 0, height - start.h);
       setCard(placeCard(left, top, start.w, start.h, moment.card.scale));
     };
@@ -134,6 +140,7 @@ export function EditLayer({ moment, width, height, scale }: EditLayerProps) {
         <MoveCard
           moment={moment}
           actorName={actorName}
+          moveNumber={moveNumber}
           theme={theme}
           frame={frame}
           visibility={1}
@@ -164,7 +171,7 @@ export function EditLayer({ moment, width, height, scale }: EditLayerProps) {
                 field={name}
                 value={value}
                 placeholder={PLACEHOLDERS[name]}
-                singleLine={name === 'moveLabel'}
+                singleLine={name === 'moveLabel' || name === 'motif'}
                 onChange={(v) => setField(name, v)}
                 focusSignal={focusFor(name)}
               />
@@ -227,7 +234,7 @@ function Toolbar(props: {
   const counters = (Object.keys(TEXT_CAPS) as CardField[])
     .filter((f) => f !== 'bestMove' || !NO_BEST_MOVE.has(moment.classification))
     .map((f) => ({ f, n: (moment[f] ?? '').length, cap: TEXT_CAPS[f] }));
-  const LABEL: Record<CardField, string> = { moveLabel: 'Label', explanation: 'Breakdown', bestMove: 'Best' };
+  const LABEL: Record<CardField, string> = { moveLabel: 'Label', explanation: 'Breakdown', bestMove: 'Best', motif: 'Motif' };
 
   const picker = picking && (
     <div className="w-64 rounded-md border border-neutral-700 bg-neutral-950/95 p-1.5 shadow-lg" data-testid="rating-picker">

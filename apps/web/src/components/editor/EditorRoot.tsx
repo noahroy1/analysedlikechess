@@ -1,6 +1,8 @@
 import type { Analysis, HistoryEntry, Ingest, Project } from '@als/schema';
 import { useEffect, useRef, useState } from 'react';
+import { THEMES } from '@als/theme';
 import { EditorProvider, useEditor, useEditorStore } from '../../editor/context.tsx';
+import { setTheme } from '../../editor/doc.ts';
 import { createEditorStore, type EditorStore, type SaveStatus } from '../../editor/store.ts';
 import { getProject, listHistory, restoreVersion, saveProject } from '../../lib/api.ts';
 import { formatFps, formatTime } from '../../lib/format.ts';
@@ -137,6 +139,7 @@ function Header({ ingest, analysis, onRerunIngest, onDelete }: Omit<EditorRootPr
             Redo
           </HeaderButton>
         </div>
+        <ThemePicker />
         <HistoryMenu />
         <HeaderButton onClick={onRerunIngest} disabled={working} title="Re-run ingest (unchanged steps are skipped)">
           Re-run ingest
@@ -176,6 +179,29 @@ function SaveIndicator() {
 }
 
 /** The last 20 saved versions; restoring one saves it as the newest. */
+/** The project's look: cards, badges, timing and holds all follow it. Undoable like any edit. */
+function ThemePicker() {
+  const store = useEditorStore();
+  const themeId = useEditor((s) => s.doc.themeId);
+  return (
+    <label className="flex items-center gap-1.5 text-xs text-neutral-400" title="Card look (holds follow its timing)">
+      Look
+      <select
+        value={themeId}
+        data-testid="theme-picker"
+        onChange={(e) => store.getState().edit((d) => setTheme(d, e.target.value))}
+        className="rounded-md border border-neutral-700 bg-neutral-900 px-2 py-1 text-xs text-neutral-200"
+      >
+        {THEMES.map((t) => (
+          <option key={t.id} value={t.id}>
+            {t.name}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
 function HistoryMenu() {
   const store = useEditorStore();
   const projectId = useEditor((s) => s.project.id);

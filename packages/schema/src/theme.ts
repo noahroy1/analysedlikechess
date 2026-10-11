@@ -27,24 +27,32 @@ export type Badge = z.infer<typeof BadgeSchema>;
 
 export const ClassificationStyleSchema = z.object({
   label: z.string(),
+  /** Completes the headline "<move> is <phrase>", e.g. "a great move". */
+  phrase: z.string(),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/),
   badge: BadgeSchema,
 });
 export type ClassificationStyle = z.infer<typeof ClassificationStyleSchema>;
 
-/**
- * Every visual choice for cards and holds. Pixel sizes are for a 1080-pixel-tall
- * frame and scale with the frame height and the moment's `card.scale`.
- */
 /** The explanation streams in once the card is in: a word starts every 1 / wordsPerSec seconds and fades in over wordFadeSec. */
 export const TypeOutSchema = z.object({ wordsPerSec: z.number().positive(), wordFadeSec: z.number().nonnegative() });
 export type TypeOut = z.infer<typeof TypeOutSchema>;
 
+/**
+ * Every visual choice for cards and holds. Pixel sizes are for a 1080-pixel-tall
+ * frame and scale with the frame height and the moment's `card.scale`.
+ */
 export const ThemeSchema = z.object({
   id: z.string().min(1),
   name: z.string(),
   classifications: z.record(ClassificationSchema, ClassificationStyleSchema),
   card: z.object({
+    /**
+     * `stacked`: badge inside the card, rating label over "Actor: Move".
+     * `headline`: badge beside the card, "<Move> is <phrase>" in the rating colour, then
+     * "<number> <actor> · <Move><notation>", the breakdown, the better move and the motif chip.
+     */
+    layout: z.enum(['stacked', 'headline']),
     fontFamily: z.string(),
     labelSize: z.number().positive(),
     titleSize: z.number().positive(),
@@ -58,6 +66,14 @@ export const ThemeSchema = z.object({
     /** Explanation lines shown before truncating. */
     lineClamp: z.int().positive(),
     badgeSize: z.number().positive(),
+    /** Gap between the card and a badge drawn beside it (`headline`). */
+    badgeGap: z.number().nonnegative(),
+    /** Width of the rating-coloured edge on the card's left. */
+    accentWidth: z.number().nonnegative(),
+    /** "Better was" line colour (`headline`). */
+    betterColor: z.string(),
+    chipBackground: z.string(),
+    chipTextColor: z.string(),
     shadow: z.boolean(),
   }),
   layout: z.object({
@@ -72,8 +88,14 @@ export const ThemeSchema = z.object({
     dim: Unit,
     /** Final zoom across the hold, for `push-in`. */
     pushIn: z.number().min(1).max(1.5),
+    /** Seconds the dim takes to come in; 0 is instant, on the first frozen frame. */
+    dimInSec: z.number().nonnegative(),
   }),
   timing: z.object({
+    /** A badge beside the card (`headline`) pops in first: after this delay, over `badgePopSec`. 0 and 0 for a badge inside the card. */
+    badgeDelaySec: z.number().nonnegative(),
+    badgePopSec: z.number().nonnegative(),
+    /** The card animates in once the badge has popped; the type-out starts when it is in. */
     cardInSec: z.number().nonnegative(),
     typeOut: TypeOutSchema,
     /** How long the finished card stays up before it leaves. */

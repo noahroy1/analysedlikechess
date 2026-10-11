@@ -138,6 +138,7 @@ export function createApp({ store, queue, analysis }: AppDeps) {
     const saved = await store.save(c.req.param('id'), edit.version, (p) => {
       p.moments = edit.moments;
       p.context.characters = edit.characters;
+      p.themeId = edit.themeId;
     });
     return c.json({ version: saved.version });
   });
@@ -145,7 +146,7 @@ export function createApp({ store, queue, analysis }: AppDeps) {
   /** The last saved versions, newest first. */
   app.get('/projects/:id/history', async (c) => c.json(await store.history(c.req.param('id'))));
 
-  /** Bring back an earlier version's moments and characters as a new version. */
+  /** Bring back an earlier version's moments, characters and theme as a new version. */
   app.post('/projects/:id/history/:version/restore', async (c) => {
     const id = c.req.param('id');
     const { version } = ProjectEditSchema.pick({ version: true }).parse(await c.req.json());
@@ -153,6 +154,7 @@ export function createApp({ store, queue, analysis }: AppDeps) {
     const saved = await store.save(id, version, (p) => {
       p.moments = old.moments;
       p.context.characters = old.context.characters;
+      p.themeId = old.themeId;
     });
     return c.json(saved);
   });

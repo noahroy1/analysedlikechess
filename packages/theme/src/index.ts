@@ -1,2 +1,2 @@
 export { Badge, type BadgeProps } from './Badge.tsx';
-export { defaultTheme, getTheme } from './themes.ts';
+export { THEMES, creatorTheme, defaultTheme, getTheme } from './themes.ts';

@@ -186,7 +186,7 @@ describe('autosave', () => {
 describe('doc operations', () => {
   const doc = (): ops.Doc => {
     const p = fixture();
-    return { moments: p.moments, characters: p.context.characters };
+    return { moments: p.moments, characters: p.context.characters, themeId: p.themeId };
   };
 
   it('retiming never crosses a neighbour or the minimum gap', () => {
@@ -203,8 +203,26 @@ describe('doc operations', () => {
 
   it('merging characters moves labels and moves', () => {
     const merged = ops.mergeCharacters(doc(), 'c-blue', 'c-red');
-    expect(merged.characters).toEqual([{ id: 'c-red', name: 'Red', speakerLabels: ['A', 'B'] }]);
+    expect(merged.characters).toEqual([{ id: 'c-red', name: 'Red', speakerLabels: ['A', 'B'], side: 'white' }]);
     expect(merged.moments.every((m) => m.actorId === 'c-red')).toBe(true);
+  });
+
+  it('sets and clears the side a character plays', () => {
+    const black = ops.setSide(doc(), 'c-red', 'black');
+    expect(black.characters.find((c) => c.id === 'c-red')?.side).toBe('black');
+    expect('side' in ops.setSide(black, 'c-red', undefined).characters.find((c) => c.id === 'c-red')!).toBe(false);
+  });
+
+  it('switching theme recomputes unlocked holds from the new timing', () => {
+    const { store } = setup();
+    const before = store.getState().doc.moments[0]!.holdSec;
+    store.getState().edit((d) => ops.setTheme(d, 'creator'));
+    expect(store.getState().theme.id).toBe('creator');
+    // The creator's badge pops before the card, so the hold is longer.
+    expect(store.getState().doc.moments[0]!.holdSec).toBeGreaterThan(before);
+    store.getState().undo();
+    expect(store.getState()).toMatchObject({ theme: { id: 'default' } });
+    expect(store.getState().doc.moments[0]!.holdSec).toBe(before);
   });
 
   it('assigning a speaker label takes it off everyone else', () => {

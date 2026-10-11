@@ -8,7 +8,8 @@
       "classification": "inaccuracy",
       "moveLabel": "Goes In Alone",
       "explanation": "Carl goes up to room 201 alone with his gun drawn, leaving his agents downstairs. He wants this collar himself, but without backup the mate takes longer.",
-      "bestMove": "Take Backup"
+      "bestMove": "Take Backup",
+      "motif": "Check"
     },
     {
       "context": "Carl, gun drawn, finds Frank in the motel bathroom among the forged cheques.",
@@ -16,7 +17,8 @@
       "classification": "best",
       "moveLabel": "Talks Shop",
       "explanation": "Frank walks out of the bathroom and chats about the typewriter and the cheques like a colleague inspecting evidence. He ignores the gun, and the mate count holds.",
-      "bestMove": null
+      "bestMove": null,
+      "motif": "Quiet Move"
     },
     {
       "context": "Carl has Frank at gunpoint and orders him to put his hands up.",
@@ -24,7 +26,8 @@
       "classification": "great",
       "moveLabel": "Barry Allen",
       "explanation": "Instead of raising his hands, Frank scolds Carl for being late and claims to be Secret Service with the forger already in custody. The forced mate disappears.",
-      "bestMove": null
+      "bestMove": null,
+      "motif": "Zwischenzug"
     },
     {
       "context": "Frank, posing as Secret Service, says his partner already has the forger.",
@@ -32,7 +35,8 @@
       "classification": "inaccuracy",
       "moveLabel": "Pushes Back",
       "explanation": "Carl says he has no idea what the man is talking about, but he keeps listening. Arguing instead of demanding proof gives Frank time to build his story.",
-      "bestMove": "Demand ID Now"
+      "bestMove": "Demand ID Now",
+      "motif": null
     },
     {
       "context": "Carl, still unsure, asks to see Frank's identification.",
@@ -40,7 +44,8 @@
       "classification": "brilliant",
       "moveLabel": "Whole Wallet",
       "explanation": "Frank hands over his whole wallet before Carl can ask twice, and even offers a gun he doesn't have. Giving up everything makes checking him feel rude.",
-      "bestMove": null
+      "bestMove": null,
+      "motif": "Sacrifice"
     },
     {
       "context": "A heist crew argues over who carries the bag out past the guards.",
@@ -48,7 +53,8 @@
       "classification": "excellent",
       "moveLabel": "Picks The New Guy",
       "explanation": "Danny hands the bag to the newest member of the crew, the one face no guard has seen. He never tells him what is inside, so the exit rests on luck.",
-      "bestMove": "Split The Haul"
+      "bestMove": "Split The Haul",
+      "motif": "Decoy"
     },
     {
       "context": "A babysitter hears a noise downstairs.",
@@ -56,7 +62,8 @@
       "classification": "good",
       "moveLabel": "Calls A Friend",
       "explanation": "Lena hears the noise and phones her friend before she moves an inch. Someone now knows where she is, just nobody who can come and help.",
-      "bestMove": "Call The Police"
+      "bestMove": "Call The Police",
+      "motif": null
     },
     {
       "context": "A new sheriff walks into a saloon in a town that does not want him.",
@@ -64,7 +71,8 @@
       "classification": "book",
       "moveLabel": "Orders Milk",
       "explanation": "The new sheriff steps up to the bar and asks for a glass of milk. Every stranger in a western opens this way, and the room laughs right on cue.",
-      "bestMove": null
+      "bestMove": null,
+      "motif": "Opening Theory"
     },
     {
       "context": "A man on the run realises his phone is being tracked.",
@@ -72,7 +80,8 @@
       "classification": "mistake",
       "moveLabel": "Ditches The Phone",
       "explanation": "Marco throws his phone out of the car window on the highway. The tracker now marks the exact spot he passed, and he has no way left to call for help.",
-      "bestMove": "Mail It Away"
+      "bestMove": "Mail It Away",
+      "motif": null
     },
     {
       "context": "The villain monologues with his back to an open window.",
@@ -80,7 +89,8 @@
       "classification": "miss",
       "moveLabel": "Stays Seated",
       "explanation": "The ropes have been loose for a full minute and the window is open behind the villain. Jack sits through the whole speech, and the free piece is gone.",
-      "bestMove": "Slip The Ropes"
+      "bestMove": "Slip The Ropes",
+      "motif": null
     },
     {
       "context": "A suspect is asked where she was on the night of the murder.",
@@ -88,7 +98,8 @@
       "classification": "blunder",
       "moveLabel": "Mentions The Knife",
       "explanation": "Asked where she was that night, Ruth insists she never touched the knife. Nobody had mentioned a knife, and the interview is over in one move.",
-      "bestMove": "Answer The Question"
+      "bestMove": "Answer The Question",
+      "motif": "Discovered Attack"
     }
   ]
 }

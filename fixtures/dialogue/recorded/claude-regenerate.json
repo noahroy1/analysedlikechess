@@ -1,16 +1,17 @@
 {
- "output": {
-  "classification": "mistake",
-  "moveLabel": "Splits the party",
-  "explanation": "Two people, two flashlights, one bad idea. Halving the group halves the eyes on every dark corner, which is exactly what the house wanted.",
-  "bestMove": "Stay together and clear the house room by room.",
-  "confidence": 0.8
- },
- "model": "claude-sonnet-5-5",
- "usage": {
-  "inputTokens": 4120,
-  "outputTokens": 520,
-  "cacheReadTokens": 0,
-  "cacheWriteTokens": 3980
- }
+  "output": {
+    "classification": "mistake",
+    "moveLabel": "Splits the party",
+    "explanation": "Two people, two flashlights, one bad idea. Halving the group halves the eyes on every dark corner, which is exactly what the house wanted.",
+    "bestMove": "Stay together and clear the house room by room.",
+    "motif": null,
+    "confidence": 0.8
+  },
+  "model": "claude-sonnet-5-5",
+  "usage": {
+    "inputTokens": 4120,
+    "outputTokens": 520,
+    "cacheReadTokens": 0,
+    "cacheWriteTokens": 3980
+  }
 }

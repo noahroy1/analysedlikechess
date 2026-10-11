@@ -12,6 +12,7 @@ import {
 export interface Doc {
   moments: Moment[];
   characters: Character[];
+  themeId: string;
 }
 
 export class EditError extends Error {}
@@ -116,6 +117,7 @@ export function mergeCharacters(doc: Doc, fromId: string, intoId: string): Doc {
   const from = doc.characters.find((c) => c.id === fromId);
   if (!from || fromId === intoId) return doc;
   return {
+    ...doc,
     characters: doc.characters
       .filter((c) => c.id !== fromId)
       .map((c) => (c.id === intoId ? { ...c, speakerLabels: [...c.speakerLabels, ...from.speakerLabels] } : c)),
@@ -136,11 +138,29 @@ export function assignSpeaker(doc: Doc, label: string, characterId: string | nul
 
 export function deleteCharacter(doc: Doc, id: string): Doc {
   return {
+    ...doc,
     characters: doc.characters.filter((c) => c.id !== id),
     moments: doc.moments.map((m) => {
       if (m.actorId !== id) return m;
       const { actorId: _, ...rest } = m;
       return rest;
+    }),
+  };
+}
+
+/** Switches the project's look; unlocked holds follow the new theme's timing. */
+export function setTheme(doc: Doc, themeId: string): Doc {
+  return doc.themeId === themeId ? doc : { ...doc, themeId };
+}
+
+/** The colour a character plays, for move numbers; undefined clears it. */
+export function setSide(doc: Doc, id: string, side: Character['side']): Doc {
+  return {
+    ...doc,
+    characters: doc.characters.map((c) => {
+      if (c.id !== id) return c;
+      const { side: _, ...rest } = c;
+      return side ? { ...rest, side } : rest;
     }),
   };
 }

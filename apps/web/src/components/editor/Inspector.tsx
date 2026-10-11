@@ -94,6 +94,15 @@ export function Inspector() {
         </Field>
       )}
 
+      <Field label="Motif" count={[moment.motif?.length ?? 0, TEXT_CAPS.motif]}>
+        <input
+          value={moment.motif ?? ''}
+          placeholder="Sacrifice, Zwischenzug, Quiet Move…"
+          onChange={(e) => set({ motif: e.target.value || undefined }, 'motif')}
+          className="input"
+        />
+      </Field>
+
       {warnings.length > 0 && (
         <ul className="rounded-md border border-amber-900/60 bg-amber-950/30 px-2 py-1.5 text-xs text-amber-300">
           {warnings.map((w) => (

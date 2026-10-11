@@ -53,24 +53,26 @@ try {
   };
 
   const wps = t.typeOut.wordsPerSec;
-  const typingEnd = t.cardInSec + (words - 1) / wps + t.typeOut.wordFadeSec;
+  // Typing starts once the badge has popped and the card is in.
+  const start = t.badgeDelaySec + t.badgePopSec + t.cardInSec;
+  const typingEnd = start + (words - 1) / wps + t.typeOut.wordFadeSec;
   const samples = [];
   for (let sec = 0; sec <= typingEnd + 0.6; sec += 0.25) samples.push({ sec, ...(await read(sec)) });
   if (shots) {
     // The edit layer covers a paused hold with the full, editable card; hide it to see the drawn frame.
     await page.eval(`document.head.insertAdjacentHTML('beforeend', '<style>[data-testid=edit-layer]{display:none!important}</style>')`);
-    for (const [i, sec] of [t.cardInSec + 1, t.cardInSec + typingEnd / 2, typingEnd + 0.5].entries()) {
+    for (const [i, sec] of [start + 1, (start + typingEnd) / 2, typingEnd + 0.5].entries()) {
       await read(sec);
       await page.screenshot(`${shots}-${i}.png`, { x: 390, y: 70, width: 830, height: 470 });
     }
   }
 
   // The last frame before the card is fully in.
-  const beforeIn = await read(t.cardInSec - 1 / fps);
-  result('no explanation words before the card is in', beforeIn !== null && beforeIn.words === 0, `${beforeIn?.words} words a frame before ${t.cardInSec} s`);
+  const beforeIn = await read(start - 1 / fps);
+  result('no explanation words before the card is in', beforeIn !== null && beforeIn.words === 0, `${beforeIn?.words} words a frame before ${start} s`);
 
-  const typing = samples.filter((s) => s.sec > t.cardInSec && s.sec < typingEnd - 0.2);
-  const expected = (sec) => Math.min(words, Math.floor((sec - t.cardInSec) * wps) + 1);
+  const typing = samples.filter((s) => s.sec > start && s.sec < typingEnd - 0.2);
+  const expected = (sec) => Math.min(words, Math.floor((sec - start) * wps) + 1);
   const offBy = Math.max(...typing.map((s) => Math.abs(s.words - expected(s.sec))));
   const monotonic = typing.every((s, i) => i === 0 || s.words >= typing[i - 1].words);
   result(`types out at ${wps} words a second`, monotonic && offBy <= 1, `${typing.map((s) => s.words).join(', ')} words at 0.25 s steps; max off by ${offBy}`);

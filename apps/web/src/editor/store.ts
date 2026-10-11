@@ -1,4 +1,4 @@
-import { ProjectSchema, type Moment, type MoveDraft, type Project, type Theme } from '@als/schema';
+import { ProjectSchema, type MoveDraft, type Project, type ProjectEdit, type Theme } from '@als/schema';
 import { getTheme } from '@als/theme';
 import { createStore, type StoreApi } from 'zustand/vanilla';
 import { normalize, type Doc } from './doc.ts';
@@ -55,7 +55,7 @@ export interface SaveOutcome {
 }
 
 export interface EditorDeps {
-  save: (edit: { version: number; moments: Moment[]; characters: Doc['characters'] }) => Promise<SaveOutcome>;
+  save: (edit: ProjectEdit) => Promise<SaveOutcome>;
   reload: () => Promise<Project>;
 }
 
@@ -84,7 +84,11 @@ export interface EditorActions {
 
 export type EditorStore = StoreApi<EditorState & EditorActions>;
 
-const docOf = (project: Project): Doc => ({ moments: project.moments, characters: project.context.characters });
+const docOf = (project: Project): Doc => ({ moments: project.moments, characters: project.context.characters, themeId: project.themeId });
+
+/** The theme follows the document, so switching it undoes like any other edit. */
+const withTheme = (doc: Doc) => ({ doc, theme: getTheme(doc.themeId) });
+const normalized = (doc: Doc) => normalize(doc, getTheme(doc.themeId));
 
 /** The editor's state for one project, with undo/redo and versioned autosave. */
 export function createEditorStore(initial: Project, deps: EditorDeps): EditorStore {
@@ -94,7 +98,7 @@ export function createEditorStore(initial: Project, deps: EditorDeps): EditorSto
   let inFlight: Promise<void> | null = null;
   let saveAgain = false;
   // Compared by reference: the doc last saved (or loaded) needs no save.
-  let savedDoc: Doc = normalize(docOf(initial), getTheme(initial.themeId));
+  let savedDoc: Doc = normalized(docOf(initial));
   let toastId = 0;
 
   const store = createStore<EditorState & EditorActions>()((set, get) => {
@@ -107,7 +111,7 @@ export function createEditorStore(initial: Project, deps: EditorDeps): EditorSto
       const merge = coalesce !== undefined && lastCoalesce?.key === coalesce && now - lastCoalesce.at < COALESCE_MS;
       lastCoalesce = coalesce !== undefined ? { key: coalesce, at: now } : null;
       set({
-        doc: next,
+        ...withTheme(next),
         past: merge ? past : [...past, doc].slice(-HISTORY_DEPTH),
         future: [],
       });
@@ -127,19 +131,19 @@ export function createEditorStore(initial: Project, deps: EditorDeps): EditorSto
       focusRequest: null,
       proposal: null,
 
-      edit: (recipe, options) => commit(normalize(recipe(get().doc), get().theme), options?.coalesce),
+      edit: (recipe, options) => commit(normalized(recipe(get().doc)), options?.coalesce),
 
       beginGesture: () => {
         gestureBase = get().doc;
         lastCoalesce = null;
       },
-      gesture: (recipe) => set({ doc: normalize(recipe(get().doc), get().theme) }),
+      gesture: (recipe) => set(withTheme(normalized(recipe(get().doc)))),
       endGesture: (keep = true) => {
         const base = gestureBase;
         gestureBase = null;
         if (!base) return;
         const { doc, past } = get();
-        if (!keep) set({ doc: base });
+        if (!keep) set(withTheme(base));
         else if (doc !== base) set({ past: [...past, base].slice(-HISTORY_DEPTH), future: [] });
         scheduleSave();
       },
@@ -150,7 +154,7 @@ export function createEditorStore(initial: Project, deps: EditorDeps): EditorSto
         if (!previous) return;
         lastCoalesce = null;
         set({
-          doc: previous,
+          ...withTheme(previous),
           past: past.slice(0, -1),
           future: [doc, ...future],
           selectedId: previous.moments.some((m) => m.id === selectedId) ? selectedId : null,
@@ -162,7 +166,7 @@ export function createEditorStore(initial: Project, deps: EditorDeps): EditorSto
         if (!next) return;
         lastCoalesce = null;
         set({
-          doc: next,
+          ...withTheme(next),
           past: [...past, doc],
           future: future.slice(1),
           selectedId: next.moments.some((m) => m.id === selectedId) ? selectedId : null,
@@ -232,6 +236,7 @@ export function createEditorStore(initial: Project, deps: EditorDeps): EditorSto
       ...project,
       moments: doc.moments,
       context: { ...project.context, characters: doc.characters },
+      themeId: doc.themeId,
     });
     if (!check.success) {
       store.setState({ saveStatus: 'invalid', saveError: check.error.issues[0]?.message ?? 'invalid project' });
@@ -239,7 +244,7 @@ export function createEditorStore(initial: Project, deps: EditorDeps): EditorSto
     }
     store.setState({ saveStatus: 'saving', saveError: null });
     try {
-      const outcome = await deps.save({ version: baseVersion, moments: doc.moments, characters: doc.characters });
+      const outcome = await deps.save({ version: baseVersion, moments: doc.moments, characters: doc.characters, themeId: doc.themeId });
       if (outcome.kind === 'conflict') {
         saveAgain = false;
         await reloadAfterConflict();
@@ -253,6 +258,7 @@ export function createEditorStore(initial: Project, deps: EditorDeps): EditorSto
           version: outcome.version!,
           moments: doc.moments,
           context: { ...s.project.context, characters: doc.characters },
+          themeId: doc.themeId,
         },
         saveStatus: s.doc === doc ? 'saved' : 'pending',
       }));

@@ -27,6 +27,7 @@ export function systemPrompt(style: StyleCorpus): string {
         `Label: ${e.moveLabel}`,
         `Breakdown: ${e.explanation}`,
         `Best move: ${e.bestMove ?? '(none)'}`,
+        `Motif: ${e.motif ?? '(none)'}`,
       ].join('\n'),
     )
     .join('\n\n');
@@ -48,6 +49,7 @@ Format (the card is read during a freeze, so every field is short):
 - Label: the move's name, two or three words in Title Case, at most ${TEXT_CAPS.moveLabel} characters. A nickname for the action, not a sentence.
 - Breakdown: exactly two sentences, about 25 to 30 words, at most ${TEXT_CAPS.explanation} characters. Sentence one: what the character visibly does. Sentence two: the verdict.
 - Best move: a two to four word command in Title Case, at most ${TEXT_CAPS.bestMove} characters.
+- Motif: the chess idea the move embodies, as a one to three word chip in Title Case, at most ${TEXT_CAPS.motif} characters (Sacrifice, Zwischenzug, Quiet Move, Check, Fork, Pin, Gambit, Decoy, Deflection, Prophylaxis). Use it when a chess idea fits the move; leave it null rather than force one.
 
 Writing (every word has to earn its place):
 - Concrete over abstract: name the person, the object, the number, the place. Strong verbs, not stacked adjectives.
@@ -81,7 +83,9 @@ export function annotationTask(candidates: Candidate[], target: number): string 
   return `Candidates found in the scene:
 ${JSON.stringify(candidates, null, 1)}
 
-Task: pick the final ${target} moves (fewer only if the scene cannot support that many), spread across the scene's arc, and annotate each in the voice shown above: rating, label, breakdown, best move (null where the rules say so) and your confidence. Prefer moves an audience would argue about. Use each candidate at most once.`;
+Task: pick the final ${target} moves (fewer only if the scene cannot support that many), spread across the scene's arc, and annotate each in the voice shown above: rating, label, breakdown, best move (null where the rules say so), motif and your confidence. Prefer moves an audience would argue about. Use each candidate at most once.
+
+Also name the scene's protagonist, the character the audience follows, who plays White. Leave it null if no one clearly stands out.`;
 }
 
 export function regenerateTask(moment: Moment, evidence: string[], actor: string | undefined, instruction?: string): string {
@@ -90,6 +94,7 @@ export function regenerateTask(moment: Moment, evidence: string[], actor: string
     `Label: ${moment.moveLabel || '(empty)'}`,
     `Breakdown: ${moment.explanation || '(empty)'}`,
     `Best move: ${moment.bestMove ?? '(none)'}`,
+    `Motif: ${moment.motif ?? '(none)'}`,
   ].join('\n');
   return `Task: write the annotation for one move.
 The video freezes at ${moment.sourceTime.toFixed(2)} s.${actor ? ` The move is ${actor}'s.` : ''}

@@ -22,6 +22,7 @@ import type { ProjectStore } from '../projects/store.ts';
 import type { AnalysisConfig } from './config.ts';
 import { annotationTask, decisionPointsTask, speakerNamingTask, systemPrompt, targetMoveCount } from './prompts.ts';
 import type { Providers } from './providers/index.ts';
+import { assignSides } from './sides.ts';
 import { snapMoves } from './snap-moves.ts';
 import { castNames, timelineText } from './timeline-text.ts';
 
@@ -34,7 +35,7 @@ const STEP_VERSION: Record<Exclude<StageName, 'snap'>, number> = {
   describe: 1,
   speakers: 1,
   decisions: 1,
-  annotate: 1,
+  annotate: 2,
 };
 
 const NAMING_SYSTEM =
@@ -264,7 +265,7 @@ export async function runAnalysis(
     );
     const candidates = uniqueIds(passA.candidates);
 
-    const passBSchema = annotationSchema(candidates.map((c) => c.id));
+    const passBSchema = annotationSchema(candidates.map((c) => c.id), cast);
     const passB: Annotation = await step(
       'annotate',
       cacheKey('annotate', STEP_VERSION.annotate, config.models.analyst, system, context, candidates, target),
@@ -292,6 +293,7 @@ export async function runAnalysis(
     analysis.status = 'done';
     await persist((p) => {
       p.moments = snapped.moments;
+      p.context.characters = assignSides(p.context.characters, p.moments, passB.protagonist);
     }, true);
     if (snapped.dropped.length) console.log(`analysis ${id}: dropped`, snapped.dropped);
   } catch (error) {

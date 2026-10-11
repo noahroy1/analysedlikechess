@@ -54,12 +54,21 @@ const moveFields = {
     .describe(
       `The better move: a two to four word command in Title Case (${TEXT_CAPS.bestMove} characters at most); null for brilliant, great, best and book`,
     ),
+  motif: z
+    .string()
+    .nullable()
+    .describe(
+      `The chess idea behind the move as a short Title Case chip (${TEXT_CAPS.motif} characters at most), e.g. Sacrifice, Zwischenzug, Quiet Move, Check, Fork, Pin, Gambit; null when none fits`,
+    ),
   confidence: z.number().describe('0-1: how sure you are this belongs in the episode as rated'),
 };
 
-/** Pass B: the final moves, rated and written. */
-export const annotationSchema = (candidateIds: readonly string[]) =>
+/** Pass B: the final moves, rated and written, and who plays White. */
+export const annotationSchema = (candidateIds: readonly string[], cast: readonly string[]) =>
   z.object({
+    protagonist: enumOf(cast, 'Unknown')
+      .nullable()
+      .describe("The scene's protagonist, who plays White; null if no one stands out"),
     moves: z.array(z.object({ candidateId: enumOf(candidateIds, 'none'), ...moveFields })),
   });
 export type Annotation = z.infer<ReturnType<typeof annotationSchema>>;
@@ -81,6 +90,7 @@ export const StyleCorpusSchema = z.object({
       moveLabel: z.string(),
       explanation: z.string(),
       bestMove: z.string().nullable().optional(),
+      motif: z.string().nullable().optional(),
     }),
   ),
 });

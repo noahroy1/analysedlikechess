@@ -8,10 +8,14 @@ const Id = z.string().min(1);
 const Seconds = z.number().nonnegative();
 const Unit = z.number().min(0).max(1);
 
+export const SIDES = ['white', 'black'] as const;
+
 export const CharacterSchema = z.object({
   id: Id,
   name: z.string(),
   speakerLabels: z.array(z.string()),
+  /** The colour they play: White for the protagonist, which numbers moves "4" for White and "4..." for Black. */
+  side: z.enum(SIDES).optional(),
 });
 export type Character = z.infer<typeof CharacterSchema>;
 
@@ -99,6 +103,8 @@ export const MomentSchema = z.object({
   explanation: z.string(),
   /** Omitted for best and brilliant. */
   bestMove: z.string().optional(),
+  /** The chess idea behind the move, shown as a chip: "Sacrifice", "Zwischenzug". */
+  motif: z.string().optional(),
   card: CardSchema,
   /** Why the AI chose this time. */
   evidence: z.object({
