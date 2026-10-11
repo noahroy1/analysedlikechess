@@ -350,6 +350,18 @@ Ship original SVG badges built on the standard chess annotation glyphs, which no
 
 In Phase 6, take 5 to 10 frames from the creator's videos where a card is on screen and build a `creator` theme that matches their fonts, colours, layout and wording conventions. A theme editor screen with live preview makes later tweaks fast for them.
 
+## Running costs and top-ups
+
+Estimates from list prices in `analysis/prices.ts` for one 3-minute clip, until Phase 4's real run replaces them with logged numbers. Each stage's cost shows in the project's Analysis tab.
+
+| Service | What it does | Per 3-min clip | Per Regenerate | Suggested top-up |
+| --- | --- | --- | --- | --- |
+| ElevenLabs (Scribe v2) | Transcript, speakers | about $0.012 ($0.22 per hour, plus 20% for character-name key terms) | none | Nothing separate: it draws on the account's plan credits. A 30 s test cost $0.002 |
+| Gemini (3.5 Flash-Lite) | Scene notes from video | about $0.02 | none | $5 prepay covers about 200 clips. Prepay credits at zero return a 402 and stop analysis |
+| Anthropic (Opus 5.5 Analyst, Haiku 5.5 naming) | Pass A, Pass B, speaker naming | about $0.25 to $0.40 | about $0.01 (Sonnet 5.5) | $10 covers about 30 clips of testing |
+
+Rule of thumb: a clip costs under half a dollar all in, and Claude is nine tenths of it. Re-running only the Analyst costs the Claude share again and nothing else. Pitch prep (two demo episodes plus tuning the style corpus, about 30 runs) fits inside $15 of Anthropic and $5 of Gemini.
+
 ## Build phases
 
 Build the editor on a hand-written fixture before any AI exists, so the hardest UX problem (editing over a frozen frame) is solved on stable data. Each phase ends only when its checks pass.

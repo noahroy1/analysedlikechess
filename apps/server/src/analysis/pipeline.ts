@@ -168,7 +168,8 @@ export async function runAnalysis(
     const audioPath = store.file(id, 'audio.wav');
 
     // Stage 2: perception, in parallel.
-    const [transcript, sceneNotes] = await Promise.all([
+    // Both run to completion even if one fails, so the other's paid result is cached for the retry.
+    const transcribing =
       hasAudio && (await exists(audioPath))
         ? step(
             'transcribe',
@@ -179,8 +180,8 @@ export async function runAnalysis(
               return { value: r.transcript, model: r.model, usage: r.usage, costUsd: r.costUsd };
             },
           )
-        : (skip('transcribe'), undefined),
-      step(
+        : (skip('transcribe'), undefined);
+    const describing = step(
         'describe',
         cacheKey('describe', STEP_VERSION.describe, sourceHash, config.models.scene, config.sceneFps, project.context.movieTitle, project.context.sceneNote, hints),
         z.array(SceneNoteSchema),
@@ -191,8 +192,10 @@ export async function runAnalysis(
           });
           return { value: r.notes, model: r.model, usage: r.usage, costUsd: r.costUsd };
         },
-      ),
-    ]);
+      );
+    const failed = (await Promise.allSettled([transcribing, describing])).find((r) => r.status === 'rejected');
+    if (failed) throw failed.reason;
+    const [transcript, sceneNotes] = await Promise.all([transcribing, describing]);
     await persist((p) => {
       if (transcript) p.transcript = transcript;
       p.sceneNotes = sceneNotes;

@@ -12,6 +12,9 @@ import {
 } from '@als/schema';
 import { defaultTheme } from '@als/theme/themes';
 import { makeTestApp, DIALOGUE_RECORDING } from '../test-helpers.ts';
+import { AnalysisService } from './service.ts';
+import { makeProviders } from './providers/index.ts';
+import { ProviderError } from './providers/types.ts';
 import { parseScribe } from './providers/elevenlabs.ts';
 import { parseNotes } from './providers/gemini.ts';
 import { snapMoves } from './snap-moves.ts';
@@ -295,4 +298,37 @@ describe('analysis pipeline', () => {
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error: expect.stringMatching(/ELEVENLABS_API_KEY.*GEMINI_API_KEY.*ANTHROPIC_API_KEY/) });
   });
+});
+
+describe('a failing vendor', () => {
+  it('does not waste the other vendor\'s paid result: the transcript is cached and shown as done', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'als-analysis-fail-'));
+    try {
+      const env = await makeTestApp(root);
+      const res = await env.app.request('/api/projects?name=dialogue.mp4', { method: 'POST', body: await readFile(DIALOGUE) });
+      const { id } = ProjectSchema.parse(await res.json());
+      await env.queue.whenIdle();
+
+      const replay = makeProviders(env.analysis.config);
+      const broke: typeof replay = { ...replay, describer: { describe: () => Promise.reject(new ProviderError('credits depleted')) } };
+      const failing = await AnalysisService.load(env.store, broke, env.analysis.config);
+      await failing.start(id);
+      await failing.queue.whenIdle();
+
+      const failed = await env.store.read(id);
+      const stage = (name: string) => failed.analysis.stages.find((s) => s.name === name);
+      expect(failed.analysis.status).toBe('error');
+      expect(stage('transcribe')?.status).toBe('done');
+      expect(stage('describe')?.status).toBe('error');
+
+      // The retry, with the vendor fixed, does not pay for transcription again.
+      await env.analysis.start(id);
+      await env.analysis.queue.whenIdle();
+      const retried = await env.store.read(id);
+      expect(retried.analysis.status).toBe('done');
+      expect(retried.analysis.stages.find((s) => s.name === 'transcribe')?.status).toBe('cached');
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  }, 120_000);
 });

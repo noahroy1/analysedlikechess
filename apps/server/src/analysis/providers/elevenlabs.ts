@@ -85,8 +85,8 @@ export function scribeTranscriber({ apiKey, model, record }: ScribeOptions): Tra
       form.append('diarize', 'true');
       form.append('timestamps_granularity', 'word');
       form.append('tag_audio_events', 'true');
-      // Character names help it spell them. TODO(verify): the docs don't show how a
-      // list is encoded; repeated fields is the multipart convention.
+      // Character names help it spell them. The docs don't show how a list is encoded;
+      // repeated fields (the multipart convention) get HTTP 200. TODO(verify): that it changes spelling.
       for (const term of keyterms) form.append('keyterms', term);
 
       const res = await fetch(ENDPOINT, { method: 'POST', headers: { 'xi-api-key': apiKey }, body: form });
