@@ -16,7 +16,7 @@
     {
       "id": "d1",
       "sourceTime": 5.5,
-      "holdSec": 5.8,
+      "holdSec": 9.3,
       "actorId": "c-dexter",
       "classification": "book",
       "moveLabel": "Night Drop",
@@ -35,7 +35,7 @@
     {
       "id": "d2",
       "sourceTime": 9.6,
-      "holdSec": 5.9,
+      "holdSec": 9.1,
       "actorId": "c-doakes",
       "classification": "great",
       "moveLabel": "Follows His Gut",
@@ -54,7 +54,7 @@
     {
       "id": "d3",
       "sourceTime": 42,
-      "holdSec": 6.2,
+      "holdSec": 8.8,
       "actorId": "c-doakes",
       "classification": "mistake",
       "moveLabel": "Stops To Gloat",
@@ -74,7 +74,7 @@
     {
       "id": "d4",
       "sourceTime": 59,
-      "holdSec": 6,
+      "holdSec": 8.9,
       "actorId": "c-dexter",
       "classification": "good",
       "moveLabel": "Hands Visible",
@@ -94,7 +94,7 @@
     {
       "id": "d5",
       "sourceTime": 86,
-      "holdSec": 5.6,
+      "holdSec": 8,
       "actorId": "c-dexter",
       "classification": "brilliant",
       "moveLabel": "Plays Beaten",
@@ -113,7 +113,7 @@
     {
       "id": "d6",
       "sourceTime": 100.2,
-      "holdSec": 5.6,
+      "holdSec": 8.2,
       "actorId": "c-doakes",
       "classification": "blunder",
       "moveLabel": "Lets Him Close",

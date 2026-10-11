@@ -1,4 +1,4 @@
-import type { Card, Theme } from '@als/schema';
+import { typeOutSec, typedWords, type Card, type Theme } from '@als/schema';
 
 export interface FrameSize {
   width: number;
@@ -67,4 +67,29 @@ export function cardMotion(progress: number, holdFrames: number, fps: number, ti
 /** First output frame of a hold where the card is fully in: where Review mode stops. */
 export function cardSettledFrame(holdFrames: number, fps: number, timing: Theme['timing']): number {
   return Math.min(holdFrames - 1, Math.ceil(timing.cardInSec * fps));
+}
+
+export interface Reveal {
+  /** Explanation words that have started, each with its 0-1 opacity; the newest may still be fading in. */
+  words: { text: string; opacity: number }[];
+  /** 0-1 opacity of what follows the typed text (the best move): it fades in once the last word is in. */
+  after: number;
+}
+
+/**
+ * How much of the explanation shows `sinceCardInSec` after the card finished
+ * animating in. A hold set by hand too short for the type-out types faster,
+ * so the text is always complete before the card leaves.
+ */
+export function revealAt(explanation: string, sinceCardInSec: number, holdSec: number, timing: Theme['timing']): Reveal {
+  const { wordsPerSec, wordFadeSec } = timing.typeOut;
+  const natural = typeOutSec(explanation, timing.typeOut);
+  const available = holdSec - timing.cardInSec - timing.cardOutSec;
+  const speed = natural > available && available > 0 ? natural / available : 1;
+  const t = Math.max(0, sinceCardInSec) * speed;
+  const fade = (start: number) => (wordFadeSec > 0 ? clamp01((t - start) / wordFadeSec) : t >= start ? 1 : 0);
+  const words = typedWords(explanation)
+    .map((text, i) => ({ text, opacity: fade(i / wordsPerSec) }))
+    .filter((_, i) => t > i / wordsPerSec);
+  return { words, after: natural === 0 ? fade(0) : fade(natural) };
 }

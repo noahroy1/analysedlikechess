@@ -1,7 +1,7 @@
 import { NO_BEST_MOVE, type Moment, type Theme } from '@als/schema';
 import { Badge } from '@als/theme';
 import type { CSSProperties, HTMLAttributes, ReactNode, Ref } from 'react';
-import { cardRect, type FrameSize } from './card.ts';
+import { cardRect, type FrameSize, type Reveal } from './card.ts';
 
 export type CardField = 'moveLabel' | 'explanation' | 'bestMove';
 
@@ -31,6 +31,8 @@ export interface MoveCardProps {
   visibility: number;
   /** 0-1 entrance. */
   enter: number;
+  /** How far the explanation has typed out; omitted, the card shows all its text (the editor). */
+  reveal?: Reveal;
   editing?: MoveCardEditing;
 }
 
@@ -38,7 +40,7 @@ export interface MoveCardProps {
  * The move card. Its only inputs are the moment, the theme and animation values.
  * TODO(open-decision): match the creator's exact card look (fonts, layout, wording) in Phase 6.
  */
-export function MoveCard({ moment, actorName, theme, frame, visibility, enter, editing }: MoveCardProps) {
+export function MoveCard({ moment, actorName, theme, frame, visibility, enter, reveal, editing }: MoveCardProps) {
   const rect = cardRect(moment.card, frame, theme);
   const u = rect.unit;
   const { card } = theme;
@@ -46,7 +48,9 @@ export function MoveCard({ moment, actorName, theme, frame, visibility, enter, e
   const text = (name: CardField, value: string) => editing?.field?.(name, value) ?? value;
   const showEmpty = editing?.showEmptyFields ?? false;
   const bestMove = moment.bestMove ?? '';
-  const showBestMove = !NO_BEST_MOVE.has(moment.classification) && (bestMove !== '' || showEmpty);
+  const showBestMove =
+    !NO_BEST_MOVE.has(moment.classification) && (bestMove !== '' || showEmpty) && (reveal === undefined || reveal.after > 0);
+  const showExplanation = reveal ? reveal.words.length > 0 : moment.explanation !== '' || showEmpty;
   const badge = <Badge badge={style.badge} color={style.color} size={card.badgeSize * u} fontFamily={card.fontFamily} />;
   const position: CSSProperties = {
     left: rect.left,
@@ -99,7 +103,7 @@ export function MoveCard({ moment, actorName, theme, frame, visibility, enter, e
         </div>
       </div>
 
-      {(moment.explanation || showEmpty) && (
+      {showExplanation && (
         <p
           style={{
             margin: `${16 * u}px 0 0`,
@@ -111,7 +115,15 @@ export function MoveCard({ moment, actorName, theme, frame, visibility, enter, e
             overflow: 'hidden',
           }}
         >
-          {text('explanation', moment.explanation)}
+          {reveal
+            ? reveal.words.map((word, i) => (
+                // Words type out one at a time, the newest fading in.
+                <span key={i} style={{ opacity: word.opacity }}>
+                  {i > 0 ? ' ' : ''}
+                  {word.text}
+                </span>
+              ))
+            : text('explanation', moment.explanation)}
         </p>
       )}
 
@@ -123,6 +135,7 @@ export function MoveCard({ moment, actorName, theme, frame, visibility, enter, e
             borderTop: `${Math.max(1, 1.5 * u)}px solid rgba(255, 255, 255, 0.14)`,
             fontSize: card.bodySize * 0.92 * u,
             lineHeight: 1.32,
+            opacity: reveal?.after,
           }}
         >
           <span

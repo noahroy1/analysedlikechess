@@ -2,7 +2,7 @@ import type { EpisodeProps, Moment, Theme } from '@als/schema';
 import { Audio, Video } from '@remotion/media';
 import { useMemo } from 'react';
 import { AbsoluteFill, Freeze, Sequence, useCurrentFrame, useVideoConfig } from 'remotion';
-import { cardMotion, type FrameSize } from './card.ts';
+import { cardMotion, revealAt, type FrameSize } from './card.ts';
 import { MoveCard } from './MoveCard.tsx';
 import { buildTimeline, type Segment } from './timeline.ts';
 
@@ -67,6 +67,8 @@ function SegmentView({ src, segment, moment, actorName, theme, frameSize, fps }:
   const holding = hold !== undefined && frame >= playFrames;
   const progress = holding ? (frame - playFrames) / hold.frames : 0;
   const motion = holding ? cardMotion(progress, hold.frames, fps, theme.timing) : { visibility: 0, enter: 0 };
+  const holdSec = (hold?.frames ?? 0) / fps;
+  const reveal = holding && moment ? revealAt(moment.explanation, progress * holdSec - theme.timing.cardInSec, holdSec, theme.timing) : undefined;
   const { treatment, dim, pushIn } = theme.freeze;
   const zoom = holding && treatment === 'push-in' ? 1 + (pushIn - 1) * progress : 1;
 
@@ -90,6 +92,7 @@ function SegmentView({ src, segment, moment, actorName, theme, frameSize, fps }:
           frame={frameSize}
           visibility={motion.visibility}
           enter={motion.enter}
+          reveal={reveal}
         />
       )}
       {hold && theme.timing.sting && (

@@ -96,10 +96,10 @@ describe('undo and redo', () => {
 });
 
 describe('holds follow the text', () => {
-  it('recomputes an unlocked hold as text changes', () => {
-    const { store, setLabel } = setup();
+  it('recomputes an unlocked hold as the explanation changes', () => {
+    const { store } = setup();
     const before = store.getState().doc.moments[0]!.holdSec;
-    setLabel('x'.repeat(40));
+    store.getState().edit((d) => ops.updateMoment(d, 'm1', { explanation: `${d.moments[0]!.explanation} Ten more words to type out before the card can leave.` }));
     expect(store.getState().doc.moments[0]!.holdSec).toBeGreaterThan(before);
   });
 

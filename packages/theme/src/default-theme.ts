@@ -1,4 +1,4 @@
-import { DEFAULT_HOLD_TIMING, type Theme } from '@als/schema';
+import { DEFAULT_REREAD_SEC, DEFAULT_TYPE_OUT, type Theme } from '@als/schema';
 
 /**
  * The app's own look. Colour families follow the usual chess annotation
@@ -44,8 +44,9 @@ export const defaultTheme: Theme = {
   // Holds darken the frozen frame by 10% (the creator's call, Oct 12, 2026).
   freeze: { treatment: 'dim', dim: 0.1, pushIn: 1.04 },
   timing: {
-    hold: DEFAULT_HOLD_TIMING,
     cardInSec: 0.25,
+    typeOut: DEFAULT_TYPE_OUT,
+    rereadSec: DEFAULT_REREAD_SEC,
     cardOutSec: 0.2,
   },
 };

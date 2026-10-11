@@ -1,5 +1,6 @@
 import { NO_BEST_MOVE } from './classification.ts';
 import type { Moment } from './project.ts';
+import type { Theme, TypeOut } from './theme.ts';
 
 /** Minimum gap between two moments, in source seconds. */
 export const MIN_MOMENT_GAP_SEC = 0.5;
@@ -17,36 +18,35 @@ export const TEXT_CAPS = {
 
 export type CappedField = keyof typeof TEXT_CAPS;
 
-export interface HoldTiming {
-  /** Reading speed for the card's text. */
-  charsPerSec: number;
-  /** Added once the text is read, for rereads. */
-  paddingSec: number;
+/**
+ * The explanation types out word by word once the card is in, then the
+ * finished card stays up for a reread. Measured on the creator's videos
+ * (Oct 12, 2026): a new word every 0.18 s (about 5.5 words a second), each
+ * fading in over 0.12 s, and about 4 s with the finished card.
+ * Themes carry their own copy in `timing`.
+ */
+export const DEFAULT_TYPE_OUT: TypeOut = { wordsPerSec: 5.5, wordFadeSec: 0.12 };
+export const DEFAULT_REREAD_SEC = 4;
+
+/** The explanation's words, in the order they type out. */
+export const typedWords = (text: string): string[] => text.trim().split(/\s+/).filter(Boolean);
+
+/** Seconds from the first word starting to the last word fully in. */
+export function typeOutSec(explanation: string, typeOut: TypeOut): number {
+  const words = typedWords(explanation).length;
+  return words === 0 ? 0 : (words - 1) / typeOut.wordsPerSec + typeOut.wordFadeSec;
 }
 
 /**
- * Half the time per character of the usual 17 characters a second subtitle
- * reading speed (the creator's call, Oct 10, 2026), plus a second to reread.
- * Themes carry their own copy in `timing.hold`.
- * TODO(open-decision): tune against the creator's videos in Phase 6.
- */
-export const DEFAULT_HOLD_TIMING: HoldTiming = { charsPerSec: 34, paddingSec: 1 };
-
-/** Everything a viewer reads on the card. */
-export const cardTextLength = (moment: Pick<Moment, 'moveLabel' | 'explanation' | 'bestMove'>): number =>
-  moment.moveLabel.trim().length + moment.explanation.trim().length + (moment.bestMove?.trim().length ?? 0);
-
-/**
- * Hold length that follows the card's text: the card animating in, reading
- * time for every character, the reread padding, then the card animating out.
+ * Hold length that follows the card's text: the card animating in, the
+ * explanation typing out, the reread, then the card animating out.
  * Rounded to 0.1 s.
  */
 export function autoHoldSec(
-  moment: Pick<Moment, 'moveLabel' | 'explanation' | 'bestMove'>,
-  timing: { hold: HoldTiming; cardInSec: number; cardOutSec: number },
+  moment: Pick<Moment, 'explanation'>,
+  timing: Pick<Theme['timing'], 'cardInSec' | 'typeOut' | 'rereadSec' | 'cardOutSec'>,
 ): number {
-  const sec =
-    timing.cardInSec + cardTextLength(moment) / timing.hold.charsPerSec + timing.hold.paddingSec + timing.cardOutSec;
+  const sec = timing.cardInSec + typeOutSec(moment.explanation, timing.typeOut) + timing.rereadSec + timing.cardOutSec;
   return Math.round(sec * 10) / 10;
 }
 

@@ -36,6 +36,10 @@ export type ClassificationStyle = z.infer<typeof ClassificationStyleSchema>;
  * Every visual choice for cards and holds. Pixel sizes are for a 1080-pixel-tall
  * frame and scale with the frame height and the moment's `card.scale`.
  */
+/** The explanation streams in once the card is in: a word starts every 1 / wordsPerSec seconds and fades in over wordFadeSec. */
+export const TypeOutSchema = z.object({ wordsPerSec: z.number().positive(), wordFadeSec: z.number().nonnegative() });
+export type TypeOut = z.infer<typeof TypeOutSchema>;
+
 export const ThemeSchema = z.object({
   id: z.string().min(1),
   name: z.string(),
@@ -70,8 +74,10 @@ export const ThemeSchema = z.object({
     pushIn: z.number().min(1).max(1.5),
   }),
   timing: z.object({
-    hold: z.object({ charsPerSec: z.number().positive(), paddingSec: z.number().nonnegative() }),
     cardInSec: z.number().nonnegative(),
+    typeOut: TypeOutSchema,
+    /** How long the finished card stays up before it leaves. */
+    rereadSec: z.number().nonnegative(),
     cardOutSec: z.number().nonnegative(),
     /** Optional sound when a card appears: a URL the Player and the renderer can both load. */
     sting: z.string().optional(),

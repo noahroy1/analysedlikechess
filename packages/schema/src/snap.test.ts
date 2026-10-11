@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { autoHoldSec, DEFAULT_HOLD_TIMING } from './rules.ts';
+import { autoHoldSec, DEFAULT_REREAD_SEC, DEFAULT_TYPE_OUT, typeOutSec } from './rules.ts';
 import { cleanFrameRange, cleanFreezeTime, freezeAfterSpeech, speechSnapTargets } from './snap.ts';
 
 const FPS = 30;
@@ -64,19 +64,25 @@ describe('speechSnapTargets', () => {
   });
 });
 
+const defaultTiming = { cardInSec: 0.25, typeOut: DEFAULT_TYPE_OUT, rereadSec: DEFAULT_REREAD_SEC, cardOutSec: 0.2 };
+
 describe('autoHoldSec', () => {
-  // Card in and out total 0.5 s here, so expectations are exact.
-  const timing = { hold: DEFAULT_HOLD_TIMING, cardInSec: 0.3, cardOutSec: 0.2 };
+  // Card in and out total 0.5 s and the reread is 4 s, so expectations are exact.
+  const timing = { cardInSec: 0.3, typeOut: { wordsPerSec: 5, wordFadeSec: 0.2 }, rereadSec: 4, cardOutSec: 0.2 };
 
-  it('is the card animations plus the padding for an empty card', () => {
-    expect(autoHoldSec({ moveLabel: '', explanation: '' }, timing)).toBe(1.5);
+  it('is the card animations plus the reread for an empty explanation', () => {
+    expect(autoHoldSec({ explanation: '' }, timing)).toBe(4.5);
+    expect(autoHoldSec({ explanation: ' \n ' }, timing)).toBe(4.5);
   });
 
-  it('adds reading time at 34 characters a second', () => {
-    expect(autoHoldSec({ moveLabel: 'x'.repeat(34), explanation: 'y'.repeat(102), bestMove: 'z'.repeat(34) }, timing)).toBe(6.5);
+  it('adds the type-out: a word every 1 / wordsPerSec, the last one fading in', () => {
+    expect(typeOutSec('one', timing.typeOut)).toBeCloseTo(0.2);
+    expect(typeOutSec(' one  two three four five six ', timing.typeOut)).toBeCloseTo(1.2);
+    expect(autoHoldSec({ explanation: 'one two three four five six' }, timing)).toBe(5.7);
   });
 
-  it('ignores surrounding whitespace', () => {
-    expect(autoHoldSec({ moveLabel: '   ', explanation: ' '.repeat(50) }, timing)).toBe(1.5);
+  it('matches the creator: a 27-word breakdown holds about 9.4 s', () => {
+    const words = Array.from({ length: 27 }, (_, i) => `w${i}`).join(' ');
+    expect(autoHoldSec({ explanation: words }, defaultTiming)).toBeCloseTo(9.3, 1);
   });
 });
