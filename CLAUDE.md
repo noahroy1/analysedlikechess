@@ -13,6 +13,7 @@ Single-user local web app: upload a movie scene clip, draft chess-style move ann
 - `ANALYST_HANDOFF_DIR=<dir> pnpm dev`: dev only, replaces the Claude calls with request/answer files a Claude Code session writes by hand (see Status).
 - `pnpm seed:sample`: creates a project from the fixture (3 moments). `pnpm seed:moments <projectId> <file>` replaces a project's moments, e.g. `fixtures/demo/doakes-moments.json` for the Dexter demo clip.
 - `scripts/browser/`: headless-Chrome checks (`phase2-checks.mjs`, `phase3-checks.mjs`, `typeout-checks.mjs`, `format-checks.mjs`) over the DevTools protocol (no dependencies) against a running `pnpm dev`. The dev build exposes the Player as `window.__alsPlayer`.
+- `scripts/ref/hold-phases.mjs <clip> <crop>`: times a reference clip's hold phases (freeze, badge, card, type-out, exit) from frame changes.
 
 ## Layout
 
@@ -54,23 +55,110 @@ Single-user local web app: upload a movie scene clip, draft chess-style move ann
 
 ## Status and handoff (updated Oct 12, 2026)
 
-Read this first in a new session, then the PLAN.md section for the next phase.
+Read this first in a new session. It says where the work stands, what to do next, what is waiting on the user, and what was learned the hard way.
 
-- **Done:** Phases 0-3, the creator's review iterations, and Phase 4 code (analysis pipeline, providers, Regenerate, Make this a move, Analysis tab). Branches are stacked and **not merged into `main`**: `phase-0-scaffold` → `phase-1-ingest` → `phase-2-player` → `phase-3-editor` → `phase-4-analysis` (current tip). Ask before merging.
-- **Phase 4 live run, Oct 11, 2026:** ElevenLabs and Gemini work live with the keys in `apps/server/.env` (the `keyterms` field is accepted as repeated multipart fields; whether it changes spelling is unverified). The Anthropic API balance is empty, so with the user's agreement **Claude Code stood in for Claude by hand** through `ANALYST_HANDOFF_DIR` (`handoffAnalyst` in `providers/replay.ts`): the pipeline writes `request-<call>.json`, a session writes `claude-<call>.json` (`{"output": …}`), and the next run validates it like a live answer, labelled `hand-written/claude-code-session` at $0. Delete a `claude-*.json` to redo that call. Run the server from `apps/server` (or with `--env-file`) or it sees no keys. A failing vendor no longer discards the other's paid result.
-- **Real clip done:** `projects/bb1-ea55` is `media/BB1.mov` (Breaking Bad, Hank and Walt in the garage, 2:28) with real transcript and scene notes and 7 hand-written draft moves, all Phase 4 checks passing; its raw responses and requests are in `analysis/recorded/`. `media/BB2.mov` is a duplicate of BB1 (identical frames), not a 3-minute cut. Diarization labelled two Hank lines (u7 "And for what?", u22 "What's the point?") as Walt.
-- **Still owed (needs an Anthropic balance):** (1) run the dialogue clip once with `ANALYSIS_RECORD_DIR` and commit all six real responses together, replacing the synthetic ones in `fixtures/dialogue/recorded/`; (2) one live Opus run to compare with the hand-written moves and report real Claude cost per clip (estimate $0.25-0.40; real Scribe $0.011 and Gemini $0.008 for the 2:28 clip). Then stop for the user's review before Phase 5.
-- **Vendor choices (user delegated, price-optimised):** ElevenLabs Scribe v2 ($0.22/h; best independent WER among candidates; sound tags), Gemini 3.5 Flash-Lite for scene notes, Claude Haiku 5.5 for speaker naming, Opus 5.5 Analyst and Sonnet 5.5 Regenerate per the plan. Expected per 3-min clip: about $0.01 transcription, $0.02 scene notes, the rest Claude (Pass A + B).
-- **Decisions from the creator's reviews** (also in PLAN.md):
-  - Holds follow the explanation's type-out (Oct 12, measured on the creator's clips, replacing the Oct 10 34 characters a second plus 1 s): card in, a word every 0.18 s (5.5 words a second) each fading in over 0.12 s, then 4 s with the finished card, then card out. Only the explanation types; the best move fades in after the last word. Review still stops once the card is in, so resuming plays the type-out; the paused edit layer always shows the full text.
-  - Spoken moves freeze 0.15 s after the last word, in that word's shot, clear of cuts.
-  - Holds dim the frozen frame by 10% (Oct 12; replaces the Oct 10 "no dim").
-  - No Book moves after the first 30 s (`BOOK_WINDOW_SEC`): the Analyst is told, and later ones are relabelled Good in `snapMoves` and Regenerate. No editor warning, by the creator's choice.
-  - Brilliant, Great, Best and Book moves never carry a best move (the editor clears it, cards never show it, the Analyst is told not to write one).
-  - The video is 80% of the centre column and capped to the viewport height so the frame and its card are always visible; nothing auto-scrolls the page.
-  - The creator liked the peripheral editor features (cast, evidence, live feedback); keep that level of polish.
-- **Format iterations (from Oct 12, branch `format-iterations` on `phase-4-analysis`):** the creator's list, in this order, one commit and walkthrough each: (1) 10% dim and the Book rule, done; (2) shorter, denser text, done: caps 24/170/32 from the creator's cards, two-sentence breakdowns, writing rules in `prompts.ts`, BB1 re-drafted through the hand-off (old answer kept as `claude-annotate.v1-long-text.json`); (3) type-out of the explanation, done: the creator's 5.5 words a second (the user chose the clips over their first estimate of 2), `revealAt()` in `packages/composition/src/card.ts`, checked by `scripts/browser/typeout-checks.mjs`; (4) the `creator` theme, done: `packages/theme/src/creator-theme.ts` (`headline` card layout, badge beside the card popping in first, measured sizes, colours and timing), motif chips written by the Analyst, White/Black sides (the Analyst names the protagonist for White, else a coin flip; set by hand in the Cast tab) driving chess move numbers (`moveNumbers()`), and a Look picker in the editor header saved as `themeId` (undoable). BB1 uses it; its Pass B answers are kept as `claude-annotate.v1-long-text.json`, `.v2-no-motif.json` and the current one; (5) sounds per move type plus a typing loop, shared by every theme (chess sounds, not creator sounds), and droppable if they block progress; (6) evaluation bar (`media/creator-ref/style-ref-evaluation-bar.png`); (7) burned-in subtitles of the dialogue, after the features that set the format apart. BB1 stays the reference clip until the format works, then BB2. `media/BB2.mov` is still the duplicate of BB1, so the real cut is needed then.
-- **Creator reference (`media/creator-ref/`, Catch Me If You Can):** cards read "<Name> is a/an <rating>" in the rating colour, then a grey line "<move no.>[...] <actor> · <Name><glyph>", a coloured left border, the explanation (streams in word by word, each new word fading in), then "Better was: <move>" in green and a grey motif chip (Quiet Move, Zwischenzug, Sacrifice, Check). The round badge sits apart from the card, beside the character; the badge appears first, then the card. Timing in both reference clips: freeze and dim, badge pops in 0.25 s later, card slides in over 0.25 s, 27 words type in about 5 s, the finished card stays about 4 s, then the card cuts away instantly as playback resumes. The eval bar sits on the left edge between the two characters' portraits, labelled Black and White, with a number or "M6". The clips also have burned-in subtitles.
-- **Style corpus:** `style/corpus.json` holds the creator's five cards (`source: creator`) plus Claude-written placeholders in the same format for the other ratings; Phase 6 replaces the placeholders.
-- **Demo data:** the creator's Dexter clip is local in `media/` (never commit it). Their project is `doakes-catching-dexter-b8f1` in `projects/`; seed demo moves with `pnpm seed:moments doakes-catching-dexter-b8f1 fixtures/demo/doakes-moments.json`. Those moves were hand-written by Claude from frames, not transcribed.
-- **How each phase has ended:** run `pnpm check`, run the phase's checks in headless Chrome (`scripts/browser/`, against `pnpm dev` with `PROJECTS_DIR` pointed at a scratch folder so the user's projects stay clean), look at screenshots, commit, then give the user a short numbered test walkthrough and stop.
+### Where things stand
+
+- **Branch:** `format-iterations` (current tip), stacked on `phase-4-analysis` → `phase-3-editor` → `phase-2-player` → `phase-1-ingest` → `phase-0-scaffold`. **Nothing is merged into `main`**; ask before merging. `apps/server/.env.example` shows as deleted in the working tree from before Oct 12; it is not ours, so leave it out of commits (`git add -A -- . ':!apps/server/.env.example'`).
+- **Done:** Phases 0-4 (Phase 4 has two owed items, below), the creator's review iterations, and format iterations 1-4 of 7 (log below).
+- **Not started:** Phase 5 (export/render) and Phase 6 (pitch build). The format iterations were inserted before Phase 5 at the user's request; the user has not said whether Phase 5 waits for all seven.
+- **Checks at the tip:** `pnpm check` passes (157 tests). The browser checks pass: `phase2-checks`, `phase3-checks`, `typeout-checks` and `format-checks`.
+
+### Next action: format iteration 5 (sounds)
+
+Blocked on one user decision, asked at the end of iteration 4 and not yet answered: **where the sounds come from.** PLAN.md forbids copying Chess.com's sound effects, which the creator's clips (`media/creator-ref/style-sound-demo-*.mov`, which have audio) may use. Options offered:
+1. **Recommended:** Claude listens to the demo clips' audio to match its character, then synthesises *original* sounds: a move sound per type or group (brighter for Brilliant/Great, duller for mistakes), plus a light key-tick loop under the type-out. No input from the user is needed, and files can be swapped later.
+2. **The user supplies files:** one per move type (or group) plus a typing loop.
+
+Fixed requirements whatever the source:
+- Sounds are chess sounds, not creator sounds, so they are shared by every theme. Do not hang them on the theme, which today has only an optional `timing.sting`.
+- They play in both the Player and the render.
+- The typing loop follows `revealAt()`, so it starts with the first word and stops with the last.
+- The user said sounds may be dropped ("sundered") if they become the bottleneck.
+
+Also waiting on the user: whether speaker naming should prefer **first names** like the creator ("Frank", "Carl") over full names ("Walter White"). For now names can be edited in the Cast tab.
+
+### Format iterations (the creator's list, Oct 12; each ends with a commit and a walkthrough)
+
+1. **10% dim and the Book rule (done, `fb225f4`).** Holds dim 10%. Book is only allowed in the first 30 s (`BOOK_WINDOW_SEC`, `relabelLateBook()`): the Analyst is told, and later Book moves are relabelled Good in `snapMoves` and Regenerate. There is no editor warning, by the user's choice.
+2. **Shorter, denser text (done, `ea48c00`).** `TEXT_CAPS`: label 24, breakdown 170, best move 32 (motif 20 was added in step 4), taken from the creator's cards. Breakdowns are two sentences: what the character visibly does, then the verdict in chess terms. The writing rules (concrete, no filler or hedging, no verdict-word openers) are in `prompts.ts`. `style/corpus.json` leads with the creator's five real cards (`source: creator`); the other ratings are Claude-written placeholders (`source: placeholder`).
+3. **Type-out (done, `6ea986e`).** Only the explanation types, at the creator's measured speed: a word every 0.18 s (5.5 words a second; the user chose this over their first estimate of 2), each fading in over 0.12 s. The best move and motif fade in after the last word. Then 4 s with the finished card. The type-out lives in `revealAt()` (`packages/composition/src/card.ts`) and `typeOutSec()` and `typeOutStartSec()` (`packages/schema/src/rules.ts`). `autoHoldSec` = badge delay + pop + card in + type-out + reread + card out. A locked hold too short for its text types faster. Review mode stops when typing starts; the paused edit layer shows the full text.
+4. **Creator theme (done, `a2945bb`).**
+   - **Theme file:** `packages/theme/src/creator-theme.ts`.
+   - **`headline` card layout:** "<Move> is <phrase>" in the rating colour, then a grey line "<number> <actor> · <Move><NOTATION>", the breakdown, "Better was: …" with a branch icon, and a motif chip.
+   - **Badge:** round, 184 px, beside the card. It pops in at 0.3 s over 0.2 s with an overshoot; the card comes in after it.
+   - **Measured values:** Arial, 640 px wide, 9 px accent edge, background `rgba(34,33,29,0.9)`. Sampled colours: Brilliant `#419ba7`, Great `#6386b1`, Best `#93b146`, Inaccuracy `#f2c247`. The other six are `TODO(open-decision)` placeholders until a reference video with those ratings is sampled.
+   - **Hold edges:** the dim is instant and the card cuts away with no fade.
+   - **Motifs:** the Analyst writes `motif` (nullable) per move.
+   - **Sides:** the Analyst names `protagonist` in Pass B, and `assignSides()` (`apps/server/src/analysis/sides.ts`) gives them White, else a coin flip among the characters with moves. Sides already set are never overwritten.
+   - **Move numbers:** `moveNumbers()` (`packages/composition/src/notation.ts`) follows chess turn order with implied moves (W, B, B → "1", "1...", "2...").
+   - **Editor:** a Look picker in the header saves `themeId` as part of the editor document, so switching is undoable and holds re-time; a White/Black toggle in Cast; a Motif field in the inspector, also editable on the chip.
+5. **Sounds:** next, blocked on the decision above.
+6. **Evaluation bar:** last of the format-defining features. Reference: `media/creator-ref/style-ref-evaluation-bar.png`. A vertical bar on the left edge between the two characters' portraits, labelled Black (top) and White (bottom), reading a number such as "1.0" or a mate count such as "M6", and animating as cards appear. The creator's second sentences refer to it ("the mate count holds", "the forced mate disappears"). Its logic is expected to be heavy (per-move evaluation from the Analyst, portraits, animation), so plan it before building.
+7. **Burned-in subtitles** of the dialogue. The user put these after the features that set the format apart.
+
+**Reference clip:** BB1 stays the reference until the format is proven, then BB2. `media/BB2.mov` is still the duplicate of BB1 (the user apologised and knows), so the real BB2 is needed before then.
+
+### Creator reference (`media/creator-ref/`, gitignored, Catch Me If You Can motel scene)
+
+These are four screenshots (`style-ref-*.png`) and five clips (`style-sound-demo-*.mov`, 1080p60 with audio). What they show:
+- **Card text:** move names are 2-3 words in Title Case. Breakdowns are two sentences of about 27 words (150-160 characters). "Better was: <2-4 word command>" appears only on inaccuracies and worse. Motif chips: Quiet Move, Zwischenzug, Sacrifice, Check.
+- **Move numbers:** "1 Carl", "1... Frank", "2... Frank", "3 Carl", "4... Frank". "4..." implies a card between "3 Carl" and "4... Frank" that wasn't in the clips.
+- **Timing from the freeze:** dim on frame 1; badge pops at 0.3 s; card fades and slides in at 0.57 s; first word at 0.77 s; 27 words in about 5 s; 3.6-4.2 s of finished card; then an instant cut.
+- **Eval bar and subtitles:** both are on screen throughout.
+
+To measure more, use `scripts/ref/hold-phases.mjs <clip> <crop>` for timing, PIL (Python 3, installed) for colours, and `ffmpeg … tile=` contact sheets for reading text. Write scratch output to the session scratchpad, never into the repo.
+
+### Real-clip project and the hand-off analyst
+
+- **`projects/bb1-ea55`** is `media/BB1.mov` (Breaking Bad, Hank and Walt in the garage, 2:28). It has:
+  - a real transcript (ElevenLabs) and real scene notes (Gemini)
+  - seven draft moves written by Claude Code standing in for the Analyst, all still `ai`/`draft`
+  - the creator theme, with Walter White as White and Hank Schrader as Black
+  - Diarization put two of Hank's lines on Walt (u7 "And for what?", u22 "What's the point?").
+  - The Pass B answers are kept in `analysis/recorded/`: `claude-annotate.v1-long-text.json` (Phase 4), `.v2-no-motif.json` (iterations 2-3) and `claude-annotate.json` (current), each with its `request-annotate*.json`.
+- **The Anthropic balance is empty**, so Claude Code writes the Claude answers by hand through `ANALYST_HANDOFF_DIR` (`handoffAnalyst` in `providers/replay.ts`). The pipeline writes `request-<call>.json` and waits; a `claude-<call>.json` (`{"output": …}`) is then validated like a live answer and labelled `hand-written/claude-code-session` at $0. To redo only Pass B on BB1:
+  1. Copy `claude-decisions.json` and `claude-speakers.json` from BB1's `analysis/recorded/` into a scratch hand-off folder (so Pass A and speaker naming are reused), and leave `claude-annotate.json` out.
+  2. In `apps/server`, run `ANALYST_HANDOFF_DIR=<dir> node --env-file-if-exists=.env src/index.ts` (no `--watch`; see the lessons below).
+  3. Send `POST /api/projects/bb1-ea55/analyze` with `{"rerun":"analyst"}`. It writes `request-annotate.json` and fails waiting.
+  4. Write `claude-annotate.json` and POST again.
+  5. Archive the previous answer in `analysis/recorded/` with a version suffix.
+
+  A rerun replaces unapproved drafts, so first check they are unedited. Keep the same picks and ratings when testing a format change, so only one thing varies.
+- **Still owed from Phase 4 (needs an Anthropic balance):**
+  1. Run the dialogue clip once with `ANALYSIS_RECORD_DIR` and commit all six real responses together, replacing the synthetic ones in `fixtures/dialogue/recorded/`. Those were last hand-edited in iteration 4 to add `motif` and `protagonist`.
+  2. Do one live Opus run on BB1, compare it with the hand-written moves, and report the real Claude cost per clip. The estimate is $0.25-0.40; the real Scribe cost was $0.011 and Gemini $0.008 for the 2:28 clip.
+- **Vendor choices (user delegated, price-optimised):**
+  - ElevenLabs Scribe v2 at $0.22/h, for the best independent WER among the candidates, plus sound tags
+  - Gemini 3.5 Flash-Lite for scene notes
+  - Claude Haiku 5.5 for speaker naming
+  - Opus 5.5 for the Analyst and Sonnet 5.5 for Regenerate, per the plan
+
+  The live keys are in `apps/server/.env`. Run the server from `apps/server` (or with `--env-file`), or it sees no keys.
+
+### Standing decisions from the creator's reviews (also in PLAN.md)
+
+- Holds follow the type-out (iteration 3). Spoken moves freeze 0.15 s after the last word, in that word's shot, clear of cuts.
+- Holds dim the frozen frame by 10%.
+- No Book moves after 30 s.
+- Brilliant, Great, Best and Book moves never carry a best move.
+- The video is 80% of the centre column and capped to the viewport height. Nothing auto-scrolls the page.
+- The creator liked the peripheral editor features (cast, evidence, live feedback); keep that level of polish.
+- **Demo data:** the creator's Dexter clip is local in `media/`; never commit it. Seed its moves with `pnpm seed:moments doakes-catching-dexter-b8f1 fixtures/demo/doakes-moments.json`. Claude wrote those moves from frames; they were not transcribed. They now carry sides and motifs.
+
+### How each step ends (the user's standing workflow)
+
+1. Run `pnpm check`.
+2. Run the browser checks against `PROJECTS_DIR=<scratch> pnpm dev` with freshly seeded samples (`pnpm seed:sample`; each check edits its project, so seed one per check). `phase2-checks` needs the output frame count, currently 1143 for the sample under the default theme.
+3. Look at screenshots.
+4. Commit.
+5. Update this section.
+6. Give the user a short numbered walkthrough and stop.
+
+### Lessons learned
+
+- `pnpm dev` runs the server under `node --watch`. Killing the process on port 8787 is not enough: the watcher restarts it when files change, possibly against the user's real projects. Stop everything with `pkill -f "src/index.ts"; pkill -f vite`.
+- The editor's edit layer covers a paused hold with the full, editable card, so screenshots of the drawn frame (type-out, badge pop) must hide `[data-testid=edit-layer]`. `typeout-checks.mjs` does this.
+- The inspector's first input is the Regenerate box, not the label. Find fields by value or placeholder.
+- A PUT to `/api/projects/:id` needs `themeId` as well as moments and characters.
+- To set a React `<select>` from a check, use the native value setter and dispatch `change` (see `format-checks.mjs`).
