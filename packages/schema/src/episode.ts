@@ -1,9 +1,9 @@
 import { z } from 'zod';
 import { EvalBarSchema } from './eval.ts';
-import { CharacterSchema, MomentSchema } from './project.ts';
-import { SoundBankSchema } from './sounds.ts';
-import { SubtitleSchema } from './subtitles.ts';
-import { ThemeSchema } from './theme.ts';
+import { CharacterSchema, MomentSchema, type Character, type Project } from './project.ts';
+import { SoundBankSchema, type SoundBank } from './sounds.ts';
+import { SubtitleSchema, subtitlesFromTranscript } from './subtitles.ts';
+import { ThemeSchema, type Theme } from './theme.ts';
 
 /**
  * Everything the <Episode> composition draws from. The Player gets it from the
@@ -26,3 +26,42 @@ export const EpisodePropsSchema = z.object({
   subtitles: z.array(SubtitleSchema).optional(),
 });
 export type EpisodeProps = z.infer<typeof EpisodePropsSchema>;
+
+/** The parts of a project (or of the editor's unsaved document) an episode is drawn from. */
+export type EpisodeDoc = Pick<Project, 'moments' | 'evalBar' | 'subtitles' | 'transcript'> & {
+  characters: Character[];
+  durationSec: number;
+};
+
+export interface EpisodeMedia {
+  /** The clip: the proxy in the Player, the original source when rendering. */
+  src: string;
+  theme: Theme;
+  /** URL of a file in the project folder (portraits). */
+  fileUrl: (file: string) => string;
+  sounds?: SoundBank | undefined;
+}
+
+/**
+ * The one way a document becomes episode props, so the Player and the
+ * renderer draw from the same data. Subtitles that were never edited follow the transcript.
+ */
+export const episodeProps = (doc: EpisodeDoc, media: EpisodeMedia): EpisodeProps => ({
+  src: media.src,
+  durationSec: doc.durationSec,
+  moments: doc.moments,
+  characters: doc.characters,
+  theme: media.theme,
+  ...(doc.evalBar ? { evalBar: doc.evalBar } : {}),
+  portraits: Object.fromEntries(doc.characters.flatMap((c) => (c.portrait ? [[c.id, media.fileUrl(c.portrait)]] : []))),
+  ...(media.sounds ? { sounds: media.sounds } : {}),
+  subtitles: doc.subtitles ?? subtitlesFromTranscript(doc.transcript),
+});
+
+/** What the renderer's composition receives: the episode plus the frame it is drawn at. */
+export const RenderPropsSchema = EpisodePropsSchema.extend({
+  fps: z.number().positive(),
+  width: z.number().int().positive(),
+  height: z.number().int().positive(),
+});
+export type RenderProps = z.infer<typeof RenderPropsSchema>;

@@ -1,9 +1,9 @@
-import { CLASSIFICATIONS, speechSnapTargets, type EpisodeProps, type SoundBank } from '@als/schema';
+import { CLASSIFICATIONS, episodeProps, speechSnapTargets, type EpisodeProps, type SoundBank } from '@als/schema';
 import { Episode, buildTimeline, cardSettledFrame, sourceFrameToOut, timeMapFrame, type Hold } from '@als/composition';
 import { Player, type PlayerRef } from '@remotion/player';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { addBeatAt } from '../../editor/bar.ts';
-import { EditError, addMoment, deleteBeat, deleteMoment, retime, setClassification, setPortrait, setStatus, subtitlesOf } from '../../editor/doc.ts';
+import { EditError, addMoment, deleteBeat, deleteMoment, retime, setClassification, setPortrait, setStatus } from '../../editor/doc.ts';
 import { PlaybackProvider, useEditor, useEditorStore, type Playback } from '../../editor/context.tsx';
 import { snapTime } from '../../editor/snapping.ts';
 import { createPortrait, fileUrl, getSoundBank } from '../../lib/api.ts';
@@ -67,17 +67,11 @@ export function Workspace({ left, right }: WorkspaceProps) {
   );
 
   const inputProps = useMemo<EpisodeProps>(
-    () => ({
-      src: fileUrl(project.id, source.proxy),
-      durationSec: source.durationSec,
-      moments,
-      characters,
-      theme,
-      ...(evalBar ? { evalBar } : {}),
-      portraits: Object.fromEntries(characters.flatMap((c) => (c.portrait ? [[c.id, fileUrl(project.id, c.portrait)]] : []))),
-      ...(sounds ? { sounds } : {}),
-      subtitles: subtitlesOf({ subtitles: editedSubtitles }, project.transcript),
-    }),
+    () =>
+      episodeProps(
+        { durationSec: source.durationSec, moments, characters, evalBar, subtitles: editedSubtitles, transcript: project.transcript },
+        { src: fileUrl(project.id, source.proxy), theme, fileUrl: (file) => fileUrl(project.id, file), sounds },
+      ),
     [project.id, source.proxy, source.durationSec, moments, characters, theme, evalBar, sounds, editedSubtitles, project.transcript],
   );
 

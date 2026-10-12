@@ -12,7 +12,7 @@ export const shotThumbnailFile = (shotIndex: number): string =>
   `frames/shot-${String(shotIndex).padStart(4, '0')}.jpg`;
 
 /** Files inside a project folder that the server will serve. */
-export const SERVABLE_FILE = /^(?:proxy\.mp4|source\.(?:mp4|mov|mkv)|frames\/shot-\d{4}\.jpg|portraits\/[a-z0-9-]+\.jpg)$/;
+export const SERVABLE_FILE = /^(?:proxy\.mp4|source\.(?:mp4|mov|mkv)|frames\/shot-\d{4}\.jpg|portraits\/[a-z0-9-]+\.jpg|renders\/v\d+-\d{8}-\d{6}\.mp4)$/;
 
 const Unit = z.number().min(0).max(1);
 

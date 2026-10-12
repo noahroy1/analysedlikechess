@@ -5,6 +5,8 @@ import {
   HistoryEntrySchema,
   PortraitResultSchema,
   RegenerateResultSchema,
+  RenderEventSchema,
+  RenderJobSchema,
   SoundBankSchema,
   SaveResultSchema,
   type AnalysisEvent,
@@ -14,6 +16,9 @@ import {
   type Moment,
   type PortraitRequest,
   type RegenerateResult,
+  type RenderEvent,
+  type RenderJob,
+  type RenderRequest,
   type SoundBank,
   type HistoryEntry,
   type ProjectEdit,
@@ -115,9 +120,10 @@ export function uploadClip(file: File, context: UploadContext, onProgress: (p: n
 export interface ProjectEventHandlers {
   ingest?: (event: IngestEvent) => void;
   analysis?: (event: AnalysisEvent) => void;
+  render?: (event: RenderEvent) => void;
 }
 
-/** Subscribes to live ingest and analysis progress for every project. Returns an unsubscribe function. */
+/** Subscribes to live ingest, analysis and render progress for every project. Returns an unsubscribe function. */
 export function subscribeProjectEvents(handlers: ProjectEventHandlers): () => void {
   const source = new EventSource('/api/events');
   source.addEventListener('ingest', (e) => {
@@ -127,6 +133,10 @@ export function subscribeProjectEvents(handlers: ProjectEventHandlers): () => vo
   source.addEventListener('analysis', (e) => {
     const parsed = AnalysisEventSchema.safeParse(JSON.parse((e as MessageEvent<string>).data));
     if (parsed.success) handlers.analysis?.(parsed.data);
+  });
+  source.addEventListener('render', (e) => {
+    const parsed = RenderEventSchema.safeParse(JSON.parse((e as MessageEvent<string>).data));
+    if (parsed.success) handlers.render?.(parsed.data);
   });
   return () => source.close();
 }
@@ -179,3 +189,29 @@ export const createPortrait = async (id: string, body: PortraitRequest): Promise
       body: JSON.stringify(body),
     }),
   ).file;
+
+/** Renders of a project, newest first. */
+export const listRenders = async (id: string): Promise<RenderJob[]> => RenderJobSchema.array().parse(await request(`/projects/${id}/renders`));
+
+/** Starts a render of the version saved as `request.version`. A 409 means the project has a newer save. */
+export async function startRender(id: string, body: RenderRequest): Promise<{ kind: 'started'; render: RenderJob } | { kind: 'conflict' }> {
+  const res = await fetch(`/api/projects/${id}/renders`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const json: unknown = await res.json().catch(() => undefined);
+  if (res.status === 409 && json && typeof json === 'object' && 'current' in json) return { kind: 'conflict' };
+  if (!res.ok) {
+    const parsed = ApiErrorSchema.safeParse(json);
+    throw new Error(parsed.success ? parsed.data.error : `render failed to start (${res.status})`);
+  }
+  return { kind: 'started', render: RenderJobSchema.parse(json) };
+}
+
+export const cancelRender = (id: string, render: string) => request(`/projects/${id}/renders/${render}/cancel`, { method: 'POST' });
+
+/** Shows the MP4 in Finder. */
+export const revealRender = (id: string, render: string) => request(`/projects/${id}/renders/${render}/reveal`, { method: 'POST' });
+
+export const deleteRender = (id: string, render: string) => request(`/projects/${id}/renders/${render}`, { method: 'DELETE' });

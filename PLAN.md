@@ -305,7 +305,7 @@ Rendering runs the same `<Episode>` composition through `@remotion/renderer` on 
 
 **Output defaults** (set per project)
 
-- Resolution and fps match the source, with 1080p and 4K presets.
+- Resolution and fps match the source, with 1080p and 4K presets. Built Oct 13: the size is chosen per render in the Render menu, which defaults to the project's last one.
 - H.264 video and AAC audio at a quality-first CRF, ready for YouTube.
 - During holds the source audio is silent, apart from the chess sounds and the theme's optional sting.
 
@@ -313,7 +313,7 @@ Rendering runs the same `<Episode>` composition through `@remotion/renderer` on 
 
 - Render a 10-second fixture with two moments.
 - Use `ffprobe` to check that output duration equals source duration plus both holds, within one frame.
-- Hash two frames inside each hold and confirm they are identical, which proves the freeze is real.
+- Compare two frames inside each hold and confirm they are identical, which proves the freeze is real. Built Oct 13: H.264 does not decode identical frames bit for bit, so they must match within 8 of 255 levels, with a control showing play frames differ.
 
 **Later, not v1**
 

@@ -14,11 +14,13 @@ import {
   EvaluateRequestSchema,
   PortraitRequestSchema,
   RegenerateRequestSchema,
+  RenderRequestSchema,
   SERVABLE_FILE,
   UPLOAD_EXTENSIONS,
   shotThumbnailFile,
   type Project,
   type ProjectSummary,
+  type RenderJob,
 } from '@als/schema';
 import { ProviderError } from './analysis/providers/index.ts';
 import { AnalysisBusyError, type AnalysisService } from './analysis/service.ts';
@@ -28,12 +30,14 @@ import { NotAVideoError, probe } from './media/probe.ts';
 import { extractPortrait, portraitFile } from './media/portrait.ts';
 import type { SoundLibrary } from './media/sounds.ts';
 import { ProjectNotFoundError, VersionConflictError, type ProjectStore } from './projects/store.ts';
+import { RenderBusyError, RenderNotFoundError, RenderPresetError, type RenderService } from './render/renders.ts';
 
 export interface AppDeps {
   store: ProjectStore;
   queue: IngestQueue;
   analysis: AnalysisService;
   sounds: SoundLibrary;
+  renders: RenderService;
 }
 
 const SSE_HEARTBEAT_MS = 15_000;
@@ -60,7 +64,7 @@ export function summarize(project: Project): ProjectSummary {
   };
 }
 
-export function createApp({ store, queue, analysis, sounds }: AppDeps) {
+export function createApp({ store, queue, analysis, sounds, renders }: AppDeps) {
   const app = new Hono().basePath('/api');
 
   // A clip that finishes ingest goes straight on to analysis (when keys are set).
@@ -76,6 +80,9 @@ export function createApp({ store, queue, analysis, sounds }: AppDeps) {
     if (error instanceof ZodError) return c.json({ error: error.message }, 400);
     if (error instanceof AnalysisBusyError) return c.json({ error: error.message }, 409);
     if (error instanceof ProviderError) return c.json({ error: error.message }, 502);
+    if (error instanceof RenderBusyError) return c.json({ error: error.message }, 409);
+    if (error instanceof RenderNotFoundError) return c.json({ error: error.message }, 404);
+    if (error instanceof RenderPresetError) return c.json({ error: error.message }, 400);
     console.error(error);
     return c.json({ error: error.message }, 500);
   });
@@ -221,6 +228,7 @@ export function createApp({ store, queue, analysis, sounds }: AppDeps) {
     const id = c.req.param('id');
     if (queue.has(id)) return c.json({ error: 'wait for ingest to finish before deleting' }, 409);
     if (analysis.queue.has(id)) return c.json({ error: 'wait for analysis to finish before deleting' }, 409);
+    if (renders.queue.has(id)) return c.json({ error: 'wait for the render to finish before deleting' }, 409);
     await store.read(id);
     await store.remove(id);
     return c.body(null, 204);
@@ -234,6 +242,31 @@ export function createApp({ store, queue, analysis, sounds }: AppDeps) {
     const file = portraitFile(request);
     await extractPortrait(store.file(id, project.source.file), store.file(id, file), request, project.source);
     return c.json({ file });
+  });
+
+  /** Renders of the project, newest first. */
+  app.get('/projects/:id/renders', async (c) => c.json(await renders.list(c.req.param('id'))));
+
+  /** Render the project as saved at `version` (409 if it has moved on, so the editor saves first). */
+  app.post('/projects/:id/renders', async (c) => {
+    const request = RenderRequestSchema.parse(await c.req.json());
+    return c.json(await renders.start(c.req.param('id'), request), 202);
+  });
+
+  app.post('/projects/:id/renders/:render/cancel', async (c) => {
+    await renders.cancel(c.req.param('id'), c.req.param('render'));
+    return c.json({ ok: true });
+  });
+
+  /** Shows the finished MP4 in Finder. */
+  app.post('/projects/:id/renders/:render/reveal', async (c) => {
+    await renders.reveal(c.req.param('id'), c.req.param('render'));
+    return c.json({ ok: true });
+  });
+
+  app.delete('/projects/:id/renders/:render', async (c) => {
+    await renders.remove(c.req.param('id'), c.req.param('render'));
+    return c.body(null, 204);
   });
 
   // Media files, with Range support so the browser can seek.
@@ -259,7 +292,7 @@ export function createApp({ store, queue, analysis, sounds }: AppDeps) {
     return serveStatic({ path })(c, next);
   });
 
-  /** Live ingest and analysis progress for every project. */
+  /** Live ingest, analysis and render progress for every project. */
   app.get('/events', (c) =>
     streamSSE(c, async (stream) => {
       const write = (event: string, data: unknown) =>
@@ -268,13 +301,17 @@ export function createApp({ store, queue, analysis, sounds }: AppDeps) {
         write('ingest', { projectId, ingest: state });
       const sendAnalysis = ({ projectId, state }: { projectId: string; state: Project['analysis'] }) =>
         write('analysis', { projectId, analysis: state });
+      const sendRender = ({ projectId, state }: { projectId: string; state: RenderJob }) => write('render', { projectId, render: state });
       for (const update of queue.snapshot()) await sendIngest(update);
       for (const update of analysis.queue.snapshot()) await sendAnalysis(update);
+      for (const update of renders.queue.snapshot()) await sendRender(update);
       queue.on('update', sendIngest);
       analysis.queue.on('update', sendAnalysis);
+      renders.queue.on('update', sendRender);
       const detach = () => {
         queue.off('update', sendIngest);
         analysis.queue.off('update', sendAnalysis);
+        renders.queue.off('update', sendRender);
       };
       stream.onAbort(detach);
       while (!stream.aborted) {

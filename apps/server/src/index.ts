@@ -7,6 +7,7 @@ import { AnalysisService } from './analysis/service.ts';
 import { createIngestQueue } from './ingest/queue.ts';
 import { SoundLibrary } from './media/sounds.ts';
 import { ProjectStore } from './projects/store.ts';
+import { RenderService } from './render/renders.ts';
 
 const port = Number(process.env.PORT ?? 8787);
 const projectsDir = process.env.PROJECTS_DIR ?? fileURLToPath(new URL('../../../projects', import.meta.url));
@@ -17,10 +18,14 @@ const store = new ProjectStore(projectsDir);
 const queue = createIngestQueue(store);
 const config = loadAnalysisConfig();
 const analysis = await AnalysisService.load(store, makeProviders(config), config);
-const app = createApp({ store, queue, analysis, sounds: new SoundLibrary(soundsDir) });
+const sounds = new SoundLibrary(soundsDir);
+const renders = new RenderService({ store, sounds, origin: `http://127.0.0.1:${port}` });
+const app = createApp({ store, queue, analysis, sounds, renders });
 
+const projects = await store.list();
+await renders.recover(projects.map((p) => p.id));
 // Resume ingests a restart interrupted; finished steps are cached, so this picks up where it stopped.
-for (const project of await store.list()) {
+for (const project of projects) {
   if (project.ingest.status === 'pending' || project.ingest.status === 'running') queue.enqueue(project.id);
   else if (project.analysis.status === 'pending' || project.analysis.status === 'running') void analysis.start(project.id);
 }
@@ -30,4 +35,6 @@ if (missing.length) console.log(`analysis needs ${missing.join(', ')} in apps/se
 // Local single-user app: listen on loopback only.
 serve({ fetch: app.fetch, port, hostname: '127.0.0.1' }, (info) => {
   console.log(`server listening on http://127.0.0.1:${info.port} (projects in ${projectsDir})`);
+  // Get the browser and the composition bundle ready so the first render starts sooner.
+  renders.warmUp();
 });

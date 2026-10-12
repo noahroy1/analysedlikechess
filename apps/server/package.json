@@ -9,12 +9,18 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@als/composition": "workspace:*",
     "@als/schema": "workspace:*",
     "@als/theme": "workspace:*",
     "@anthropic-ai/sdk": "0.133.0",
     "@google/genai": "2.28.0",
     "@hono/node-server": "2.1.4",
+    "@remotion/bundler": "4.0.534",
+    "@remotion/renderer": "4.0.534",
     "hono": "4.13.13",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "remotion": "4.0.534",
     "zod": "4.6.5"
   }
 }

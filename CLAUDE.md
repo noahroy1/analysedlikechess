@@ -5,14 +5,14 @@ Single-user local web app: upload a movie scene clip, draft chess-style move ann
 ## Commands
 
 - `pnpm dev`: web (Vite, http://localhost:5173) and server (Hono, http://127.0.0.1:8787) together. Vite proxies `/api` to the server.
-- `pnpm check`: lint, typecheck and tests. Run before every commit.
+- `pnpm check`: lint, typecheck and tests. Run before every commit. It includes the render test (`apps/server/src/render/render.test.ts`, about 13 s), which renders the sample through headless Chrome.
 - `pnpm test` / `pnpm lint` / `pnpm typecheck`: individually.
 - `scripts/make-sample-clip.sh`: regenerates `fixtures/sample/source.mp4` (needs system ffmpeg).
 - `scripts/make-dialogue-clip.sh`: regenerates `fixtures/dialogue/source.mp4`, a rights-free two-voice scene (macOS `say`) for analysis tests.
 - `ANALYSIS_REPLAY_DIR=$PWD/fixtures/dialogue/recorded pnpm dev`: runs analysis on recorded responses, no keys or API calls. `ANALYSIS_RECORD_DIR` records real ones.
 - `ANALYST_HANDOFF_DIR=<dir> pnpm dev`: dev only, replaces the Claude calls with request/answer files a Claude Code session writes by hand (see Status).
 - `pnpm seed:sample`: creates a project from the fixture (3 moments). `pnpm seed:moments <projectId> <file>` replaces a project's moments, e.g. `fixtures/demo/doakes-moments.json` for the Dexter demo clip.
-- `scripts/browser/`: headless-Chrome checks (`phase2-checks.mjs`, `phase3-checks.mjs`, `typeout-checks.mjs`, `format-checks.mjs`, `evalbar-checks.mjs`, `sound-checks.mjs`, `subtitle-checks.mjs`) over the DevTools protocol (no dependencies) against a running `pnpm dev`. The dev build exposes the Player as `window.__alsPlayer`.
+- `scripts/browser/`: headless-Chrome checks (`phase2-checks.mjs`, `phase3-checks.mjs`, `typeout-checks.mjs`, `format-checks.mjs`, `evalbar-checks.mjs`, `sound-checks.mjs`, `subtitle-checks.mjs`, `render-checks.mjs`) over the DevTools protocol (no dependencies) against a running `pnpm dev`. The dev build exposes the Player as `window.__alsPlayer`.
 - `scripts/ref/hold-phases.mjs <clip> <crop>`: times a reference clip's hold phases (freeze, badge, card, type-out, exit) from frame changes.
 
 ## Layout
@@ -20,7 +20,7 @@ Single-user local web app: upload a movie scene clip, draft chess-style move ann
 - `apps/web`: editor UI (Vite, React, Tailwind).
 - `apps/server`: Hono API, jobs, ffmpeg, AI adapters, render. Runs TypeScript directly on Node (type stripping), so use only erasable syntax and `.ts` import extensions.
 - `packages/schema`: Zod schemas and the types derived from them; the only source of types.
-- `packages/composition`: Remotion `<Episode>`, `<MoveCard>`, `timeMap()`. Lint enforces purity.
+- `packages/composition`: Remotion `<Episode>`, `<MoveCard>`, `timeMap()`. Lint enforces purity. `render-entry.tsx` registers the composition for the renderer; the server imports only `@als/composition/timeline` (plain TypeScript, no JSX).
 - `packages/theme`: classification tokens, badges, theme presets.
 - `fixtures/`: test data, including the sample project and recorded provider responses.
 - `projects/`: runtime project folders, gitignored. `PROJECTS_DIR` overrides the location.
@@ -39,6 +39,7 @@ Single-user local web app: upload a movie scene clip, draft chess-style move ann
 - Hard invariants (moment spacing, ordering, references) live in `ProjectSchema`. Soft rules (text caps, `bestMove` on best/brilliant) are `momentWarnings()`, so the editor warns without blocking saves.
 - The output is the source with a hold at each moment. `buildTimeline()` in `packages/composition` is the only mapping between source and output frames; the Player, timeline UI and renderer all use it.
 - `<Episode>` renders one `<Sequence>` per play-then-hold segment so the same `@remotion/media` `<Video>` plays into its `<Freeze>`; premounting loads the next segment. Verified frame-exact in the Player (Phase 2 spike), so the extracted-still fallback is not needed.
+- Rendering (`apps/server/src/render/`): `episodeProps()` (`packages/schema/src/episode.ts`) is the one way a document becomes `<Episode>` props, used by the Player and the renderer. A render reads a snapshot of the saved version (`renders/<id>.json`), loads the original source (not the proxy), portraits and sounds from this server over HTTP with absolute URLs, and writes `renders/<id>.mp4` (H.264 CRF 18, AAC 320k, BT.709). The bundle is made once and again only when composition, schema or theme sources change. Renders are listed in `renders/renders.json`; live progress goes out over `/api/events` as `render` events.
 - Ingest stages are cached by content hash in each project's `ingest.json`. Bump a step's `STEP_VERSION` in `apps/server/src/ingest/ingest.ts` when its command changes.
 - Cut detection uses ffmpeg `scdet` plus peak picking (`apps/server/src/media/cuts.ts`), tuned on dark film footage where real cuts score only 5-10. Check changes against a contact sheet of real footage, not just the synthetic fixture.
 - Dependencies are pinned to exact versions (`save-exact` in `.npmrc`). TypeScript stays below 6.1 until typescript-eslint supports newer versions.
@@ -55,18 +56,20 @@ Single-user local web app: upload a movie scene clip, draft chess-style move ann
 8. Where the creator's format is unknown (exact card look, text length, hold timing), leave a `TODO(open-decision)` comment rather than guessing.
 9. Commit after each working step with a message that says what now works.
 
-## Status and handoff (updated Oct 12, 2026)
+## Status and handoff (updated Oct 13, 2026)
 
 Read this first in a new session. It says where the work stands, what to do next, what is waiting on the user, and what was learned the hard way.
 
 ### Where things stand
 
 - **Branch:** work now happens on `main` (the user asked for this on Oct 12; commit and push to `main`). `main` was fast-forwarded to the tip of `format-iterations`, and all phase branches (`phase-0-scaffold` … `phase-4-analysis`, `format-iterations`) are pushed to GitHub as history; do not add new per-phase branches. `apps/server/.env.example` shows as deleted in the working tree from before Oct 12; it is not ours, so leave it out of commits (`git add -A -- . ':!apps/server/.env.example'`).
-- **Done:** Phases 0-4 (Phase 4 has two owed items, below), the creator's review iterations, and all seven format iterations (log below).
-- **Not started:** Phase 5 (export/render) and Phase 6 (pitch build). The format iterations were inserted before Phase 5 at the user's request and are now all built; Phase 5 is next once the user has reviewed them.
-- **Checks at the tip:** `pnpm check` passes (224 tests). The browser checks pass: `phase2-checks`, `phase3-checks`, `typeout-checks`, `format-checks`, `evalbar-checks`, `sound-checks` and `subtitle-checks`.
+- **Done:** Phases 0-5 (Phase 4 has two owed items, below), the creator's review iterations, and all seven format iterations (log below).
+- **Not started:** Phase 6 (pitch build).
+- **Checks at the tip:** `pnpm check` passes (236 tests, including the render test). The browser checks pass: `phase2-checks`, `phase3-checks`, `typeout-checks`, `format-checks`, `evalbar-checks`, `sound-checks`, `subtitle-checks` and `render-checks` (on the sample and on a copy of BB1).
 
-### Next action: the user's review of iterations 5-7, then Phase 5
+### Next action: the user's review of Phase 5 (and iterations 5-7), then Phase 6
+
+Phase 5 (Oct 13) is built and waiting on the user's review. See "Phase 5: export" below.
 
 Waiting on the user:
 - **Sounds (iteration 5):** listen in Preview mode. Four questions are open:
@@ -135,6 +138,22 @@ Waiting on the user:
    - **Editor:** a Subtitles tab lists every line, with the live one highlighted. Click a time to show it. Text, start and end are editable, × deletes a line, and "Rebuild from transcript" drops all edits. Every change is undoable and autosaved.
    - `subtitle-checks.mjs` covers: the line during speech and through a hold, the measured look, edit, save, reload, rebuild, undo, delete, and the default look.
 
+### Phase 5: export (done, Oct 13)
+
+- **Render menu** in the editor header (beside History): pick a size (Source, plus 1080p or 4K where the clip scales evenly to it), then press Render MP4. The editor saves first and renders that saved version (`POST /projects/:id/renders` with `version`; 409 if a newer save exists). The header button shows "Rendering N%"; the menu shows the stage, a progress bar and Cancel. A toast announces the result. Finished renders have Play (opens the MP4 in a tab), Show in Finder (`open -R`) and Delete.
+- **Server:** `RenderService` (`apps/server/src/render/renders.ts`) runs one render per project through a `JobQueue`. A server restart marks interrupted renders failed (`recover()`). On start it opens the browser and bundles in the background (`warmUp()`). Chrome Headless Shell (about 170 MB) downloads on first use into `apps/server/node_modules/.remotion`.
+- **Speed:** BB1 (2:28 source, 3:38 output, 5230 frames at 1080p) renders in about 2 minutes, 76 MB. The sample renders in about 14 s.
+- **Verified on BB1:**
+  - The MP4 has every output frame, at exactly 24000/1001.
+  - Cards, badges, the eval bar with portraits, and subtitles all draw as in the Player.
+  - Audio: the source is silent during holds. The move sound lands at about 0.27 s into the freeze, typing runs under the type-out, and the reread is silent.
+- **Render test** (`render.test.ts`): renders two moments of the 10 s sample. It checks the length (source plus holds, within one frame, and the exact frame count), the freeze, and silence in holds against a tone between them.
+  - **Freeze tolerance:** identical frames do not always decode bit for bit from H.264 (rounding moves a few values by up to 4), so "two frames in each hold are the same" allows 8 levels instead of comparing hashes. A control requires play frames 5 apart to differ by more than 50.
+- **Preview match** (`render-checks.mjs`): renders from the menu, then compares three holds' reread frames in the MP4 with the Player's frames.
+  - **Measure:** PSNR after an RGB conversion and a 1.5 px blur, because the Player draws text at page scale from the 720p proxy.
+  - **Measured:** BB1 scores 34 dB, the synthetic sample 29-31 dB, and the no-card controls 14-22 dB. The check requires at least 27 dB and 8 dB over the control.
+- **Not built (PLAN "later"):** overlay-only alpha export and an edit list.
+
 **Reference clip:** BB1 stays the reference until the format is proven, then BB2. `media/BB2.mov` is still the duplicate of BB1 (the user apologised and knows), so the real BB2 is needed before then.
 
 ### Creator reference (`media/creator-ref/`, gitignored, Catch Me If You Can motel scene)
@@ -187,7 +206,7 @@ To measure more, use `scripts/ref/hold-phases.mjs <clip> <crop>` for timing, PIL
 ### How each step ends (the user's standing workflow)
 
 1. Run `pnpm check`.
-2. Run the browser checks against `PROJECTS_DIR=<scratch> pnpm dev` with freshly seeded samples (`pnpm seed:sample`; each check edits its project, so seed one per check). `phase2-checks` needs the output frame count, currently 1143 for the sample under the default theme. `sound-checks` also takes the projects folder, because it strips that project's audio.
+2. Run the browser checks against `PROJECTS_DIR=<scratch> pnpm dev` with freshly seeded samples (`pnpm seed:sample`; each check edits its project, so seed one per check). `phase2-checks` needs the output frame count, currently 1143 for the sample under the default theme. `sound-checks` and `render-checks` also take the projects folder (`render-checks` reads the MP4 from it; `--reuse` compares the newest render without making another).
 3. Look at screenshots.
 4. Commit.
 5. Update this section.
@@ -203,4 +222,7 @@ To measure more, use `scripts/ref/hold-phases.mjs <clip> <crop>` for timing, PIL
 - To type into an input from a check, focus it and send `Input.insertText` (a synthetic `input` event followed at once by `blur()` commits the old value). Select a move with the Player outside any hold: a paused hold keeps its own move selected.
 - Headless Chrome can't be listened to. To check sounds, hook `AudioBufferSourceNode.prototype.start` before the page loads (see `sound-checks.mjs`). Log even before the Player reports playing, because frame 0's sounds are scheduled while the audio context resumes.
 - `<Sequence premountFor>` does not allow `layout="none"`. Give `<Audio>` its own `from`, `durationInFrames` and `premountFor` instead.
+- Remotion downloads its browser under the nearest `package.json` above the working directory. The server runs from `apps/server`, so the render test changes into that folder too and shares one copy (each copy is about 580 MB).
+- The renderer's browser loads media from this server at another origin. It runs with `disableWebSecurity` rather than the server sending CORS headers, which any web page could then use.
+- When comparing a Player screenshot with an MP4 frame in ffmpeg, force both to `rgb24` (a PNG and an MP4 frame otherwise convert differently) and close any menu over the stage first.
 - The editor is now taller than a 1150-1300 px window, so the page can show a scrollbar. Measure a container and its children in the same pass.

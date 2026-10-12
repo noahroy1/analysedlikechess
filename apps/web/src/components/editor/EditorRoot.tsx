@@ -12,7 +12,9 @@ import { AnalysisPanel } from './AnalysisPanel.tsx';
 import { CharactersPanel } from './CharactersPanel.tsx';
 import { SubtitlesPanel } from './SubtitlesPanel.tsx';
 import { Inspector } from './Inspector.tsx';
+import { HeaderButton } from './HeaderButton.tsx';
 import { MomentsPanel } from './MomentsPanel.tsx';
+import { RenderMenu } from './RenderMenu.tsx';
 import { Workspace } from './Workspace.tsx';
 
 export interface EditorRootProps {
@@ -142,6 +144,7 @@ function Header({ ingest, analysis, onRerunIngest, onDelete }: Omit<EditorRootPr
         </div>
         <ThemePicker />
         <HistoryMenu />
+        <RenderMenu />
         <HeaderButton onClick={onRerunIngest} disabled={working} title="Re-run ingest (unchanged steps are skipped)">
           Re-run ingest
         </HeaderButton>
@@ -319,32 +322,5 @@ function ToastView() {
     >
       {toast.text}
     </div>
-  );
-}
-
-function HeaderButton(props: {
-  onClick: () => void;
-  disabled?: boolean;
-  title: string;
-  danger?: boolean;
-  first?: boolean;
-  last?: boolean;
-  children: string;
-}) {
-  const radius = props.first ? 'rounded-l-md' : props.last ? 'rounded-r-md -ml-px' : 'rounded-md';
-  return (
-    <button
-      type="button"
-      onClick={props.onClick}
-      disabled={props.disabled}
-      title={props.title}
-      className={`${radius} border px-2.5 py-1 text-xs disabled:opacity-40 ${
-        props.danger
-          ? 'border-neutral-800 text-neutral-400 hover:border-red-900 hover:text-red-300'
-          : 'border-neutral-700 text-neutral-200 hover:border-neutral-500'
-      }`}
-    >
-      {props.children}
-    </button>
   );
 }

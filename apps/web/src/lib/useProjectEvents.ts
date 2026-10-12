@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { subscribeProjectEvents, type ProjectEventHandlers } from './api.ts';
 
-/** Calls the handlers for every live ingest and analysis update while mounted. */
+/** Calls the handlers for every live ingest, analysis and render update while mounted. */
 export function useProjectEvents(handlers: ProjectEventHandlers) {
   const latest = useRef(handlers);
   useEffect(() => {
@@ -12,6 +12,7 @@ export function useProjectEvents(handlers: ProjectEventHandlers) {
       subscribeProjectEvents({
         ingest: (e) => latest.current.ingest?.(e),
         analysis: (e) => latest.current.analysis?.(e),
+        render: (e) => latest.current.render?.(e),
       }),
     [],
   );
