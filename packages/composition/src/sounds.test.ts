@@ -1,6 +1,6 @@
 import { DEFAULT_TYPE_OUT, typedWords, type Character, type Moment, type SoundBank, type SoundId } from '@als/schema';
 import { describe, expect, it } from 'vitest';
-import { SPACE_EVERY_SEC, TYPING_END_LAST_KEY_SEC, moveSound, soundCues, type SoundCue } from './sounds.ts';
+import { GAME_START_SEC, SPACE_EVERY_SEC, TYPING_END_LAST_KEY_SEC, moveSound, soundCues, type SoundCue } from './sounds.ts';
 import { buildTimeline } from './timeline.ts';
 
 const fps = 30;
@@ -40,13 +40,17 @@ const only = (cues: SoundCue[], key: string) => cues.find((c) => c.key === key)!
 const spaceCues = (cues: SoundCue[]) => cues.filter((c) => c.sound.startsWith('typing-space'));
 
 describe('game sounds', () => {
-  it('starts on the first frame, warns ten seconds out and ends on the last frame', () => {
+  it('starts a second in, warns ten seconds out and ends on the last frame', () => {
     const cues = cuesFor([moment('a', 5)]);
     const out = 60 * fps + 10 * fps;
-    expect(only(cues, 'game-start').from).toBe(0);
+    expect(only(cues, 'game-start').from).toBe(GAME_START_SEC * fps);
     expect(only(cues, 'ten-seconds').from).toBe(out - 10 * fps);
     const end = only(cues, 'game-end');
     expect(end.from + end.frames).toBe(out);
+  });
+
+  it('plays game-start on the first frame of a video shorter than its delay', () => {
+    expect(only(cuesFor([], full, 0.5), 'game-start').from).toBe(0);
   });
 
   it('skips the warning on a video under ten seconds', () => {

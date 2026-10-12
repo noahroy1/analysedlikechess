@@ -23,6 +23,8 @@ import type { Timeline } from './timeline.ts';
 
 /** Seconds before the end when the low-time warning plays. */
 export const TEN_SECONDS = 10;
+/** Seconds into the video when game-start plays: a beat in, so it is heard rather than lost on the first frame (the user's choice, Oct 13). */
+export const GAME_START_SEC = 1;
 
 /** Words per minute of the typing recording. */
 export const TYPING_WPM = 97;
@@ -88,7 +90,9 @@ export function soundCues({ timeline, moments, characters, timing, sounds }: Sou
   };
 
   const end = timeline.outFrames;
-  add('game-start', 'game-start', 0);
+  // A video shorter than the delay plays it on its first frame.
+  const start = toFrames(GAME_START_SEC);
+  add('game-start', 'game-start', Number.isFinite(end) && start >= end ? 0 : start);
   if (Number.isFinite(end)) {
     if (end > toFrames(TEN_SECONDS)) add('ten-seconds', 'game-ten-seconds-remaining', end - toFrames(TEN_SECONDS));
     // Finishes on the last frame.

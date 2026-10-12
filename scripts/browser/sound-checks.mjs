@@ -114,8 +114,8 @@ try {
       const start = cues.find((c) => c.key === 'game-start');
       const end = cues.find((c) => c.key === 'game-end');
       const ten = cues.find((c) => c.key === 'ten-seconds');
-      const ok = start?.from === 0 && end && end.from + end.frames === timeline.outFrames && ten?.from === timeline.outFrames - 10 * fps;
-      result(`${look}: game-start on frame 0, the ten-second warning 10 s out, game-end finishing on the last frame`, !!ok, `start ${start?.from}, ten ${ten?.from}, end ${end?.from}+${end?.frames} of ${timeline.outFrames}`);
+      const ok = start?.from === Math.round(fps) && end && end.from + end.frames === timeline.outFrames && ten?.from === timeline.outFrames - 10 * fps;
+      result(`${look}: game-start 1 s in, the ten-second warning 10 s out, game-end finishing on the last frame`, !!ok, `start ${start?.from}, ten ${ten?.from}, end ${end?.from}+${end?.frames} of ${timeline.outFrames}`);
     }
   };
 

@@ -19,8 +19,7 @@ export type Subtitle = z.infer<typeof SubtitleSchema>;
 /**
  * Longest line built from the transcript; longer sentences are split. The
  * creator's lines are short single sentences ("Step out of the bathroom!",
- * 25 characters) and how they break a long one is unknown.
- * TODO(open-decision): the creator's longest line and how they split one.
+ * 25 characters). The user confirmed 42 reads right in the video (Oct 13, 2026).
  */
 export const SUBTITLE_MAX_CHARS = 42;
 /**

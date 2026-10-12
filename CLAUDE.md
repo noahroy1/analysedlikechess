@@ -73,14 +73,13 @@ Phase 5 (Oct 13) is built and waiting on the user's review. See "Phase 5: export
 
 Waiting on the user:
 - **Sounds (iteration 5):** listen in Preview mode. Four questions are open:
-  1. **Typing level.** The typing files sit about 20 dB below the creator's typing; the move sounds match the creator's level. Options: the user re-exports them louder, or a per-sound gain is added (Web Audio allows volume above 1).
+  1. **Typing level.** The typing files sit about 20 dB below the creator's typing. The user is re-exporting them 20 dB louder (Oct 13), so no gain is added in code; check the level once the new files are in `media/sounds`.
   2. **`move-capture`** is served but nothing plays it yet. Which moves should?
   3. **Inaccuracies** play `move-mistake`, as the creator's clips do (0.99 match), not `move-self`/`move-opponent` as the user's rule said. One line to undo: `BORROWED` in `sounds.ts`.
   4. **Missing files:** `move-miss` and `hold-open` (the segment opening). Dropping them in `media/sounds` makes them play; nothing else changes.
-- **Subtitles (iteration 7):** review them on BB1 (Subtitles tab). One open decision: `SUBTITLE_MAX_CHARS` (42). The creator's lines seen so far are short single sentences, and how they split a long one is unknown.
 - **Evaluation bar (iteration 6):** review it on BB1. Its Pass C was written by hand. BB1 now has portraits.
 - **Size per rating** (`TODO(open-decision)` on `EVAL_DIRECTION`): the code fixes only the direction; the Analyst picks the size.
-- Whether speaker naming should prefer **first names** like the creator ("Frank", "Carl") over full names ("Walter White"). For now names can be edited in the Cast tab.
+- **Card placement (assessed Oct 13, not built):** whether to place cards automatically so they clear faces and the move's subject. See "Card placement" below; it needs the user's go-ahead and three choices.
 
 ### Format iterations (the creator's list, Oct 12; each ends with a commit and a walkthrough)
 
@@ -98,7 +97,7 @@ Waiting on the user:
    - **Move numbers:** `moveNumbers()` (`packages/composition/src/notation.ts`) follows chess turn order with implied moves (W, B, B → "1", "1...", "2...").
    - **Editor:** a Look picker in the header saves `themeId` as part of the editor document, so switching is undoable and holds re-time; a White/Black toggle in Cast; a Motif field in the inspector, also editable on the chip.
 5. **Sounds (done).** The user supplied the files (`media/sounds`, 48 kHz, gitignored). Placement was measured on the creator's clips (Oct 12) by cross-correlating the files with their audio: the freeze is silent, the move sound starts 0.27-0.29 s in as the badge pops, and typing runs from the first word to about the last, with a silent reread.
-   - **Game:** `game-start` on frame 0, `game-ten-seconds-remaining` 10 s before the end, and `game-end` finishing on the last frame.
+   - **Game:** `game-start` 1 s in (`GAME_START_SEC`, the user's choice on Oct 13 so it is heard; frame 0 on a video shorter than that), `game-ten-seconds-remaining` 10 s before the end, and `game-end` finishing on the last frame.
    - **Holds:** `hold-open` (no file yet) on the first frozen frame, then the move sound at `badgeDelaySec`. The move sound is the rating's own `move-<rating>` if the file exists, else a borrowed one (inaccuracy → mistake), else `move-self` for White and `move-opponent` for Black.
    - **Typing** follows `revealAt()` (and `typeOutSpeed()` for short locked holds): `typing-start-middle` from the first word, looping if needed, then `typing-end` placed so its last keystroke (1.24 s in, `TYPING_END_LAST_KEY_SEC`) lands on the last word. A short type-out starts partway into the ending. The recording plays at its own 97 WPM, never sped up (that would raise its pitch).
    - **Spaces:** a press every 60/97 s (a WPM word is five keystrokes including its space), each snapped to a word appearing, varied among `typing-space-1..3` and seeded by the move's id.
@@ -129,7 +128,7 @@ Waiting on the user:
    - A 1080p frame of ours matches the creator's within 1-2 px (width 634 vs 638, letter height 37 vs 37, centre 958 vs 958).
    - **Building lines:**
      - `subtitlesFromTranscript()` gives one sentence per line from its first word to `SUBTITLE_TAIL_SEC` (0.3 s) after its last.
-     - A sentence over `SUBTITLE_MAX_CHARS` (42, `TODO(open-decision)`) splits at the most even comma or dash where both halves fit, else at the most even word.
+     - A sentence over `SUBTITLE_MAX_CHARS` (42, confirmed by the user Oct 13) splits at the most even comma or dash where both halves fit, else at the most even word.
      - A line stays at least 0.8 s unless the next one starts first, and gaps under 0.25 s close.
      - A line under 0.3 s on screen (a mis-timed word) folds into an unfinished line before it.
      - A leading "..." and sound tags are dropped.
@@ -137,6 +136,25 @@ Waiting on the user:
    - **Rendering:** `<SubtitleLine>` (`packages/composition/src/Subtitles.tsx`) draws the line at the frame's source time. Themes: creator as measured; the default look has its own (system sans 600, 44 px).
    - **Editor:** a Subtitles tab lists every line, with the live one highlighted. Click a time to show it. Text, start and end are editable, × deletes a line, and "Rebuild from transcript" drops all edits. Every change is undoable and autosaved.
    - `subtitle-checks.mjs` covers: the line during speech and through a hold, the measured look, edit, save, reload, rebuild, undo, delete, and the default look.
+
+### Decisions, Oct 13
+
+- Speaker names stay full names ("Walter White"), not the creator's first names.
+- `SUBTITLE_MAX_CHARS` 42 is right as seen in the video.
+- `game-start` plays 1 s in.
+
+### Card placement (assessed Oct 13, not built)
+
+The creator places each card by hand per shot, clear of faces (`media/creator-ref` screenshots: mid-left between two men, top-right over a curtain, upper-centre over a door), with the badge on the side toward the action. Ours use the theme's corner, which covered 40-100% of a face on 5 of 13 BB1 and Dexter freeze frames.
+
+- **Spike:** each freeze frame went through macOS Vision (faces, people, saliency; local, about 65 ms) and Gemini 3.5 Flash-Lite (named faces plus the move's subject; about 2.3 s and $0.0007 a frame).
+  - **Faces:** both found every visible face. Gemini also found heads seen from behind and tiny distant figures, and named each face.
+  - **Subject:** Gemini's single subject box was tight only sometimes (the gun, the raised hands); often it was the whole person or half the frame, so it can only be a soft preference.
+- **Placement search:** card plus badge on either side; no-go zones for the bar strip, name corners and the subtitle line; on close-ups only the eyes-to-mouth band is protected. Result: faces fully clear on 8 of 13 frames, eyes and mouth clear on 12 of 13. Close-ups leave no face-free spot for a full card.
+- **Open choices for the user:**
+  - Gemini (cloud, in the pipeline already, names the mover) or Vision (local and free, macOS only, against the plan's "no local AI models").
+  - What close-ups should do (the creator's references have none).
+  - Whether a retime re-places an unlocked card.
 
 ### Phase 5: export (done, Oct 13)
 
