@@ -26,12 +26,14 @@ import { pendingIngest } from './ingest/ingest.ts';
 import type { IngestQueue } from './ingest/queue.ts';
 import { NotAVideoError, probe } from './media/probe.ts';
 import { extractPortrait, portraitFile } from './media/portrait.ts';
+import type { SoundLibrary } from './media/sounds.ts';
 import { ProjectNotFoundError, VersionConflictError, type ProjectStore } from './projects/store.ts';
 
 export interface AppDeps {
   store: ProjectStore;
   queue: IngestQueue;
   analysis: AnalysisService;
+  sounds: SoundLibrary;
 }
 
 const SSE_HEARTBEAT_MS = 15_000;
@@ -58,7 +60,7 @@ export function summarize(project: Project): ProjectSummary {
   };
 }
 
-export function createApp({ store, queue, analysis }: AppDeps) {
+export function createApp({ store, queue, analysis, sounds }: AppDeps) {
   const app = new Hono().basePath('/api');
 
   // A clip that finishes ingest goes straight on to analysis (when keys are set).
@@ -242,6 +244,15 @@ export function createApp({ store, queue, analysis }: AppDeps) {
         ctx.header('Cache-Control', 'no-cache');
       },
     })(c, next);
+  });
+
+  /** The chess sounds that exist, with their lengths, for the Player and the renderer. */
+  app.get('/sounds', async (c) => c.json(await sounds.bank()));
+
+  app.get('/sounds/:file', async (c, next) => {
+    const path = sounds.path(c.req.param('file'));
+    if (!path) return c.json({ error: 'not found' }, 404);
+    return serveStatic({ path })(c, next);
   });
 
   /** Live ingest and analysis progress for every project. */

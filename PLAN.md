@@ -232,6 +232,7 @@ outDuration(sourceDuration, moments) => number;
 - Play segments render the video trimmed to their source range.
 - Hold segments wrap the video in Remotion's `<Freeze>` at the moment's frame and draw `<MoveCard>` over it. If seeking inside the Player proves unreliable during the Phase 2 spike, fall back to a still extracted with ffmpeg at the exact frame (re-extracted whenever a moment is retimed).
 - Source audio stops during a hold, because source time is not advancing. The theme can add an optional sting sound when the card appears.
+- Chess sounds (format iteration 5) are shared by every theme: `soundCues()` places game start/end, the ten-second warning, a move sound on the badge and typing under the type-out. The files are the user's, local in `media/sounds` and never committed; `EpisodeProps.sounds` carries their URLs and lengths.
 - The card animates from hold progress only, for example in over 0.25 s and out over 0.2 s, so the preview and the render stay identical.
 - The composition must stay pure: no editor state, no network, no clocks. Everything comes in through props.
 
@@ -305,7 +306,7 @@ Rendering runs the same `<Episode>` composition through `@remotion/renderer` on 
 
 - Resolution and fps match the source, with 1080p and 4K presets.
 - H.264 video and AAC audio at a quality-first CRF, ready for YouTube.
-- During holds the source audio is silent, with the theme's optional sting.
+- During holds the source audio is silent, apart from the chess sounds and the theme's optional sting.
 
 **Render test** (automated, part of Phase 5)
 
@@ -323,7 +324,7 @@ All visual choices live in a theme JSON in `packages/theme`, never hard-coded in
 
 **Default badge set**
 
-Ship original SVG badges built on the standard chess annotation glyphs, which no one owns. Do not copy Chess.com's badge artwork, exact colours or sound effects. The icon pack is swappable, so the creator can load whatever assets they already use in their videos.
+Ship original SVG badges built on the standard chess annotation glyphs, which no one owns. Do not copy Chess.com's badge artwork, exact colours or sound effects into the repo. (The sound files are the user's own, kept local and gitignored like the demo footage.) The icon pack is swappable, so the creator can load whatever assets they already use in their videos.
 
 | Classification | Glyph | Colour family |
 | --- | --- | --- |

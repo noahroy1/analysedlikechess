@@ -6,3 +6,4 @@ export * from './card.ts';
 export * from './eval-bar.ts';
 export * from './timeline.ts';
 export * from './notation.ts';
+export * from './sounds.ts';

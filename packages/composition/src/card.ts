@@ -98,16 +98,21 @@ export interface Reveal {
 }
 
 /**
- * How much of the explanation shows `sinceStartSec` after typing starts (the
- * card fully in). A hold set by hand too short for the type-out types faster,
- * so the text is always complete before the card leaves.
+ * How many times faster than normal the explanation types: 1, unless a hold
+ * set by hand is too short for the type-out, so the text is always complete
+ * before the card leaves.
  */
+export function typeOutSpeed(explanation: string, holdSec: number, timing: Theme['timing']): number {
+  const natural = typeOutSec(explanation, timing.typeOut);
+  const available = holdSec - typeOutStartSec(timing) - timing.cardOutSec;
+  return natural > available && available > 0 ? natural / available : 1;
+}
+
+/** How much of the explanation shows `sinceStartSec` after typing starts (the card fully in). */
 export function revealAt(explanation: string, sinceStartSec: number, holdSec: number, timing: Theme['timing']): Reveal {
   const { wordsPerSec, wordFadeSec } = timing.typeOut;
   const natural = typeOutSec(explanation, timing.typeOut);
-  const available = holdSec - typeOutStartSec(timing) - timing.cardOutSec;
-  const speed = natural > available && available > 0 ? natural / available : 1;
-  const t = Math.max(0, sinceStartSec) * speed;
+  const t = Math.max(0, sinceStartSec) * typeOutSpeed(explanation, holdSec, timing);
   const fade = (start: number) => (wordFadeSec > 0 ? clamp01((t - start) / wordFadeSec) : t >= start ? 1 : 0);
   const words = typedWords(explanation)
     .map((text, i) => ({ text, opacity: fade(i / wordsPerSec) }))

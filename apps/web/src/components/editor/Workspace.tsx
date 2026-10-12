@@ -1,4 +1,4 @@
-import { CLASSIFICATIONS, speechSnapTargets, type EpisodeProps } from '@als/schema';
+import { CLASSIFICATIONS, speechSnapTargets, type EpisodeProps, type SoundBank } from '@als/schema';
 import { Episode, buildTimeline, cardSettledFrame, sourceFrameToOut, timeMapFrame, type Hold } from '@als/composition';
 import { Player, type PlayerRef } from '@remotion/player';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
@@ -6,7 +6,7 @@ import { addBeatAt } from '../../editor/bar.ts';
 import { EditError, addMoment, deleteBeat, deleteMoment, retime, setClassification, setPortrait, setStatus } from '../../editor/doc.ts';
 import { PlaybackProvider, useEditor, useEditorStore, type Playback } from '../../editor/context.tsx';
 import { snapTime } from '../../editor/snapping.ts';
-import { createPortrait, fileUrl } from '../../lib/api.ts';
+import { createPortrait, fileUrl, getSoundBank } from '../../lib/api.ts';
 import { formatTime } from '../../lib/format.ts';
 import { adjacentHold, holdStopFrame, reviewStop, type PlaybackMode } from '../../lib/playback.ts';
 import { ShotStrip } from '../ShotStrip.tsx';
@@ -53,6 +53,11 @@ export function Workspace({ left, right }: WorkspaceProps) {
   const { source } = project;
   const fps = source.fps;
   const shots = useMemo(() => project.shots ?? [], [project.shots]);
+  const [sounds, setSounds] = useState<SoundBank>();
+  useEffect(() => {
+    // Sounds are optional: without them the Player has only the clip's audio.
+    getSoundBank().then(setSounds, (error: unknown) => console.warn('no chess sounds:', error));
+  }, []);
 
   const timeline = useMemo(() => buildTimeline(moments, fps, source.durationSec), [moments, fps, source.durationSec]);
   const snapTargets = useMemo(
@@ -69,8 +74,9 @@ export function Workspace({ left, right }: WorkspaceProps) {
       theme,
       ...(evalBar ? { evalBar } : {}),
       portraits: Object.fromEntries(characters.flatMap((c) => (c.portrait ? [[c.id, fileUrl(project.id, c.portrait)]] : []))),
+      ...(sounds ? { sounds } : {}),
     }),
-    [project.id, source.proxy, source.durationSec, moments, characters, theme, evalBar],
+    [project.id, source.proxy, source.durationSec, moments, characters, theme, evalBar, sounds],
   );
 
   // Handlers attached once read the latest values here.

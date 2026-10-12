@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { EvalBarSchema } from './eval.ts';
 import { CharacterSchema, MomentSchema } from './project.ts';
+import { SoundBankSchema } from './sounds.ts';
 import { ThemeSchema } from './theme.ts';
 
 /**
@@ -18,5 +19,7 @@ export const EpisodePropsSchema = z.object({
   evalBar: EvalBarSchema.optional(),
   /** Portrait URLs by character id, loadable by the Player and the renderer. */
   portraits: z.record(z.string(), z.string()).optional(),
+  /** Chess sound effects, shared by every theme. Without them the episode has only the source audio. */
+  sounds: SoundBankSchema.optional(),
 });
 export type EpisodeProps = z.infer<typeof EpisodePropsSchema>;

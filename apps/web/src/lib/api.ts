@@ -5,6 +5,7 @@ import {
   HistoryEntrySchema,
   PortraitResultSchema,
   RegenerateResultSchema,
+  SoundBankSchema,
   SaveResultSchema,
   type AnalysisEvent,
   type AnalyzeRequest,
@@ -13,6 +14,7 @@ import {
   type Moment,
   type PortraitRequest,
   type RegenerateResult,
+  type SoundBank,
   type HistoryEntry,
   type ProjectEdit,
   IngestEventSchema,
@@ -69,6 +71,9 @@ export const restoreVersion = (id: string, version: number, baseVersion: number)
 export const rerunIngest = (id: string) => request(`/projects/${id}/ingest`, { method: 'POST' });
 
 export const deleteProject = (id: string) => request(`/projects/${id}`, { method: 'DELETE' });
+
+/** The chess sounds the server has (files in `media/sounds`); empty when there are none. */
+export const getSoundBank = async (): Promise<SoundBank> => SoundBankSchema.parse(await request('/sounds'));
 
 /** URL of a file inside a project folder, e.g. `proxy.mp4` or a shot thumbnail. */
 export const fileUrl = (id: string, file: string, version?: number) =>

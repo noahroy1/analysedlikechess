@@ -12,7 +12,7 @@ Single-user local web app: upload a movie scene clip, draft chess-style move ann
 - `ANALYSIS_REPLAY_DIR=$PWD/fixtures/dialogue/recorded pnpm dev`: runs analysis on recorded responses, no keys or API calls. `ANALYSIS_RECORD_DIR` records real ones.
 - `ANALYST_HANDOFF_DIR=<dir> pnpm dev`: dev only, replaces the Claude calls with request/answer files a Claude Code session writes by hand (see Status).
 - `pnpm seed:sample`: creates a project from the fixture (3 moments). `pnpm seed:moments <projectId> <file>` replaces a project's moments, e.g. `fixtures/demo/doakes-moments.json` for the Dexter demo clip.
-- `scripts/browser/`: headless-Chrome checks (`phase2-checks.mjs`, `phase3-checks.mjs`, `typeout-checks.mjs`, `format-checks.mjs`) over the DevTools protocol (no dependencies) against a running `pnpm dev`. The dev build exposes the Player as `window.__alsPlayer`.
+- `scripts/browser/`: headless-Chrome checks (`phase2-checks.mjs`, `phase3-checks.mjs`, `typeout-checks.mjs`, `format-checks.mjs`, `evalbar-checks.mjs`, `sound-checks.mjs`) over the DevTools protocol (no dependencies) against a running `pnpm dev`. The dev build exposes the Player as `window.__alsPlayer`.
 - `scripts/ref/hold-phases.mjs <clip> <crop>`: times a reference clip's hold phases (freeze, badge, card, type-out, exit) from frame changes.
 
 ## Layout
@@ -24,7 +24,7 @@ Single-user local web app: upload a movie scene clip, draft chess-style move ann
 - `packages/theme`: classification tokens, badges, theme presets.
 - `fixtures/`: test data, including the sample project and recorded provider responses.
 - `projects/`: runtime project folders, gitignored. `PROJECTS_DIR` overrides the location.
-- `media/`: local demo footage (copyrighted), gitignored. Never commit clips.
+- `media/`: local demo footage (copyrighted), gitignored. Never commit clips. `media/sounds/` holds the user's chess sound files (`SOUNDS_DIR` overrides it); never commit them either.
 
 ## Conventions
 
@@ -34,6 +34,7 @@ Single-user local web app: upload a movie scene clip, draft chess-style move ann
 - The edit layer draws the same `<MoveCard>` over the Player through its `editing` slots; the render path never passes them.
 - Analysis (`apps/server/src/analysis/`): providers sit behind `Transcriber` / `SceneDescriber` / `Analyst` (ElevenLabs Scribe v2, Gemini, Claude). Stages cache by input hash in `<project>/analysis/manifest.json`; `rerun: 'analyst'` redoes only Pass A/B. Analyst schemas are built per clip with enums for cast, candidate and utterance ids. Prices for cost logging are in `analysis/prices.ts`. Regenerate never writes `project.json` (so an open editor is not forced to reload); its spend goes to `analysis/regenerate-usage.json`.
 - The server imports `@als/theme/themes` (no JSX); the web app imports `@als/theme`. Themes: `default` (the app's own `stacked` card) and `creator` (the creator's `headline` card); a project's `themeId` is part of the editor document, so switching is saved and undoable and unlocked holds follow the new timing.
+- Chess sounds are shared by every theme, never on the theme. Files are `<id>.<ext>` per `SOUND_IDS` (`packages/schema/src/sounds.ts`); the server lists them with probed lengths at `GET /api/sounds`, and missing files are skipped. `soundCues()` (`packages/composition/src/sounds.ts`) is the only placement logic, so the Player and the render agree.
 - Hard invariants (moment spacing, ordering, references) live in `ProjectSchema`. Soft rules (text caps, `bestMove` on best/brilliant) are `momentWarnings()`, so the editor warns without blocking saves.
 - The output is the source with a hold at each moment. `buildTimeline()` in `packages/composition` is the only mapping between source and output frames; the Player, timeline UI and renderer all use it.
 - `<Episode>` renders one `<Sequence>` per play-then-hold segment so the same `@remotion/media` `<Video>` plays into its `<Freeze>`; premounting loads the next segment. Verified frame-exact in the Player (Phase 2 spike), so the extracted-still fallback is not needed.
@@ -60,30 +61,21 @@ Read this first in a new session. It says where the work stands, what to do next
 ### Where things stand
 
 - **Branch:** work now happens on `main` (the user asked for this on Oct 12; commit and push to `main`). `main` was fast-forwarded to the tip of `format-iterations`, and all phase branches (`phase-0-scaffold` … `phase-4-analysis`, `format-iterations`) are pushed to GitHub as history; do not add new per-phase branches. `apps/server/.env.example` shows as deleted in the working tree from before Oct 12; it is not ours, so leave it out of commits (`git add -A -- . ':!apps/server/.env.example'`).
-- **Done:** Phases 0-4 (Phase 4 has two owed items, below), the creator's review iterations, and format iterations 1-4 and 6 of 7 (log below). Iteration 5 (sounds) is blocked.
+- **Done:** Phases 0-4 (Phase 4 has two owed items, below), the creator's review iterations, and format iterations 1-6 of 7 (log below). Iteration 7 (subtitles) is next.
 - **Not started:** Phase 5 (export/render) and Phase 6 (pitch build). The format iterations were inserted before Phase 5 at the user's request; the user has not said whether Phase 5 waits for all seven.
-- **Checks at the tip:** `pnpm check` passes (193 tests). The browser checks pass: `phase2-checks`, `phase3-checks`, `typeout-checks`, `format-checks` and `evalbar-checks`.
+- **Checks at the tip:** `pnpm check` passes (211 tests). The browser checks pass: `phase2-checks`, `phase3-checks`, `typeout-checks`, `format-checks`, `evalbar-checks` and `sound-checks`.
 
-### Next action: the user's review of iteration 6, then iteration 5 or 7
+### Next action: the user's review of iterations 5 and 6, then iteration 7
 
-Iteration 6 (evaluation bar) is built; see item 6 of the log. Waiting on the user:
-- **Review the bar on BB1.** Its Pass C was written by hand. BB1 has no portraits yet: they are for the user to crop in the Cast tab.
-- **Size per rating** (`TODO(open-decision)` on `EVAL_DIRECTION`): code fixes only the direction; the Analyst picks the size.
-- **Sounds (iteration 5)** are still blocked on where they come from (below). Iteration 7 (subtitles) can start without it.
-
-### Iteration 5 (sounds): blocked
-
-Blocked on one user decision, asked at the end of iteration 4 and not yet answered: **where the sounds come from.** PLAN.md forbids copying Chess.com's sound effects, which the creator's clips (`media/creator-ref/style-sound-demo-*.mov`, which have audio) may use. Options offered:
-1. **Recommended:** Claude listens to the demo clips' audio to match its character, then synthesises *original* sounds: a move sound per type or group (brighter for Brilliant/Great, duller for mistakes), plus a light key-tick loop under the type-out. No input from the user is needed, and files can be swapped later.
-2. **The user supplies files:** one per move type (or group) plus a typing loop.
-
-Fixed requirements whatever the source:
-- Sounds are chess sounds, not creator sounds, so they are shared by every theme. Do not hang them on the theme, which today has only an optional `timing.sting`.
-- They play in both the Player and the render.
-- The typing loop follows `revealAt()`, so it starts with the first word and stops with the last.
-- The user said sounds may be dropped ("sundered") if they become the bottleneck.
-
-Also waiting on the user: whether speaker naming should prefer **first names** like the creator ("Frank", "Carl") over full names ("Walter White"). For now names can be edited in the Cast tab.
+Waiting on the user:
+- **Sounds (iteration 5):** listen in Preview mode. Four questions are open:
+  1. **Typing level.** The typing files sit about 20 dB below the creator's typing; the move sounds match the creator's level. Options: the user re-exports them louder, or a per-sound gain is added (Web Audio allows volume above 1).
+  2. **`move-capture`** is served but nothing plays it yet. Which moves should?
+  3. **Inaccuracies** play `move-mistake`, as the creator's clips do (0.99 match), not `move-self`/`move-opponent` as the user's rule said. One line to undo: `BORROWED` in `sounds.ts`.
+  4. **Missing files:** `move-miss` and `hold-open` (the segment opening). Dropping them in `media/sounds` makes them play; nothing else changes.
+- **Evaluation bar (iteration 6):** review it on BB1. Its Pass C was written by hand. BB1 has no portraits yet; the user crops them in the Cast tab.
+- **Size per rating** (`TODO(open-decision)` on `EVAL_DIRECTION`): the code fixes only the direction; the Analyst picks the size.
+- Whether speaker naming should prefer **first names** like the creator ("Frank", "Carl") over full names ("Walter White"). For now names can be edited in the Cast tab.
 
 ### Format iterations (the creator's list, Oct 12; each ends with a commit and a walkthrough)
 
@@ -100,7 +92,13 @@ Also waiting on the user: whether speaker naming should prefer **first names** l
    - **Sides:** the Analyst names `protagonist` in Pass B, and `assignSides()` (`apps/server/src/analysis/sides.ts`) gives them White, else a coin flip among the characters with moves. Sides already set are never overwritten.
    - **Move numbers:** `moveNumbers()` (`packages/composition/src/notation.ts`) follows chess turn order with implied moves (W, B, B → "1", "1...", "2...").
    - **Editor:** a Look picker in the header saves `themeId` as part of the editor document, so switching is undoable and holds re-time; a White/Black toggle in Cast; a Motif field in the inspector, also editable on the chip.
-5. **Sounds:** next, blocked on the decision above.
+5. **Sounds (done).** The user supplied the files (`media/sounds`, 48 kHz, gitignored). Placement was measured on the creator's clips (Oct 12) by cross-correlating the files with their audio: the freeze is silent, the move sound starts 0.27-0.29 s in as the badge pops, and typing runs from the first word to about the last, with a silent reread.
+   - **Game:** `game-start` on frame 0, `game-ten-seconds-remaining` 10 s before the end, and `game-end` finishing on the last frame.
+   - **Holds:** `hold-open` (no file yet) on the first frozen frame, then the move sound at `badgeDelaySec`. The move sound is the rating's own `move-<rating>` if the file exists, else a borrowed one (inaccuracy → mistake), else `move-self` for White and `move-opponent` for Black.
+   - **Typing** follows `revealAt()` (and `typeOutSpeed()` for short locked holds): `typing-start-middle` from the first word, looping if needed, then `typing-end` placed so its last keystroke (1.24 s in, `TYPING_END_LAST_KEY_SEC`) lands on the last word. A short type-out starts partway into the ending. The recording plays at its own 97 WPM, never sped up (that would raise its pitch).
+   - **Spaces:** a press every 60/97 s (a WPM word is five keystrokes including its space), each snapped to a word appearing, varied among `typing-space-1..3` and seeded by the move's id.
+   - **Plumbing:** `SoundLibrary` (`apps/server/src/media/sounds.ts`) and `GET /api/sounds[/:file]`. The editor fetches the bank into `EpisodeProps.sounds`, and `<Episode>` draws one premounted `<Audio>` per cue.
+   - `sound-checks.mjs` strips the scratch project's audio, plays the whole episode under both looks and compares the Web Audio schedule with `soundCues()`. All cues land within 0.6 frames.
 6. **Evaluation bar (done: `147731b`, `2da3bdf`, `c81ca21` and the portraits commit).** Reference: `media/creator-ref/style-ref-evaluation-bar.png` and the demo clips, measured Oct 12.
    - **Look:** the creator theme's optional `evalBar` block. Black's player is at the top and White's at the bottom; the bar's coloured part spans x 26-67 and y 112-968 at 1080p. The label is at the leader's end, unsigned ("1.0", "M4"). The default theme has no bar.
    - **Data:** `Moment.eval` (the eval after the move) and `project.evalBar` (`start` plus `beats`). An eval is `{pawns}` or `{mate}`, signed from White's side. Bar height is `evalFill()` = 0.5 + 0.5 tanh(0.184 pawns), fitted to the creator's bar.
@@ -174,7 +172,7 @@ To measure more, use `scripts/ref/hold-phases.mjs <clip> <crop>` for timing, PIL
 ### How each step ends (the user's standing workflow)
 
 1. Run `pnpm check`.
-2. Run the browser checks against `PROJECTS_DIR=<scratch> pnpm dev` with freshly seeded samples (`pnpm seed:sample`; each check edits its project, so seed one per check). `phase2-checks` needs the output frame count, currently 1143 for the sample under the default theme.
+2. Run the browser checks against `PROJECTS_DIR=<scratch> pnpm dev` with freshly seeded samples (`pnpm seed:sample`; each check edits its project, so seed one per check). `phase2-checks` needs the output frame count, currently 1143 for the sample under the default theme. `sound-checks` also takes the projects folder, because it strips that project's audio.
 3. Look at screenshots.
 4. Commit.
 5. Update this section.
@@ -188,4 +186,6 @@ To measure more, use `scripts/ref/hold-phases.mjs <clip> <crop>` for timing, PIL
 - A PUT to `/api/projects/:id` needs `themeId` as well as moments and characters.
 - To set a React `<select>` from a check, use the native value setter and dispatch `change` (see `format-checks.mjs`).
 - To type into an input from a check, focus it and send `Input.insertText` (a synthetic `input` event followed at once by `blur()` commits the old value). Select a move with the Player outside any hold: a paused hold keeps its own move selected.
+- Headless Chrome can't be listened to. To check sounds, hook `AudioBufferSourceNode.prototype.start` before the page loads (see `sound-checks.mjs`). Log even before the Player reports playing, because frame 0's sounds are scheduled while the audio context resumes.
+- `<Sequence premountFor>` does not allow `layout="none"`. Give `<Audio>` its own `from`, `durationInFrames` and `premountFor` instead.
 - The editor is now taller than a 1150-1300 px window, so the page can show a scrollbar. Measure a container and its children in the same pass.

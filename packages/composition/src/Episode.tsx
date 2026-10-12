@@ -7,6 +7,7 @@ import { EvalBar, barPlayers } from './EvalBar.tsx';
 import { evalBarAt, placeKeyframes } from './eval-bar.ts';
 import { MoveCard } from './MoveCard.tsx';
 import { moveNumbers } from './notation.ts';
+import { soundCues } from './sounds.ts';
 import { buildTimeline, type Segment } from './timeline.ts';
 
 /**
@@ -14,7 +15,7 @@ import { buildTimeline, type Segment } from './timeline.ts';
  * moment. Pure: everything arrives through props, and every frame is derived
  * from the frame number, so the Player and the renderer draw identical frames.
  */
-export function Episode({ src, durationSec, moments, characters, theme, evalBar, portraits }: EpisodeProps) {
+export function Episode({ src, durationSec, moments, characters, theme, evalBar, portraits, sounds }: EpisodeProps) {
   const { fps, width, height } = useVideoConfig();
   const frame = useCurrentFrame();
   const timeline = useMemo(() => buildTimeline(moments, fps, durationSec), [moments, fps, durationSec]);
@@ -25,6 +26,10 @@ export function Episode({ src, durationSec, moments, characters, theme, evalBar,
   const players = useMemo(() => barPlayers(characters, moments, portraits), [characters, moments, portraits]);
   const names = useMemo(() => new Map(characters.map((c) => [c.id, c.name])), [characters]);
   const numbers = useMemo(() => moveNumbers(moments, characters), [moments, characters]);
+  const cues = useMemo(
+    () => (sounds ? soundCues({ timeline, moments, characters, timing: theme.timing, sounds }) : []),
+    [sounds, timeline, moments, characters, theme.timing],
+  );
 
   return (
     <AbsoluteFill style={{ backgroundColor: 'black', overflow: 'hidden' }}>
@@ -66,6 +71,19 @@ export function Episode({ src, durationSec, moments, characters, theme, evalBar,
           frame={{ width, height }}
         />
       )}
+      {cues.map((cue) => (
+        // Premounting loads each sound a second ahead, so it starts on its frame.
+        <Audio
+          key={cue.key}
+          name={cue.sound}
+          src={cue.src}
+          from={cue.from}
+          durationInFrames={cue.frames}
+          premountFor={fps}
+          {...(cue.trimBefore ? { trimBefore: cue.trimBefore } : {})}
+          {...(cue.loop ? { loop: true } : {})}
+        />
+      ))}
     </AbsoluteFill>
   );
 }

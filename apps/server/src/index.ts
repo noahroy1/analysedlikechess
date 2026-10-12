@@ -5,16 +5,19 @@ import { loadAnalysisConfig } from './analysis/config.ts';
 import { makeProviders } from './analysis/providers/index.ts';
 import { AnalysisService } from './analysis/service.ts';
 import { createIngestQueue } from './ingest/queue.ts';
+import { SoundLibrary } from './media/sounds.ts';
 import { ProjectStore } from './projects/store.ts';
 
 const port = Number(process.env.PORT ?? 8787);
 const projectsDir = process.env.PROJECTS_DIR ?? fileURLToPath(new URL('../../../projects', import.meta.url));
+// Chess sounds are local files like the demo footage, never committed.
+const soundsDir = process.env.SOUNDS_DIR ?? fileURLToPath(new URL('../../../media/sounds', import.meta.url));
 
 const store = new ProjectStore(projectsDir);
 const queue = createIngestQueue(store);
 const config = loadAnalysisConfig();
 const analysis = await AnalysisService.load(store, makeProviders(config), config);
-const app = createApp({ store, queue, analysis });
+const app = createApp({ store, queue, analysis, sounds: new SoundLibrary(soundsDir) });
 
 // Resume ingests a restart interrupted; finished steps are cached, so this picks up where it stopped.
 for (const project of await store.list()) {
