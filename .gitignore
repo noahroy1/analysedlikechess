@@ -15,4 +15,4 @@ projects/*
 !.env.example
 
 # local demo footage: copyrighted, never committed
-media/
+/media/
