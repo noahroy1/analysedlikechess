@@ -73,13 +73,13 @@ Phase 5 (Oct 13) is built and waiting on the user's review. See "Phase 5: export
 
 Waiting on the user:
 - **Sounds (iteration 5):** listen in Preview mode. Four questions are open:
-  1. **Typing level.** The typing files sit about 20 dB below the creator's typing. The user is re-exporting them 20 dB louder (Oct 13), so no gain is added in code; check the level once the new files are in `media/sounds`.
+  1. **Typing level.** The user re-exported the typing files 12 dB louder (Oct 13). Measured after that, the loop averages -42.1 dB against the creator's typing at -35.7 dB (mean over the type-out of three clips, -35.2 to -36.0), so it is still about 6 dB quiet. The loop peaks at -19.8 dB, so +6 dB more would not clip. No gain is added in code.
   2. **`move-capture`** is served but nothing plays it yet. Which moves should?
   3. **Inaccuracies** play `move-mistake`, as the creator's clips do (0.99 match), not `move-self`/`move-opponent` as the user's rule said. One line to undo: `BORROWED` in `sounds.ts`.
   4. **Missing files:** `move-miss` and `hold-open` (the segment opening). Dropping them in `media/sounds` makes them play; nothing else changes.
 - **Evaluation bar (iteration 6):** review it on BB1. Its Pass C was written by hand. BB1 now has portraits.
 - **Size per rating** (`TODO(open-decision)` on `EVAL_DIRECTION`): the code fixes only the direction; the Analyst picks the size.
-- **Card placement (assessed Oct 13, not built):** whether to place cards automatically so they clear faces and the move's subject. See "Card placement" below; it needs the user's go-ahead and three choices.
+- **Card placement (assessed Oct 13, not built):** the user has set the behaviour (below) and asked for Gemini's costs, which are sourced. Waiting on the go-ahead to build, with Gemini at medium resolution as the recommendation.
 
 ### Format iterations (the creator's list, Oct 12; each ends with a commit and a walkthrough)
 
@@ -151,10 +151,23 @@ The creator places each card by hand per shot, clear of faces (`media/creator-re
   - **Faces:** both found every visible face. Gemini also found heads seen from behind and tiny distant figures, and named each face.
   - **Subject:** Gemini's single subject box was tight only sometimes (the gun, the raised hands); often it was the whole person or half the frame, so it can only be a soft preference.
 - **Placement search:** card plus badge on either side; no-go zones for the bar strip, name corners and the subtitle line; on close-ups only the eyes-to-mouth band is protected. Result: faces fully clear on 8 of 13 frames, eyes and mouth clear on 12 of 13. Close-ups leave no face-free spot for a full card.
-- **Open choices for the user:**
-  - Gemini (cloud, in the pipeline already, names the mover) or Vision (local and free, macOS only, against the plan's "no local AI models").
-  - What close-ups should do (the creator's references have none).
-  - Whether a retime re-places an unlocked card.
+- **The user's decisions (Oct 13):**
+  - The purpose is not to hide the drama, so eyes and mouths weigh most. On a close-up the card may cover hair, forehead, chin or shoulders, never the eyes-to-mouth band.
+  - A retime keeps any position or scale the user set by hand. A card never changed by hand is placed again on the new frame.
+  - A "Re-evaluate" button beside the position and scale controls places the card again on demand, replacing a manual position.
+- **Still open:** Gemini or Vision. The user asked for Gemini's costs first.
+- **Gemini costs (sourced Oct 13 from ai.google.dev pricing, updated Oct 9, 2026, and the spike's logged tokens):**
+  - **Rates and image cost:** Gemini 3.5 Flash-Lite costs $0.30 per 1M input tokens and $2.50 per 1M output tokens, including thinking; `prices.ts` already matches. A Gemini 3 image costs up to 1120 tokens by default (`high`) or 560 at `medium`.
+  - **Per frame, measured on 13 frames:**
+    - Default (`high`): 1274 tokens in and 127 out, so $0.0007 a frame.
+    - `medium`: 700 in and 119 out, so $0.0005 a frame. Output is most of the bill.
+    - Calls take about 2 s.
+  - **Accuracy:** `medium` matched every face Vision found (14/14), and its face boxes agree with `high`'s (median IoU 0.96). Run to run, the boxes agree at a median IoU of 0.98, but one run missed a tiny distant figure.
+  - **Per clip:** BB1's 7 cards cost about $0.004 at `medium`, plus $0.0005 for each retime or Re-evaluate. That is about 1-2% of a clip's analysis, which Claude dominates at $0.25-0.40.
+  - **Alternatives:**
+    - Gemini 2.5 Flash-Lite ($0.10/$0.40, about $0.0002 a frame) is untested for this.
+    - Gemini 3.8 Flash ($0.75/$3.75, doubling on Jan 1, 2027) costs about 2-3 times as much.
+    - The Batch API halves prices but can take hours, which is no use for Re-evaluate.
 
 ### Phase 5: export (done, Oct 13)
 
