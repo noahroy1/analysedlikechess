@@ -62,9 +62,16 @@ Read this first in a new session. It says where the work stands, what to do next
 - **Branch:** `format-iterations` (current tip), stacked on `phase-4-analysis` → `phase-3-editor` → `phase-2-player` → `phase-1-ingest` → `phase-0-scaffold`. **Nothing is merged into `main`**; ask before merging. `apps/server/.env.example` shows as deleted in the working tree from before Oct 12; it is not ours, so leave it out of commits (`git add -A -- . ':!apps/server/.env.example'`).
 - **Done:** Phases 0-4 (Phase 4 has two owed items, below), the creator's review iterations, and format iterations 1-4 of 7 (log below).
 - **Not started:** Phase 5 (export/render) and Phase 6 (pitch build). The format iterations were inserted before Phase 5 at the user's request; the user has not said whether Phase 5 waits for all seven.
-- **Checks at the tip:** `pnpm check` passes (157 tests). The browser checks pass: `phase2-checks`, `phase3-checks`, `typeout-checks` and `format-checks`.
+- **Checks at the tip:** `pnpm check` passes (182 tests). The browser checks pass: `phase2-checks`, `phase3-checks`, `typeout-checks` and `format-checks`.
 
-### Next action: format iteration 5 (sounds)
+### Next action: finish format iteration 6 (evaluation bar)
+
+The user started iteration 6 before answering the sounds question (iteration 5 stays blocked, below). Plan agreed Oct 12; steps 1-2 are done, see item 6 of the log. Remaining:
+- **Step 3, editor:** an eval lane under the timeline (a step plot, solid dots for cards and hollow ones for beats), a beat inspector (time, value, reason, delete), "add beat at playhead", an Eval field in the moment inspector (`parseEval`), the start value, `evalWarnings` shown like `momentWarnings`, and a **Re-evaluate** button. Re-evaluate is a Pass C endpoint that, like Regenerate, never writes `project.json`: it returns the evals, the editor applies them as one undoable edit, and its spend is logged beside the project.
+- **Step 4, portraits:** the user chose to crop them from the video. In the Cast tab, pause on a frame and drag a square over a face; the server crops a still into the project folder (`SERVABLE_FILE` must allow it). Feed the URLs into `EpisodeProps.portraits`. Initials stay as the fallback.
+- Then an `evalbar-checks.mjs` browser check, a walkthrough, and stop.
+
+### Iteration 5 (sounds): blocked
 
 Blocked on one user decision, asked at the end of iteration 4 and not yet answered: **where the sounds come from.** PLAN.md forbids copying Chess.com's sound effects, which the creator's clips (`media/creator-ref/style-sound-demo-*.mov`, which have audio) may use. Options offered:
 1. **Recommended:** Claude listens to the demo clips' audio to match its character, then synthesises *original* sounds: a move sound per type or group (brighter for Brilliant/Great, duller for mistakes), plus a light key-tick loop under the type-out. No input from the user is needed, and files can be swapped later.
@@ -94,7 +101,14 @@ Also waiting on the user: whether speaker naming should prefer **first names** l
    - **Move numbers:** `moveNumbers()` (`packages/composition/src/notation.ts`) follows chess turn order with implied moves (W, B, B → "1", "1...", "2...").
    - **Editor:** a Look picker in the header saves `themeId` as part of the editor document, so switching is undoable and holds re-time; a White/Black toggle in Cast; a Motif field in the inspector, also editable on the chip.
 5. **Sounds:** next, blocked on the decision above.
-6. **Evaluation bar:** last of the format-defining features. Reference: `media/creator-ref/style-ref-evaluation-bar.png`. A vertical bar on the left edge between the two characters' portraits, labelled Black (top) and White (bottom), reading a number such as "1.0" or a mate count such as "M6", and animating as cards appear. The creator's second sentences refer to it ("the mate count holds", "the forced mate disappears"). Its logic is expected to be heavy (per-move evaluation from the Analyst, portraits, animation), so plan it before building.
+6. **Evaluation bar (in progress; steps 1-2 done).** Reference: `media/creator-ref/style-ref-evaluation-bar.png` and the demo clips, measured Oct 12.
+   - **Look:** the creator theme's optional `evalBar` block. Black's player is at the top and White's at the bottom; the bar's coloured part spans x 26-67 and y 112-968 at 1080p. The label is at the leader's end, unsigned ("1.0", "M4"). The default theme has no bar.
+   - **Data:** `Moment.eval` (the eval after the move) and `project.evalBar` (`start` plus `beats`). An eval is `{pawns}` or `{mate}`, signed from White's side. Bar height is `evalFill()` = 0.5 + 0.5 tanh(0.184 pawns), fitted to the creator's bar.
+   - **Settling:** each new eval steps through 2-4 readings (`settleReadings()` in `packages/composition/src/eval-bar.ts`, seeded by id), 0.18, 0.58, 1.13 and 1.78 s into the freeze. The label changes first and the bar eases after. Beats use 1-2 readings in about 0.5 s (the user's choice: quieter than cards).
+   - **Beats (the user's idea):** Pass A over-generates about twice the target. The candidates Pass B does not card become beats: the bar moves during play with no freeze, so it reacts between cards. They are placed like spoken moves and kept 2.5 s clear of any other change (`placeBeats()`).
+   - **Pass C (`evaluate` stage, Opus, after snap):** one call values every card and beat together, so the bar tells one story instead of wobbling. Code then enforces the rules in `applyEvaluation()`: a rating never moves the bar the wrong way for the mover (it holds instead), beats move it at most 6% and never start a mate, and evals on kept (approved or user) moves and user beats are fixed. Sizes per rating are a `TODO(open-decision)`. `evalWarnings()` flags the same rules in the editor.
+   - **BB1:** has a hand-written Pass C (`analysis/recorded/claude-evaluate.json`): 7 cards and 7 beats. Hank opens up 1.5, the cancer card turns it, Walt reaches +6.1, and "Tread Lightly" flips it to M4 for Black.
+   - **Dialogue fixture:** has a synthetic `claude-evaluate.json`, to be replaced with the real recording that is still owed.
 7. **Burned-in subtitles** of the dialogue. The user put these after the features that set the format apart.
 
 **Reference clip:** BB1 stays the reference until the format is proven, then BB2. `media/BB2.mov` is still the duplicate of BB1 (the user apologised and knows), so the real BB2 is needed before then.

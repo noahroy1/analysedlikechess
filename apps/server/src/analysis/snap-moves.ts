@@ -20,15 +20,34 @@ export interface SnapResult {
 }
 
 /**
+ * When a candidate's move happens: a spoken move just after its last word, in
+ * that word's shot; a visual move on the nearest clean frame. Undefined when
+ * there is neither evidence nor a time.
+ */
+export function candidateTime(project: Project, candidate: Candidate): number | undefined {
+  const { fps, durationSec } = project.source;
+  const shots = project.shots ?? [];
+  const words = project.transcript?.words ?? [];
+  const utterances = new Map((project.transcript?.utterances ?? []).map((u) => [u.id, u]));
+  const evidence = candidate.evidenceUtteranceIds.map((id) => utterances.get(id)).filter((u) => u !== undefined);
+  if ((candidate.kind === 'spoken' || candidate.visualTimeSec === null) && evidence.length) {
+    const last = evidence.reduce((a, b) => (b.end > a.end ? b : a));
+    const lastWordEnd = words[last.wordRange[1]]?.end ?? last.end;
+    return Math.min(freezeAfterSpeech(lastWordEnd, shots, fps), durationSec);
+  }
+  if (candidate.visualTimeSec !== null) {
+    return Math.min(cleanFreezeTime(Math.min(Math.max(candidate.visualTimeSec, 0), durationSec), shots, fps), durationSec);
+  }
+  return undefined;
+}
+
+/**
  * Stage 4: places each annotated move on an exact frame and merges the drafts
  * into the track. Spoken moves freeze just after their last word, in that
  * word's shot; visual moves on the nearest clean frame. Moves the creator
  * approved or added are kept; AI drafts are replaced.
  */
 export function snapMoves(project: Project, candidates: Candidate[], moves: Annotation['moves'], theme: Theme): SnapResult {
-  const { fps, durationSec } = project.source;
-  const shots = project.shots ?? [];
-  const words = project.transcript?.words ?? [];
   const utterances = new Map((project.transcript?.utterances ?? []).map((u) => [u.id, u]));
   const byId = new Map(candidates.map((c) => [c.id, c]));
   const dropped: SnapResult['dropped'] = [];
@@ -40,19 +59,8 @@ export function snapMoves(project: Project, candidates: Candidate[], moves: Anno
     const candidate = byId.get(move.candidateId);
     if (!candidate) return dropped.push({ candidateId: move.candidateId, reason: 'unknown candidate' });
     const evidence = candidate.evidenceUtteranceIds.map((id) => utterances.get(id)).filter((u) => u !== undefined);
-
-    let sourceTime: number;
-    if ((candidate.kind === 'spoken' || candidate.visualTimeSec === null) && evidence.length) {
-      const last = evidence.reduce((a, b) => (b.end > a.end ? b : a));
-      const lastWordEnd = words[last.wordRange[1]]?.end ?? last.end;
-      sourceTime = freezeAfterSpeech(lastWordEnd, shots, fps);
-    } else if (candidate.visualTimeSec !== null) {
-      const t = Math.min(Math.max(candidate.visualTimeSec, 0), durationSec);
-      sourceTime = cleanFreezeTime(t, shots, fps);
-    } else {
-      return dropped.push({ candidateId: candidate.id, reason: 'no evidence or time to place it' });
-    }
-    sourceTime = Math.min(sourceTime, durationSec);
+    const sourceTime = candidateTime(project, candidate);
+    if (sourceTime === undefined) return dropped.push({ candidateId: candidate.id, reason: 'no evidence or time to place it' });
 
     const actorId = characterFor(candidate.actor);
     const classification = relabelLateBook(move.classification, sourceTime);

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { ClassificationSchema } from './classification.ts';
+import type { Eval } from './eval.ts';
 import { TEXT_CAPS } from './rules.ts';
 
 // Structured outputs for the analysis pipeline. They are built per clip so the
@@ -76,6 +77,35 @@ export type Annotation = z.infer<ReturnType<typeof annotationSchema>>;
 /** Pass B for one moment (Regenerate, and "Make this a move"). */
 export const MoveDraftSchema = z.object(moveFields);
 export type MoveDraft = z.infer<typeof MoveDraftSchema>;
+
+/**
+ * An eval as the model writes it: structured outputs have no unions of
+ * objects, so pawns and mate are both nullable and `toEval` picks one.
+ */
+const evalFields = {
+  pawns: z.number().nullable().describe("White's advantage in pawns, one decimal, negative when Black is ahead; null when there is a mate"),
+  mate: z.int().nullable().describe('Forced mate in this many moves, positive when White mates and negative when Black does; null otherwise'),
+};
+
+/** Pass C: one eval for every card and beat at once, so the bar tells one coherent story. */
+export const evaluationSchema = (ids: readonly string[]) =>
+  z.object({
+    start: z.object(evalFields).describe('The position as the scene opens, before the first move'),
+    evals: z.array(
+      z.object({
+        id: enumOf(ids, 'none'),
+        ...evalFields,
+        reason: z.string().describe('Why the bar moves here, in one short line'),
+      }),
+    ),
+  });
+export type Evaluation = z.infer<ReturnType<typeof evaluationSchema>>;
+
+/** The model's pawns-or-mate pair as an Eval. A mate of 0 or a missing value reads as level. */
+export const toEval = (e: { pawns: number | null; mate: number | null }): Eval =>
+  e.mate !== null && e.mate !== 0
+    ? { mate: Math.max(-99, Math.min(99, Math.trunc(e.mate))) }
+    : { pawns: Math.max(-99, Math.min(99, Math.round((e.pawns ?? 0) * 10) / 10)) || 0 };
 
 /** The creator's breakdowns, used as few-shot examples, plus a short voice guide. */
 export const StyleCorpusSchema = z.object({

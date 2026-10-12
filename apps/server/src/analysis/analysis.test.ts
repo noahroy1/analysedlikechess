@@ -10,6 +10,7 @@ import {
   NO_BEST_MOVE,
   ProjectSchema,
   RegenerateResultSchema,
+  evalWarnings,
   type Project,
 } from '@als/schema';
 import { defaultTheme } from '@als/theme/themes';
@@ -228,6 +229,7 @@ describe('analysis pipeline', () => {
       ['decisions', 'done'],
       ['annotate', 'done'],
       ['snap', 'done'],
+      ['evaluate', 'done'],
     ]);
     expect(project.moments).toHaveLength(3);
     expect(project.moments.every((m) => m.origin === 'ai' && m.status === 'draft')).toBe(true);
@@ -247,6 +249,19 @@ describe('analysis pipeline', () => {
       ['Blue', 'white'],
     ]);
     expect(project.moments.map((m) => m.motif)).toEqual([undefined, 'Prophylaxis', 'Decoy']);
+  });
+
+  it('values every card and beat for the evaluation bar in one pass', () => {
+    // The three candidates Pass B did not pick become beats; every move gets an eval.
+    expect(project.evalBar?.start).toEqual({ pawns: 0.2 });
+    expect(project.evalBar?.beats.map((b) => [b.id, b.origin])).toEqual([
+      ['beat-c2', 'ai'],
+      ['beat-c3', 'ai'],
+      ['beat-c5', 'ai'],
+    ]);
+    expect(project.evalBar?.beats.every((b) => b.reason && b.action && b.actorId)).toBe(true);
+    expect(project.moments.map((m) => m.eval)).toEqual([{ pawns: 0.9 }, { pawns: 2.8 }, { mate: 3 }]);
+    expect(evalWarnings(project.evalBar, project.moments, project.context.characters).size).toBe(0);
   });
 
   it("cites only evidence that exists in the transcript", () => {
@@ -273,11 +288,11 @@ describe('analysis pipeline', () => {
   it('shows tokens and cost per stage', () => {
     const byName = Object.fromEntries(project.analysis.stages.map((s) => [s.name, s]));
     expect(byName.transcribe!.usage?.audioSec).toBeCloseTo(30.8, 0);
-    for (const name of ['describe', 'speakers', 'decisions', 'annotate']) {
+    for (const name of ['describe', 'speakers', 'decisions', 'annotate', 'evaluate']) {
       expect(byName[name]!.usage?.outputTokens).toBeGreaterThan(0);
       expect(byName[name]!.model).toBeTruthy();
     }
-    for (const name of ['transcribe', 'describe', 'speakers', 'decisions', 'annotate']) {
+    for (const name of ['transcribe', 'describe', 'speakers', 'decisions', 'annotate', 'evaluate']) {
       expect(byName[name]!.costUsd).toBeGreaterThan(0);
     }
     const sum = project.analysis.stages.reduce((s, x) => s + (x.costUsd ?? 0), 0);
@@ -288,17 +303,20 @@ describe('analysis pipeline', () => {
     expect((await readdir(env.store.file(project.id, 'history'))).length).toBeGreaterThan(0);
   });
 
-  it('re-running the Analyst skips Stages 1 and 2 and keeps approved moves', async () => {
-    // Approve one move through the editor's save path.
+  it('re-running the Analyst skips Stages 1 and 2 and keeps approved moves and their evals', async () => {
+    // Approve one move through the editor's save path, with an eval set by hand.
     const approved = project.moments[1]!;
     const save = await env.app.request(`/api/projects/${project.id}`, {
       method: 'PUT',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         version: project.version,
-        moments: project.moments.map((m) => (m.id === approved.id ? { ...m, status: 'approved', moveLabel: 'Approved edit' } : m)),
+        moments: project.moments.map((m) =>
+          m.id === approved.id ? { ...m, status: 'approved', moveLabel: 'Approved edit', eval: { pawns: 2 } } : m,
+        ),
         characters: project.context.characters,
         themeId: project.themeId,
+        evalBar: project.evalBar,
       }),
     });
     expect(save.status).toBe(200);
@@ -318,8 +336,10 @@ describe('analysis pipeline', () => {
       ['decisions', 'done'],
       ['annotate', 'done'],
       ['snap', 'done'],
+      ['evaluate', 'done'],
     ]);
     expect(rerun.moments.find((m) => m.id === approved.id)?.moveLabel).toBe('Approved edit');
+    expect(rerun.moments.find((m) => m.id === approved.id)?.eval).toEqual({ pawns: 2 });
     expect(rerun.moments).toHaveLength(3);
     // Cached stages cost nothing on this run.
     const cached = rerun.analysis.stages.filter((s) => s.status === 'cached');

@@ -1,4 +1,16 @@
-import { BOOK_WINDOW_SEC, CLASSIFICATIONS, NO_BEST_MOVE, TEXT_CAPS, type Candidate, type Moment, type StyleCorpus } from '@als/schema';
+import {
+  BOOK_WINDOW_SEC,
+  CLASSIFICATIONS,
+  EVAL_DIRECTION,
+  NO_BEST_MOVE,
+  TEXT_CAPS,
+  formatEvalSigned,
+  type Candidate,
+  type Classification,
+  type Eval,
+  type Moment,
+  type StyleCorpus,
+} from '@als/schema';
 
 // Prompts for the Analyst. The system prompt is shared by every Claude call on
 // a clip (and cached); each pass adds its own task after the cached timeline.
@@ -86,6 +98,56 @@ ${JSON.stringify(candidates, null, 1)}
 Task: pick the final ${target} moves (fewer only if the scene cannot support that many), spread across the scene's arc, and annotate each in the voice shown above: rating, label, breakdown, best move (null where the rules say so), motif and your confidence. Prefer moves an audience would argue about. Use each candidate at most once.
 
 Also name the scene's protagonist, the character the audience follows, who plays White. Leave it null if no one clearly stands out.`;
+}
+
+/** One change of the bar, as Pass C sees it. */
+export interface EvaluationItem {
+  id: string;
+  kind: 'card' | 'beat';
+  sourceTime: number;
+  actor?: string;
+  side?: 'white' | 'black';
+  classification?: Classification;
+  moveLabel?: string;
+  explanation?: string;
+  /** For beats: what the character did. */
+  action?: string;
+  /** Set by the editor: keep this value. */
+  fixed?: Eval;
+}
+
+const byDirection = (direction: 'gain' | 'loss' | 'either') =>
+  CLASSIFICATIONS.filter((c) => EVAL_DIRECTION[c] === direction).join(', ');
+
+export function evaluationTask(items: EvaluationItem[], fixedStart?: Eval): string {
+  const lines = items.map((item) => {
+    const who = item.actor ? `${item.actor}${item.side ? ` (${item.side === 'white' ? 'White' : 'Black'})` : ''}` : 'unknown';
+    const what =
+      item.kind === 'card'
+        ? `${item.classification} "${item.moveLabel}": ${item.explanation}`
+        : item.action ?? '';
+    const fixed = item.fixed ? ` [FIXED at ${formatEvalSigned(item.fixed)}]` : '';
+    return `[${item.sourceTime.toFixed(2)}] ${item.kind} ${item.id} · ${who} · ${what}${fixed}`;
+  });
+  return `The finished episode shows an evaluation bar beside the video, as a chess engine would: who is winning the scene, moment by moment. It changes at every card (a rated move, where the video freezes) and at every beat (a smaller decision, with no card, while the video plays).
+
+Changes of the bar, in order:
+${lines.join('\n')}
+
+Task: give the evaluation after each of them, plus the start, the position as the scene opens${fixedStart ? ` (FIXED at ${formatEvalSigned(fixedStart)})` : ''}. Write them together as one curve: it is the scene's story told by the bar.
+
+Values:
+- pawns: White's advantage, one decimal (0.3, -1.2); 0 is level, and about ±1 is a clear edge, ±3 winning, beyond ±6 crushing.
+- mate: a forced mate in so many moves (positive when White mates, negative when Black does), only when the outcome is sealed in the story. The count drops as the winning side keeps pressing (M6, then M5); a great defence can make it disappear.
+
+Rules:
+- The rating sets the direction for the player who moved: ${byDirection('gain')} gain them ground; ${byDirection('loss')} lose them ground; ${byDirection('either')} can go either way by a little.
+- Size follows the rating: an inaccuracy costs a little, a mistake more, a blunder can lose the game; a great or brilliant move can turn it.
+- Beats are nudges, smaller than any card, and never start or end a mate.
+- Where a card's breakdown mentions the bar or the mate, match it.
+- End where the scene ends: the last value says who won the scene.
+- Keep every FIXED value exactly as given.
+- reason: one short line on why the bar moves.`;
 }
 
 export function regenerateTask(moment: Moment, evidence: string[], actor: string | undefined, instruction?: string): string {

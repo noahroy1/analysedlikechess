@@ -3,10 +3,12 @@ import { mkdir, readFile, rename, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { z } from 'zod';
 import {
+  DEFAULT_START_EVAL,
   SceneNoteSchema,
   TranscriptSchema,
   annotationSchema,
   decisionPointsSchema,
+  evaluationSchema,
   speakerNamingSchema,
   type Analysis,
   type Annotation,
@@ -20,13 +22,14 @@ import {
 import { getTheme } from '@als/theme/themes';
 import type { ProjectStore } from '../projects/store.ts';
 import type { AnalysisConfig } from './config.ts';
-import { annotationTask, decisionPointsTask, speakerNamingTask, systemPrompt, targetMoveCount } from './prompts.ts';
+import { applyEvaluation, evaluationItems, placeBeats } from './evaluate.ts';
+import { annotationTask, decisionPointsTask, evaluationTask, speakerNamingTask, systemPrompt, targetMoveCount } from './prompts.ts';
 import type { Providers } from './providers/index.ts';
 import { assignSides } from './sides.ts';
 import { snapMoves } from './snap-moves.ts';
 import { castNames, timelineText } from './timeline-text.ts';
 
-export const ANALYSIS_STAGES = ['transcribe', 'describe', 'speakers', 'decisions', 'annotate', 'snap'] as const;
+export const ANALYSIS_STAGES = ['transcribe', 'describe', 'speakers', 'decisions', 'annotate', 'snap', 'evaluate'] as const;
 type StageName = (typeof ANALYSIS_STAGES)[number];
 
 /** Bump a step's version when its prompt or parsing changes, so cached outputs are redone. */
@@ -36,6 +39,7 @@ const STEP_VERSION: Record<Exclude<StageName, 'snap'>, number> = {
   speakers: 1,
   decisions: 1,
   annotate: 2,
+  evaluate: 1,
 };
 
 const NAMING_SYSTEM =
@@ -49,7 +53,7 @@ export interface AnalysisDeps {
 }
 
 export interface AnalysisOptions {
-  /** 'analyst' redoes Pass A and B with the cached transcript and scene notes; 'all' redoes everything. */
+  /** 'analyst' redoes Passes A, B and C with the cached transcript and scene notes; 'all' redoes everything. */
   rerun?: 'analyst' | 'all';
 }
 
@@ -79,9 +83,9 @@ interface StepResult<T> {
 }
 
 /**
- * Stages 2-4 of the pipeline: transcribe and describe (in parallel), name the
- * speakers, find decision points (Pass A), annotate (Pass B), snap to frames.
- * Every step is skipped when its inputs are unchanged.
+ * Stages 2-5 of the pipeline: transcribe and describe (in parallel), name the
+ * speakers, find decision points (Pass A), annotate (Pass B), snap to frames,
+ * then evaluate the bar (Pass C). Every step is skipped when its inputs are unchanged.
  */
 export async function runAnalysis(
   deps: AnalysisDeps,
@@ -120,7 +124,7 @@ export async function runAnalysis(
   emit();
 
   const force = (name: StageName) =>
-    options.rerun === 'all' || (options.rerun === 'analyst' && (name === 'decisions' || name === 'annotate'));
+    options.rerun === 'all' || (options.rerun === 'analyst' && (name === 'decisions' || name === 'annotate' || name === 'evaluate'));
 
   /** Runs one step unless its key matches the last run and its output is on disk. */
   async function step<T>(name: StageName, key: string, schema: z.ZodType<T>, work: () => Promise<StepResult<T>>): Promise<T> {
@@ -290,12 +294,53 @@ export async function runAnalysis(
     emit();
     const snapped = snapMoves(project, candidates, passB.moves, getTheme(project.themeId));
     snapStage.status = 'done';
-    analysis.status = 'done';
     await persist((p) => {
       p.moments = snapped.moments;
       p.context.characters = assignSides(p.context.characters, p.moments, passB.protagonist);
     }, true);
     if (snapped.dropped.length) console.log(`analysis ${id}: dropped`, snapped.dropped);
+
+    // Stage 5: the evaluation bar (Pass C). One call values every card and
+    // beat together, so the bar tells one story instead of wobbling. Evals the
+    // creator kept (on approved or own moves, and their own beats) stay fixed.
+    const fixed = new Set([
+      ...project.moments.filter((m) => m.eval && (m.origin === 'user' || m.status === 'approved')).map((m) => m.id),
+      ...(project.evalBar?.beats ?? []).filter((b) => b.origin === 'user').map((b) => b.id),
+    ]);
+    const track = {
+      moments: project.moments,
+      characters: project.context.characters,
+      evalBar: {
+        start: project.evalBar?.start ?? DEFAULT_START_EVAL,
+        beats: placeBeats(project, candidates, new Set(passB.moves.map((m) => m.candidateId))),
+      },
+    };
+    const items = evaluationItems(track, fixed);
+    const passCSchema = evaluationSchema(items.map((i) => i.id));
+    const passC = await step(
+      'evaluate',
+      cacheKey('evaluate', STEP_VERSION.evaluate, config.models.analyst, system, context, items),
+      passCSchema,
+      async () => {
+        const r = await providers.analyst.run({
+          name: 'evaluate',
+          model: config.models.analyst,
+          effort: 'medium',
+          system,
+          context,
+          task: evaluationTask(items),
+          schema: passCSchema,
+        });
+        return { value: r.output, model: r.model, usage: r.usage, costUsd: r.costUsd };
+      },
+    );
+    const applied = applyEvaluation(track, passC, fixed);
+    analysis.status = 'done';
+    await persist((p) => {
+      p.moments = applied.moments;
+      p.evalBar = applied.evalBar;
+    });
+    if (applied.adjusted.length) console.log(`analysis ${id}: evals adjusted`, applied.adjusted);
   } catch (error) {
     const running = analysis.stages.filter((s) => s.status === 'running');
     const message = error instanceof Error ? error.message : String(error);

@@ -1,0 +1,15 @@
+{
+  "output": {
+    "start": { "pawns": 0.2, "mate": null },
+    "evals": [
+      { "id": "ai-c1-1", "pawns": 0.9, "mate": null, "reason": "Splitting up hands Blue the safer half of the plan" },
+      { "id": "beat-c2", "pawns": 1.2, "mate": null, "reason": "Blue names the danger out loud" },
+      { "id": "beat-c3", "pawns": 1.6, "mate": null, "reason": "Red walks into the basement alone" },
+      { "id": "ai-c4-2", "pawns": 2.8, "mate": null, "reason": "One way in, and Blue is watching it" },
+      { "id": "beat-c5", "pawns": 3.3, "mate": null, "reason": "The lights take away the dark corners" },
+      { "id": "ai-c6-3", "pawns": null, "mate": 3, "reason": "Red climbs toward the noise alone: the game is over" }
+    ]
+  },
+  "model": "claude-opus-5-5",
+  "usage": { "inputTokens": 412, "outputTokens": 318, "cacheReadTokens": 4980, "cacheWriteTokens": 0 }
+}

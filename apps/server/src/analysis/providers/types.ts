@@ -33,7 +33,7 @@ export interface SceneDescriber {
 }
 
 /** Which call this is, so recorded responses can be replayed per call. */
-export type AnalystCallName = 'speakers' | 'decisions' | 'annotate' | 'regenerate';
+export type AnalystCallName = 'speakers' | 'decisions' | 'annotate' | 'evaluate' | 'regenerate';
 
 export interface AnalystCall<T> {
   name: AnalystCallName;
@@ -56,7 +56,7 @@ export interface AnalystResult<T> {
   costUsd: number;
 }
 
-/** Claude with structured outputs: Pass A, Pass B, speaker naming and Regenerate. */
+/** Claude with structured outputs: Pass A, Pass B, Pass C, speaker naming and Regenerate. */
 export interface Analyst {
   run<T>(call: AnalystCall<T>): Promise<AnalystResult<T>>;
 }

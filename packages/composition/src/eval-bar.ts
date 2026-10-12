@@ -44,9 +44,11 @@ export function settleReadings(before: Eval, after: Eval, kind: EvalKeyframe['ki
   }
 
   const shares = kind === 'beat' ? [0.6] : APPROACH[count]!;
+  // Intermediate readings stay short of a full bar (about ±10.6 pawns), so
+  // settling into a mate reads as a big number, then the mate.
   const readings: Eval[] = shares.map((share) => {
     const jitter = (random() - 0.5) * 0.12;
-    return pawnsForFill(from + (to - from) * (share + jitter));
+    return pawnsForFill(Math.min(0.98, Math.max(0.02, from + (to - from) * (share + jitter))));
   });
   // A card that barely moves the bar still shows the engine thinking.
   if (kind === 'move' && swing < 0.01 && !isMate(after)) {

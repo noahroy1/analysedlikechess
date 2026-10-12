@@ -23,6 +23,12 @@ describe('settleReadings', () => {
     expect(great[0]).toBeGreaterThan(great[1]!);
   });
 
+  it('reads a big number, not past the mate, before a mate lands', () => {
+    const r = settleReadings({ pawns: 4.3 }, { mate: -4 }, 'move', 'ai-c14-7');
+    expect(r).toHaveLength(4);
+    for (const e of r.slice(0, -1)) expect('pawns' in e && Math.abs(e.pawns) <= 10.6).toBe(true);
+  });
+
   it('wobbles the count when a mate holds', () => {
     const r = settleReadings({ mate: 4 }, { mate: 6 }, 'move', 'm4');
     expect(r.at(-1)).toEqual({ mate: 6 });
