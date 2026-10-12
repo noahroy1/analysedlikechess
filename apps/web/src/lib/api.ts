@@ -3,6 +3,7 @@ import {
   ApiErrorSchema,
   EvaluateResultSchema,
   HistoryEntrySchema,
+  PortraitResultSchema,
   RegenerateResultSchema,
   SaveResultSchema,
   type AnalysisEvent,
@@ -10,6 +11,7 @@ import {
   type EvaluateRequest,
   type EvaluateResult,
   type Moment,
+  type PortraitRequest,
   type RegenerateResult,
   type HistoryEntry,
   type ProjectEdit,
@@ -162,3 +164,13 @@ export const evaluateTrack = async (id: string, body: EvaluateRequest): Promise<
       body: JSON.stringify(body),
     }),
   );
+
+/** Crops a portrait from one frame; returns its file. The project is not saved. */
+export const createPortrait = async (id: string, body: PortraitRequest): Promise<string> =>
+  PortraitResultSchema.parse(
+    await request(`/projects/${id}/portraits`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    }),
+  ).file;

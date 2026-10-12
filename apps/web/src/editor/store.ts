@@ -31,6 +31,8 @@ export interface EditorState {
   toast: Toast | null;
   /** A Regenerate result waiting for the creator to accept or discard. */
   proposal: Proposal | null;
+  /** The character whose portrait is being cropped on the stage, if any. */
+  portraitCrop: string | null;
   /** Asks the edit layer to put the cursor in a card field (e.g. after adding a move). */
   focusRequest: { id: string; field: 'moveLabel' | 'explanation' | 'bestMove'; n: number } | null;
 }
@@ -72,6 +74,7 @@ export interface EditorActions {
   notify: (text: string, tone?: Toast['tone']) => void;
   requestFocus: (id: string, field: 'moveLabel' | 'explanation' | 'bestMove') => void;
   setProposal: (proposal: Proposal | null) => void;
+  setPortraitCrop: (characterId: string | null) => void;
   dismissToast: () => void;
   /** Saves now if anything is pending. */
   flush: () => Promise<void>;
@@ -147,6 +150,7 @@ export function createEditorStore(initial: Project, deps: EditorDeps): EditorSto
       toast: null,
       focusRequest: null,
       proposal: null,
+      portraitCrop: null,
 
       edit: (recipe, options) => commit(normalized(recipe(get().doc)), options?.coalesce),
 
@@ -194,6 +198,7 @@ export function createEditorStore(initial: Project, deps: EditorDeps): EditorSto
       notify: (text, tone = 'info') => set({ toast: { id: ++toastId, text, tone } }),
       dismissToast: () => set({ toast: null }),
       setProposal: (proposal) => set({ proposal }),
+      setPortraitCrop: (portraitCrop) => set({ portraitCrop }),
       requestFocus: (id, field) => set((s) => ({ focusRequest: { id, field, n: (s.focusRequest?.n ?? 0) + 1 } })),
 
       flush: async () => {

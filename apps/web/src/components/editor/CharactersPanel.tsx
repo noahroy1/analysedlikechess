@@ -1,12 +1,15 @@
 import { useState } from 'react';
 import { SIDES } from '@als/schema';
-import { addCharacter, assignSpeaker, deleteCharacter, mergeCharacters, renameCharacter, setSide } from '../../editor/doc.ts';
+import { addCharacter, assignSpeaker, deleteCharacter, mergeCharacters, renameCharacter, setPortrait, setSide } from '../../editor/doc.ts';
 import { useEditor, useEditorStore } from '../../editor/context.tsx';
+import { fileUrl } from '../../lib/api.ts';
 
-/** Rename, merge and reassign speakers, and pick who plays White. Names and move numbers flow through to every card. */
+/** Rename, merge and reassign speakers, pick who plays White, and crop portraits for the bar. Names and move numbers flow through to every card. */
 export function CharactersPanel() {
   const store = useEditorStore();
   const characters = useEditor((s) => s.doc.characters);
+  const projectId = useEditor((s) => s.project.id);
+  const cropping = useEditor((s) => s.portraitCrop);
   const moments = useEditor((s) => s.doc.moments);
   const transcript = useEditor((s) => s.project.transcript);
   const [newName, setNewName] = useState('');
@@ -25,8 +28,23 @@ export function CharactersPanel() {
           {characters.map((c) => {
             const moveCount = moments.filter((m) => m.actorId === c.id).length;
             return (
-              <li key={c.id} className="rounded-md border border-neutral-800 p-2">
+              <li key={c.id} className="rounded-md border border-neutral-800 p-2" data-character-id={c.id}>
                 <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    data-testid="portrait-button"
+                    title={c.portrait ? 'Crop a new portrait from the frame on screen' : 'Crop a portrait for the bar from the frame on screen'}
+                    onClick={() => store.getState().setPortraitCrop(cropping === c.id ? null : c.id)}
+                    className={`size-9 shrink-0 overflow-hidden rounded border bg-neutral-900 text-[10px] text-neutral-400 hover:border-sky-500 ${
+                      cropping === c.id ? 'border-sky-400' : 'border-neutral-700'
+                    }`}
+                  >
+                    {c.portrait ? (
+                      <img src={fileUrl(projectId, c.portrait)} alt={`${c.name} portrait`} className="size-full object-cover" />
+                    ) : (
+                      '+ Face'
+                    )}
+                  </button>
                   <input
                     value={c.name}
                     aria-label="Character name"
@@ -72,6 +90,11 @@ export function CharactersPanel() {
                   <span>
                     {moveCount} move{moveCount === 1 ? '' : 's'}
                   </span>
+                  {c.portrait && (
+                    <button type="button" className="text-neutral-500 hover:text-neutral-200" onClick={() => edit((d) => setPortrait(d, c.id, undefined))}>
+                      Clear portrait
+                    </button>
+                  )}
                   {characters.length > 1 && (
                     <select
                       value=""

@@ -3,15 +3,16 @@ import { Episode, buildTimeline, cardSettledFrame, sourceFrameToOut, timeMapFram
 import { Player, type PlayerRef } from '@remotion/player';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { addBeatAt } from '../../editor/bar.ts';
-import { EditError, addMoment, deleteBeat, deleteMoment, retime, setClassification, setStatus } from '../../editor/doc.ts';
+import { EditError, addMoment, deleteBeat, deleteMoment, retime, setClassification, setPortrait, setStatus } from '../../editor/doc.ts';
 import { PlaybackProvider, useEditor, useEditorStore, type Playback } from '../../editor/context.tsx';
 import { snapTime } from '../../editor/snapping.ts';
-import { fileUrl } from '../../lib/api.ts';
+import { createPortrait, fileUrl } from '../../lib/api.ts';
 import { formatTime } from '../../lib/format.ts';
 import { adjacentHold, holdStopFrame, reviewStop, type PlaybackMode } from '../../lib/playback.ts';
 import { ShotStrip } from '../ShotStrip.tsx';
 import { Timeline } from '../Timeline.tsx';
 import { EditLayer } from './EditLayer.tsx';
+import { PortraitCropper } from './PortraitCropper.tsx';
 import { Kbd } from './Inspector.tsx';
 import { TranscriptDrawer } from './TranscriptDrawer.tsx';
 
@@ -40,6 +41,8 @@ export function Workspace({ left, right }: WorkspaceProps) {
   const theme = useEditor((s) => s.theme);
   const selectedId = useEditor((s) => s.selectedId);
   const evalBar = useEditor((s) => s.doc.evalBar);
+  const portraitCrop = useEditor((s) => s.portraitCrop);
+  const [cropping, setCropping] = useState(false);
   const player = useRef<PlayerRef>(null);
   const stage = useRef<HTMLDivElement>(null);
   const [frame, setFrame] = useState(0);
@@ -65,6 +68,7 @@ export function Workspace({ left, right }: WorkspaceProps) {
       characters,
       theme,
       ...(evalBar ? { evalBar } : {}),
+      portraits: Object.fromEntries(characters.flatMap((c) => (c.portrait ? [[c.id, fileUrl(project.id, c.portrait)]] : []))),
     }),
     [project.id, source.proxy, source.durationSec, moments, characters, theme, evalBar],
   );
@@ -158,6 +162,11 @@ export function Workspace({ left, right }: WorkspaceProps) {
     // Only frame moves re-anchor; timeline changes are followed above.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [frame, playing]);
+
+  // Cropping a portrait works on a still frame.
+  useEffect(() => {
+    if (portraitCrop) player.current?.pause();
+  }, [portraitCrop]);
 
   // The card on screen is the selected move.
   useEffect(() => {
@@ -313,8 +322,28 @@ export function Workspace({ left, right }: WorkspaceProps) {
               moveToBeginningWhenEnded={false}
               style={{ width: '100%', aspectRatio: `${source.width} / ${source.height}` }}
             />
-            {editableMoment && scale > 0 && (
+            {editableMoment && scale > 0 && !portraitCrop && (
               <EditLayer moment={editableMoment} width={source.width} height={source.height} scale={scale} />
+            )}
+            {portraitCrop && (
+              <PortraitCropper
+                name={characters.find((c) => c.id === portraitCrop)?.name ?? ''}
+                aspect={source.width / source.height}
+                busy={cropping}
+                onCancel={() => store.getState().setPortraitCrop(null)}
+                onUse={(square) => {
+                  const characterId = portraitCrop;
+                  const sourceTime = timeMapFrame(timeline, frame).sourceFrame / fps;
+                  setCropping(true);
+                  createPortrait(project.id, { characterId, sourceTime, ...square })
+                    .then((file) => {
+                      store.getState().edit((d) => setPortrait(d, characterId, file));
+                      store.getState().setPortraitCrop(null);
+                    })
+                    .catch((e: unknown) => store.getState().notify(`Could not crop the portrait: ${e instanceof Error ? e.message : String(e)}`, 'error'))
+                    .finally(() => setCropping(false));
+                }}
+              />
             )}
           </div>
 

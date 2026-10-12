@@ -17,6 +17,8 @@ export const CharacterSchema = z.object({
   speakerLabels: z.array(z.string()),
   /** The colour they play: White for the protagonist, which numbers moves "4" for White and "4..." for Black. */
   side: z.enum(SIDES).optional(),
+  /** Square still beside the evaluation bar, cropped from the clip: a file in the project folder (`portraits/…`). */
+  portrait: z.string().regex(/^portraits\/[a-z0-9-]+\.jpg$/).optional(),
 });
 export type Character = z.infer<typeof CharacterSchema>;
 

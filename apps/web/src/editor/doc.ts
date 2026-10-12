@@ -186,6 +186,18 @@ export function setSide(doc: Doc, id: string, side: Character['side']): Doc {
   };
 }
 
+/** A character's portrait file beside the bar; undefined clears it. */
+export function setPortrait(doc: Doc, id: string, file: string | undefined): Doc {
+  return {
+    ...doc,
+    characters: doc.characters.map((c) => {
+      if (c.id !== id) return c;
+      const { portrait: _, ...rest } = c;
+      return file ? { ...rest, portrait: file } : rest;
+    }),
+  };
+}
+
 // The evaluation bar
 
 /** A move or a beat: they share one id space. */

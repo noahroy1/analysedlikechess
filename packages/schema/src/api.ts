@@ -11,7 +11,26 @@ export const shotThumbnailFile = (shotIndex: number): string =>
   `frames/shot-${String(shotIndex).padStart(4, '0')}.jpg`;
 
 /** Files inside a project folder that the server will serve. */
-export const SERVABLE_FILE = /^(?:proxy\.mp4|source\.(?:mp4|mov|mkv)|frames\/shot-\d{4}\.jpg)$/;
+export const SERVABLE_FILE = /^(?:proxy\.mp4|source\.(?:mp4|mov|mkv)|frames\/shot-\d{4}\.jpg|portraits\/[a-z0-9-]+\.jpg)$/;
+
+const Unit = z.number().min(0).max(1);
+
+/**
+ * Crop a character's portrait from one frame of the clip: a square whose
+ * top-left corner is at (x, y), as fractions of the frame's width and height,
+ * and whose side is `size` of the frame's height.
+ */
+export const PortraitRequestSchema = z.object({
+  characterId: z.string().min(1),
+  sourceTime: z.number().nonnegative(),
+  x: Unit,
+  y: Unit,
+  size: z.number().positive().max(1),
+});
+export type PortraitRequest = z.infer<typeof PortraitRequestSchema>;
+
+/** The new still's folder-relative file; nothing else is saved, so the editor sets it on the character. */
+export const PortraitResultSchema = z.object({ file: z.string() });
 
 export const ProjectSummarySchema = z.object({
   id: z.string(),

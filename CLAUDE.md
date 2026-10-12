@@ -60,15 +60,16 @@ Read this first in a new session. It says where the work stands, what to do next
 ### Where things stand
 
 - **Branch:** `format-iterations` (current tip), stacked on `phase-4-analysis` → `phase-3-editor` → `phase-2-player` → `phase-1-ingest` → `phase-0-scaffold`. **Nothing is merged into `main`**; ask before merging. `apps/server/.env.example` shows as deleted in the working tree from before Oct 12; it is not ours, so leave it out of commits (`git add -A -- . ':!apps/server/.env.example'`).
-- **Done:** Phases 0-4 (Phase 4 has two owed items, below), the creator's review iterations, and format iterations 1-4 of 7 (log below).
+- **Done:** Phases 0-4 (Phase 4 has two owed items, below), the creator's review iterations, and format iterations 1-4 and 6 of 7 (log below). Iteration 5 (sounds) is blocked.
 - **Not started:** Phase 5 (export/render) and Phase 6 (pitch build). The format iterations were inserted before Phase 5 at the user's request; the user has not said whether Phase 5 waits for all seven.
-- **Checks at the tip:** `pnpm check` passes (189 tests). The browser checks pass: `phase2-checks`, `phase3-checks`, `typeout-checks`, `format-checks` and `evalbar-checks`.
+- **Checks at the tip:** `pnpm check` passes (193 tests). The browser checks pass: `phase2-checks`, `phase3-checks`, `typeout-checks`, `format-checks` and `evalbar-checks`.
 
-### Next action: finish format iteration 6 (evaluation bar)
+### Next action: the user's review of iteration 6, then iteration 5 or 7
 
-The user started iteration 6 before answering the sounds question (iteration 5 stays blocked, below). Plan agreed Oct 12; steps 1-3 are done, see item 6 of the log. Remaining:
-- **Step 4, portraits:** the user chose to crop them from the video. In the Cast tab, pause on a frame and drag a square over a face; the server crops a still into the project folder (`SERVABLE_FILE` must allow it). Feed the URLs into `EpisodeProps.portraits`. Initials stay as the fallback.
-- Then extend `evalbar-checks.mjs` for portraits, give a walkthrough, and stop.
+Iteration 6 (evaluation bar) is built; see item 6 of the log. Waiting on the user:
+- **Review the bar on BB1.** Its Pass C was written by hand. BB1 has no portraits yet: they are for the user to crop in the Cast tab.
+- **Size per rating** (`TODO(open-decision)` on `EVAL_DIRECTION`): code fixes only the direction; the Analyst picks the size.
+- **Sounds (iteration 5)** are still blocked on where they come from (below). Iteration 7 (subtitles) can start without it.
 
 ### Iteration 5 (sounds): blocked
 
@@ -100,7 +101,7 @@ Also waiting on the user: whether speaker naming should prefer **first names** l
    - **Move numbers:** `moveNumbers()` (`packages/composition/src/notation.ts`) follows chess turn order with implied moves (W, B, B → "1", "1...", "2...").
    - **Editor:** a Look picker in the header saves `themeId` as part of the editor document, so switching is undoable and holds re-time; a White/Black toggle in Cast; a Motif field in the inspector, also editable on the chip.
 5. **Sounds:** next, blocked on the decision above.
-6. **Evaluation bar (in progress; steps 1-2 done).** Reference: `media/creator-ref/style-ref-evaluation-bar.png` and the demo clips, measured Oct 12.
+6. **Evaluation bar (done: `147731b`, `2da3bdf`, `c81ca21` and the portraits commit).** Reference: `media/creator-ref/style-ref-evaluation-bar.png` and the demo clips, measured Oct 12.
    - **Look:** the creator theme's optional `evalBar` block. Black's player is at the top and White's at the bottom; the bar's coloured part spans x 26-67 and y 112-968 at 1080p. The label is at the leader's end, unsigned ("1.0", "M4"). The default theme has no bar.
    - **Data:** `Moment.eval` (the eval after the move) and `project.evalBar` (`start` plus `beats`). An eval is `{pawns}` or `{mate}`, signed from White's side. Bar height is `evalFill()` = 0.5 + 0.5 tanh(0.184 pawns), fitted to the creator's bar.
    - **Settling:** each new eval steps through 2-4 readings (`settleReadings()` in `packages/composition/src/eval-bar.ts`, seeded by id), 0.18, 0.58, 1.13 and 1.78 s into the freeze. The label changes first and the bar eases after. Beats use 1-2 readings in about 0.5 s (the user's choice: quieter than cards).
@@ -113,6 +114,10 @@ Also waiting on the user: whether speaker naming should prefer **first names** l
      - Moves have a "Bar after this move" field (`parseEval`: "1.0", "-0.8", "M4", "-M6"), and the beat inspector edits time, value, who, what happened and why.
      - `evalWarnings` show beside `momentWarnings`. `Delete` removes a selected beat.
      - Fixed on the way: leaving a paused hold now drops the playhead anchor. Before, a later edit pulled the playhead back to the card.
+   - **Portraits (the user's choice: cropped from the video):**
+     - In the Cast tab, click a character's face box: a square appears over the stage. Drag it onto the face, resize it from the corner, then press Use (Enter) or Cancel (Esc).
+     - `POST /projects/:id/portraits` crops that source frame with ffmpeg into `portraits/<character>-<hash>.jpg` (256 px). It saves only the image; the editor sets `Character.portrait` as an undoable edit.
+     - `EpisodeProps.portraits` maps character ids to URLs. Without one, the bar shows initials in the side's colours. The bar shows the character with the most moves on each side.
    - **BB1:** has a hand-written Pass C (`analysis/recorded/claude-evaluate.json`): 7 cards and 7 beats. Hank opens up 1.5, the cancer card turns it, Walt reaches +6.1, and "Tread Lightly" flips it to M4 for Black.
    - **Dialogue fixture:** has a synthetic `claude-evaluate.json`, to be replaced with the real recording that is still owed.
 7. **Burned-in subtitles** of the dialogue. The user put these after the features that set the format apart.
@@ -146,8 +151,8 @@ To measure more, use `scripts/ref/hold-phases.mjs <clip> <crop>` for timing, PIL
 
   A rerun replaces unapproved drafts, so first check they are unedited. Keep the same picks and ratings when testing a format change, so only one thing varies.
 - **Still owed from Phase 4 (needs an Anthropic balance):**
-  1. Run the dialogue clip once with `ANALYSIS_RECORD_DIR` and commit all six real responses together, replacing the synthetic ones in `fixtures/dialogue/recorded/`. Those were last hand-edited in iteration 4 to add `motif` and `protagonist`.
-  2. Do one live Opus run on BB1, compare it with the hand-written moves, and report the real Claude cost per clip. The estimate is $0.25-0.40; the real Scribe cost was $0.011 and Gemini $0.008 for the 2:28 clip.
+  1. Run the dialogue clip once with `ANALYSIS_RECORD_DIR` and commit all seven real responses together, replacing the synthetic ones in `fixtures/dialogue/recorded/`. Those were last hand-edited in iteration 4 to add `motif` and `protagonist`; `claude-evaluate.json` was written by hand in iteration 6.
+  2. Do one live Opus run on BB1, compare it with the hand-written moves and bar, and report the real Claude cost per clip (now four Claude calls: naming, Pass A, Pass B, Pass C). The estimate is $0.25-0.40; the real Scribe cost was $0.011 and Gemini $0.008 for the 2:28 clip.
 - **Vendor choices (user delegated, price-optimised):**
   - ElevenLabs Scribe v2 at $0.22/h, for the best independent WER among the candidates, plus sound tags
   - Gemini 3.5 Flash-Lite for scene notes

@@ -2,7 +2,7 @@
 // usage: node scripts/browser/evalbar-checks.mjs <scratchDir> <projectId>
 // Use a project seeded from the fixture (`pnpm seed:sample`): Red plays White,
 // Blue Black; m1 is Red's mistake, m2 Blue's book move, m3 Red's brilliant.
-// The checks edit and save it.
+// The checks edit and save it, and crop a portrait for Red.
 import { launch, sleep } from './cdp.mjs';
 
 const [S, projectId] = process.argv.slice(2);
@@ -139,6 +139,31 @@ try {
     const doc = JSON.parse(await page.eval(`JSON.stringify(${E}.getState().doc)`));
     const ok = doc.evalBar?.start?.pawns === -1.5 && doc.evalBar.beats.length === 1 && doc.moments.find((m) => m.id === 'm3')?.eval?.mate === 4;
     result('the start, the beat and the move evals survive a reload', ok, JSON.stringify(doc.evalBar));
+  }
+  // 7. A portrait cropped from the frame shows beside the bar, saves, and undoes.
+  {
+    await page.eval(`${P}.pause(); ${P}.seekTo(15)`);
+    await sleep(200);
+    await page.eval(`[...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Cast').click()`);
+    await sleep(200);
+    await page.eval(`document.querySelector('[data-character-id=c-red] [data-testid=portrait-button]').click()`);
+    await page.waitFor(`!!document.querySelector('[data-testid=portrait-cropper]')`);
+    const editLayerHidden = await page.eval(`!document.querySelector('[data-testid=edit-layer]')`);
+    await page.eval(`document.querySelector('[data-testid=crop-use]').click()`);
+    await page.waitFor(`!document.querySelector('[data-testid=portrait-cropper]')`, 10000);
+    const file = await page.eval(`${E}.getState().doc.characters.find((c) => c.id === 'c-red').portrait ?? ''`);
+    await sleep(400);
+    const drawn = await page.eval(`[...document.querySelectorAll('[data-testid=eval-bar] img')].map((i) => i.getAttribute('src')).join(' ')`);
+    const loaded = await page.eval(`[...document.querySelectorAll('[data-testid=eval-bar] img')].every((i) => i.complete && i.naturalWidth === 256)`);
+    result('a portrait cropped from the frame shows beside the bar', /^portraits\/c-red-[0-9a-f]{8}\.jpg$/.test(file) && drawn.includes(file) && loaded && editLayerHidden, `${file}; bar draws "${drawn}"`);
+
+    await waitSaved();
+    await open();
+    const kept = await page.eval(`${E}.getState().doc.characters.find((c) => c.id === 'c-red').portrait ?? ''`);
+    await page.eval(`${E}.getState().edit((d) => ({ ...d, characters: d.characters.map((c) => { const { portrait, ...rest } = c; return rest; }) }))`);
+    await page.eval(`${E}.getState().undo()`);
+    const undone = await page.eval(`${E}.getState().doc.characters.find((c) => c.id === 'c-red').portrait ?? ''`);
+    result('the portrait survives a reload, and clearing it undoes', kept === file && undone === file, `after reload "${kept}"`);
   }
 } catch (error) {
   result('evaluation bar checks ran', false, error instanceof Error ? error.message : String(error));

@@ -149,6 +149,22 @@ describe('ingest', () => {
     expect((await res.arrayBuffer()).byteLength).toBe(100);
   });
 
+  it('crops a square portrait from one frame, serves it, and leaves the project unsaved', async () => {
+    const before = (await store.read(project.id)).version;
+    const res = await app.request(`/api/projects/${project.id}/portraits`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ characterId: 'c-red', sourceTime: 1, x: 0.3, y: 0.2, size: 0.5 }),
+    });
+    expect(res.status).toBe(200);
+    const { file } = (await res.json()) as { file: string };
+    expect(file).toMatch(/^portraits\/c-red-[0-9a-f]{8}\.jpg$/);
+    const size = await run('ffprobe', ['-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=width,height', '-of', 'csv=p=0', join(dir, file)]);
+    expect(size.trim()).toBe('256,256');
+    expect((await app.request(`/api/projects/${project.id}/files/${file}`)).status).toBe(200);
+    expect((await store.read(project.id)).version).toBe(before);
+  });
+
   it('refuses to serve files outside the allowlist', async () => {
     for (const name of ['project.json', 'ingest.json', '..%2F..%2Fetc%2Fpasswd', 'audio.wav']) {
       const res = await app.request(`/api/projects/${project.id}/files/${name}`);

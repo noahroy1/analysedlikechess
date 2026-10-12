@@ -12,6 +12,7 @@ import {
   AnalyzeRequestSchema,
   ProjectEditSchema,
   EvaluateRequestSchema,
+  PortraitRequestSchema,
   RegenerateRequestSchema,
   SERVABLE_FILE,
   UPLOAD_EXTENSIONS,
@@ -24,6 +25,7 @@ import { AnalysisBusyError, type AnalysisService } from './analysis/service.ts';
 import { pendingIngest } from './ingest/ingest.ts';
 import type { IngestQueue } from './ingest/queue.ts';
 import { NotAVideoError, probe } from './media/probe.ts';
+import { extractPortrait, portraitFile } from './media/portrait.ts';
 import { ProjectNotFoundError, VersionConflictError, type ProjectStore } from './projects/store.ts';
 
 export interface AppDeps {
@@ -216,6 +218,16 @@ export function createApp({ store, queue, analysis }: AppDeps) {
     await store.read(id);
     await store.remove(id);
     return c.body(null, 204);
+  });
+
+  /** Crops a portrait from one frame. Saves only the image; the editor puts it on the character. */
+  app.post('/projects/:id/portraits', async (c) => {
+    const id = c.req.param('id');
+    const request = PortraitRequestSchema.parse(await c.req.json());
+    const project = await store.read(id);
+    const file = portraitFile(request);
+    await extractPortrait(store.file(id, project.source.file), store.file(id, file), request, project.source);
+    return c.json({ file });
   });
 
   // Media files, with Range support so the browser can seek.
