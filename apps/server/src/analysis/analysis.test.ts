@@ -456,7 +456,7 @@ describe('analysis pipeline', () => {
     const bare = await makeTestApp(root, { replayDir: undefined, keys: {} });
     const res = await bare.app.request(`/api/projects/${project.id}/analyze`, { method: 'POST' });
     expect(res.status).toBe(400);
-    expect(await res.json()).toEqual({ error: expect.stringMatching(/ELEVENLABS_API_KEY.*GEMINI_API_KEY.*ANTHROPIC_API_KEY/) });
+    expect(await res.json()).toEqual({ error: expect.stringMatching(/ELEVENLABS_API_KEY.*GEMINI_API_KEY.*OPENAI_API_KEY/) });
   });
 });
 

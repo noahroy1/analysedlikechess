@@ -13,6 +13,12 @@ const TOKEN_PRICES: Record<string, { input: number; output: number; cacheRead?: 
   // Fallback models the server may route a refused request to.
   'claude-opus-5': { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 },
   'claude-opus-4-8': { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 },
+  // OpenAI, checked Oct 13, 2026 (developers.openai.com/api/docs/pricing), short context (≤272K input).
+  // `:flex` is the Flex tier (Batch rates). Output includes reasoning tokens.
+  'gpt-6-luna': { input: 0.1, output: 0.5, cacheRead: 0.01, cacheWrite: 0.125 },
+  'gpt-6-luna:flex': { input: 0.05, output: 0.25, cacheRead: 0.005, cacheWrite: 0.0625 },
+  'gpt-6.1-sol': { input: 2, output: 10, cacheRead: 0.1, cacheWrite: 2.5 },
+  'gpt-6.1-sol:flex': { input: 1, output: 5, cacheRead: 0.05, cacheWrite: 1.25 },
   'gemini-3.5-flash-lite': { input: 0.3, output: 2.5 },
   'gemini-3.1-flash-lite': { input: 0.25, output: 1.5 },
   'gemini-3.8-flash': { input: 0.75, output: 3.75 },

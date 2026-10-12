@@ -40,6 +40,7 @@ export async function reevaluate(
     name: 'evaluate',
     model: deps.config.models.analyst,
     effort: 'medium',
+    interactive: true,
     system: systemPrompt(deps.style),
     context: timelineText(current),
     task: evaluationTask(items),

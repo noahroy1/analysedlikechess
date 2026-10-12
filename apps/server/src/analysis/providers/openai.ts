@@ -1,0 +1,148 @@
+import { toJsonSchema } from '@als/schema';
+import { costUsd } from '../prices.ts';
+import { ProviderError, type Analyst, type AnalystCall } from './types.ts';
+
+const ENDPOINT = 'https://api.openai.com/v1/responses';
+/** Flex can queue; OpenAI's own SDKs wait 10 minutes and its examples 15. */
+const TIMEOUT_MS = 15 * 60 * 1000;
+/** Explicit cache breakpoints exist from gpt-5.6 on; older models cache implicitly and reject them. */
+const EXPLICIT_CACHE = /^gpt-(5\.([6-9]|\d{2,})|([6-9]|\d{2,})(\.|-|$))/;
+
+export interface OpenAIOptions {
+  apiKey: string;
+  record?: (name: string, raw: unknown) => Promise<void>;
+}
+
+interface ResponseBody {
+  status?: string;
+  model?: string;
+  service_tier?: string;
+  error?: { code?: string; message?: string } | null;
+  incomplete_details?: { reason?: string } | null;
+  output?: { type: string; content?: { type: string; text?: string; refusal?: string }[] }[];
+  usage?: {
+    input_tokens: number;
+    output_tokens: number;
+    input_tokens_details?: { cached_tokens?: number; cache_write_tokens?: number };
+  };
+}
+
+/**
+ * Strict structured outputs take a subset of JSON Schema. Zod already closes
+ * every object and requires every field (optional ones are nullable), so only
+ * the `$schema` tag and z.int()'s safe-integer bounds are removed.
+ */
+export function strictSchema(schema: AnalystCall<unknown>['schema']): Record<string, unknown> {
+  const strip = (node: unknown): unknown => {
+    if (Array.isArray(node)) return node.map(strip);
+    if (!node || typeof node !== 'object') return node;
+    const out: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(node)) {
+      if (key === '$schema') continue;
+      if ((key === 'minimum' || key === 'maximum') && Math.abs(value as number) === Number.MAX_SAFE_INTEGER) continue;
+      out[key] = strip(value);
+    }
+    return out;
+  };
+  return strip(toJsonSchema(schema)) as Record<string, unknown>;
+}
+
+/**
+ * OpenAI's Responses API with strict structured outputs, called with fetch.
+ * Background stages ask for the Flex tier (half price, may queue) and fall back
+ * to standard when Flex has no capacity; Regenerate and Re-evaluate use standard.
+ * The system prompt and the scene timeline end at explicit cache breakpoints,
+ * so later passes and Regenerate read them from the cache and the per-call task
+ * is never written to it.
+ */
+export function openaiAnalyst({ apiKey, record }: OpenAIOptions): Analyst {
+  async function request(call: AnalystCall<unknown>, tier: 'flex' | 'default'): Promise<ResponseBody> {
+    const explicit = EXPLICIT_CACHE.test(call.model);
+    const breakpoint = explicit ? { prompt_cache_breakpoint: { mode: 'explicit' } } : {};
+    let res: Response;
+    try {
+      res = await fetch(ENDPOINT, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+        body: JSON.stringify({
+          model: call.model,
+          service_tier: tier,
+          store: false,
+          max_output_tokens: 64000,
+          reasoning: { effort: call.effort },
+          ...(explicit ? { prompt_cache_options: { mode: 'explicit' } } : {}),
+          text: { format: { type: 'json_schema', name: call.name, strict: true, schema: strictSchema(call.schema) } },
+          input: [
+            { role: 'developer', content: [{ type: 'input_text', text: call.system, ...breakpoint }] },
+            {
+              role: 'user',
+              content: [
+                { type: 'input_text', text: call.context, ...breakpoint },
+                { type: 'input_text', text: call.task },
+              ],
+            },
+          ],
+        }),
+      });
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'TimeoutError') {
+        if (tier === 'flex') return request(call, 'default');
+        throw new ProviderError(`OpenAI took too long on the ${call.name} step`);
+      }
+      throw new ProviderError(`Could not reach OpenAI: ${(error as Error).message}`);
+    }
+    const body = (await res.json().catch(() => ({}))) as ResponseBody;
+    if (res.ok) return body;
+    // Flex has no capacity (429 Resource Unavailable, not billed) or timed out: retry on standard.
+    if (tier === 'flex' && (res.status === 429 || res.status === 408) && body.error?.code !== 'insufficient_quota') {
+      return request(call, 'default');
+    }
+    if (res.status === 401) throw new ProviderError('The OpenAI API key was rejected');
+    if (body.error?.code === 'insufficient_quota') throw new ProviderError('The OpenAI account is out of credit');
+    if (body.error?.code === 'model_not_found') throw new ProviderError(`OpenAI: ${body.error.message} (allow it in the project's model settings)`);
+    if (res.status === 429) throw new ProviderError('OpenAI rate limit reached; try again shortly');
+    throw new ProviderError(`OpenAI request failed (${res.status}): ${body.error?.message ?? res.statusText}`);
+  }
+
+  return {
+    async run(call) {
+      const body = await request(call, call.interactive ? 'default' : 'flex');
+      if (body.status === 'incomplete') {
+        const reason = body.incomplete_details?.reason;
+        throw new ProviderError(
+          reason === 'max_output_tokens' ? `OpenAI ran out of room on the ${call.name} step` : `OpenAI stopped the ${call.name} step early (${reason ?? 'no reason given'})`,
+        );
+      }
+      if (body.status !== 'completed') throw new ProviderError(`OpenAI's ${call.name} step ${body.status ?? 'failed'}: ${body.error?.message ?? ''}`.trim());
+      const content = (body.output ?? []).filter((item) => item.type === 'message').flatMap((item) => item.content ?? []);
+      const refusal = content.find((c) => c.type === 'refusal');
+      if (refusal) throw new ProviderError(`OpenAI declined the ${call.name} step: ${refusal.refusal ?? ''}`.trim());
+      const text = content.find((c) => c.type === 'output_text')?.text;
+      let json: unknown;
+      try {
+        json = JSON.parse(text ?? '');
+      } catch {
+        throw new ProviderError(`OpenAI's ${call.name} output was not JSON`);
+      }
+      const parsed = call.schema.safeParse(json);
+      if (!parsed.success) throw new ProviderError(`OpenAI's ${call.name} output did not match the schema`);
+
+      // input_tokens includes cache reads and writes; each token is billed at one of the three rates.
+      const u = body.usage;
+      const cacheReadTokens = u?.input_tokens_details?.cached_tokens ?? 0;
+      const cacheWriteTokens = u?.input_tokens_details?.cache_write_tokens ?? 0;
+      const usage = {
+        inputTokens: Math.max(0, (u?.input_tokens ?? 0) - cacheReadTokens - cacheWriteTokens),
+        outputTokens: u?.output_tokens ?? 0,
+        cacheReadTokens,
+        cacheWriteTokens,
+      };
+      // Responses name a dated snapshot ("gpt-6-luna-2026-05-18"); prices are per model and tier.
+      const model = (body.model ?? call.model).replace(/-\d{4}-\d{2}-\d{2}$/, '');
+      const priced = body.service_tier === 'flex' ? `${model}:flex` : model;
+      await record?.(`openai-${call.name}`, { output: parsed.data, model: priced, usage });
+      return { output: parsed.data, model: `openai/${priced}`, usage, costUsd: costUsd(priced, usage) };
+    },
+  };
+}

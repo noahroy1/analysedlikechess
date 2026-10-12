@@ -29,6 +29,7 @@ export async function regenerateMoment(
     name: 'regenerate',
     model: deps.config.models.regen,
     effort: 'medium',
+    interactive: true,
     system: systemPrompt(deps.style),
     context: timelineText(project),
     task: regenerateTask(moment, evidence, actor, instruction?.trim() || undefined),

@@ -1,7 +1,8 @@
-import type { AnalysisConfig } from '../config.ts';
+import { isClaude, type AnalysisConfig } from '../config.ts';
 import { claudeAnalyst } from './claude.ts';
 import { scribeTranscriber } from './elevenlabs.ts';
 import { geminiDescriber, geminiRegions } from './gemini.ts';
+import { openaiAnalyst } from './openai.ts';
 import { handoffAnalyst, recorder, replayProviders } from './replay.ts';
 import { ProviderError, type Providers } from './types.ts';
 
@@ -32,7 +33,9 @@ export function makeProviders(config: AnalysisConfig): Providers {
       run: (call) =>
         config.handoffDir
           ? handoffAnalyst(config.handoffDir).run(call)
-          : claudeAnalyst({ apiKey: need(config.keys.anthropic, 'ANTHROPIC_API_KEY'), record }).run(call),
+          : isClaude(call.model)
+            ? claudeAnalyst({ apiKey: need(config.keys.anthropic, 'ANTHROPIC_API_KEY'), record }).run(call)
+            : openaiAnalyst({ apiKey: need(config.keys.openai, 'OPENAI_API_KEY'), record }).run(call),
     },
   };
 }

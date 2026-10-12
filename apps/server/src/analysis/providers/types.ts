@@ -59,6 +59,8 @@ export interface AnalystCall<T> {
   name: AnalystCallName;
   model: string;
   effort: 'low' | 'medium' | 'high';
+  /** Someone is waiting on it (Regenerate, Re-evaluate): never the slower, cheaper tier. */
+  interactive?: boolean;
   /** Stable instructions: role, rubric, voice and examples. Cached. */
   system: string;
   /** Shared context (the scene timeline). Cached, so later passes reuse it. */
@@ -76,7 +78,7 @@ export interface AnalystResult<T> {
   costUsd: number;
 }
 
-/** Claude with structured outputs: Pass A, Pass B, Pass C, speaker naming and Regenerate. */
+/** The LLM with structured outputs (OpenAI or Claude): Pass A, Pass B, Pass C, speaker naming and Regenerate. */
 export interface Analyst {
   run<T>(call: AnalystCall<T>): Promise<AnalystResult<T>>;
 }

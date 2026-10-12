@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
  * `.env`; nothing here reaches the browser.
  */
 export interface AnalysisConfig {
-  keys: { anthropic?: string; gemini?: string; elevenlabs?: string };
+  keys: { anthropic?: string; openai?: string; gemini?: string; elevenlabs?: string };
   models: {
     /** Speech-to-text with word timestamps and diarization. */
     transcriber: string;
@@ -27,7 +27,7 @@ export interface AnalysisConfig {
   /** Replay recorded provider responses from this folder instead of calling the APIs. */
   replayDir?: string;
   /**
-   * Dev only: instead of calling Claude, write each request to this folder and
+   * Dev only: instead of calling the LLM, write each request to this folder and
    * read the answer from `claude-<call>.json` beside it (hand-written, e.g. by a
    * Claude Code session). Lets analysis run before an API balance exists.
    */
@@ -42,15 +42,17 @@ export function loadAnalysisConfig(env: NodeJS.ProcessEnv = process.env): Analys
   return {
     keys: {
       anthropic: blank(env.ANTHROPIC_API_KEY),
+      openai: blank(env.OPENAI_API_KEY),
       gemini: blank(env.GEMINI_API_KEY),
       elevenlabs: blank(env.ELEVENLABS_API_KEY),
     },
     models: {
       transcriber: blank(env.TRANSCRIBER_MODEL) ?? 'scribe_v2',
       scene: blank(env.SCENE_MODEL) ?? 'gemini-3.5-flash-lite',
-      naming: blank(env.NAMING_MODEL) ?? 'claude-haiku-5-5',
-      analyst: blank(env.ANALYST_MODEL) ?? 'claude-opus-5-5',
-      regen: blank(env.REGEN_MODEL) ?? 'claude-sonnet-5-5',
+      // GPT-6 Luna for every LLM call (chosen Oct 13, 2026, cost first). A `claude-` model goes to Anthropic.
+      naming: blank(env.NAMING_MODEL) ?? 'gpt-6-luna',
+      analyst: blank(env.ANALYST_MODEL) ?? 'gpt-6-luna',
+      regen: blank(env.REGEN_MODEL) ?? 'gpt-6-luna',
       regions: blank(env.REGIONS_MODEL) ?? 'gemini-3.5-flash-lite',
     },
     autoAnalyze: (blank(env.AUTO_ANALYZE) ?? 'true') !== 'false',
@@ -62,12 +64,20 @@ export function loadAnalysisConfig(env: NodeJS.ProcessEnv = process.env): Analys
   };
 }
 
+/** Claude models go to Anthropic; every other LLM model to OpenAI. */
+export const isClaude = (model: string) => model.startsWith('claude-');
+
 /** Keys a full analysis needs; empty when it can run. */
 export function missingKeys(config: AnalysisConfig): string[] {
   if (config.replayDir) return [];
   const missing: string[] = [];
   if (!config.keys.elevenlabs) missing.push('ELEVENLABS_API_KEY');
   if (!config.keys.gemini) missing.push('GEMINI_API_KEY');
-  if (!config.keys.anthropic && !config.handoffDir) missing.push('ANTHROPIC_API_KEY');
+  if (!config.handoffDir) {
+    const { naming, analyst, regen } = config.models;
+    const llms = [naming, analyst, regen];
+    if (llms.some(isClaude) && !config.keys.anthropic) missing.push('ANTHROPIC_API_KEY');
+    if (!llms.every(isClaude) && !config.keys.openai) missing.push('OPENAI_API_KEY');
+  }
   return missing;
 }

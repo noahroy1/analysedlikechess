@@ -10,7 +10,7 @@ import { ProviderError, type Analyst, type Providers } from './types.ts';
 // Tests never call cloud APIs: they replay one real response per provider,
 // recorded with ANALYSIS_RECORD_DIR. The same replay lets the app run without keys.
 
-const RecordedClaude = z.object({ output: z.unknown(), model: z.string(), usage: UsageSchema });
+const RecordedAnalyst = z.object({ output: z.unknown(), model: z.string(), usage: UsageSchema });
 const UsageMetadata = z.looseObject({ promptTokenCount: z.number().optional(), candidatesTokenCount: z.number().optional() }).optional();
 const RecordedGemini = z.object({ raw: GeminiNotesSchema, usageMetadata: UsageMetadata });
 const RecordedRegions = z.object({ raw: GeminiRegionsSchema, usageMetadata: UsageMetadata });
@@ -60,7 +60,9 @@ export function replayProviders(dir: string): Providers {
     },
     analyst: {
       async run(call) {
-        const recorded = RecordedClaude.parse(await readJson(dir, `claude-${call.name}`));
+        // OpenAI recordings first; the older fixtures are Claude's.
+        const raw = await readJson(dir, `openai-${call.name}`).catch(() => readJson(dir, `claude-${call.name}`));
+        const recorded = RecordedAnalyst.parse(raw);
         // Same validation as a live call: a stale recording fails loudly.
         const output = call.schema.parse(recorded.output);
         return { output, model: `replay/${recorded.model}`, usage: recorded.usage, costUsd: costUsd(recorded.model, recorded.usage) };

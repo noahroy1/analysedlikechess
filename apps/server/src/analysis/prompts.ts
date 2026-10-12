@@ -12,7 +12,7 @@ import {
   type StyleCorpus,
 } from '@als/schema';
 
-// Prompts for the Analyst. The system prompt is shared by every Claude call on
+// Prompts for the Analyst. The system prompt is shared by every Analyst call on
 // a clip (and cached); each pass adds its own task after the cached timeline.
 
 const RUBRIC: Record<(typeof CLASSIFICATIONS)[number], string> = {
