@@ -1,7 +1,7 @@
-import type { AudioEvent, SceneNote, Transcript, Usage } from '@als/schema';
+import type { AudioEvent, Box, FaceRegion, SceneNote, Transcript, Usage } from '@als/schema';
 import type { z } from 'zod';
 
-// The three provider interfaces from the plan. Swapping a vendor means a new
+// The three provider interfaces from the plan, plus the frame region finder. Swapping a vendor means a new
 // implementation of one of these; nothing else changes.
 
 export interface TranscribeResult {
@@ -30,6 +30,26 @@ export interface DescribeResult {
 
 export interface SceneDescriber {
   describe(videoPath: string, options: { durationSec: number; context: SceneContext }): Promise<DescribeResult>;
+}
+
+/** The move a frozen frame belongs to, so the finder knows what its subject is. */
+export interface RegionContext {
+  moveLabel: string;
+  explanation: string;
+  actorName?: string | undefined;
+}
+
+export interface FindRegionsResult {
+  faces: FaceRegion[];
+  subject?: Box;
+  model: string;
+  usage: Usage;
+  costUsd: number;
+}
+
+/** Faces and the move's subject on one still frame (a JPEG), for placing its card. */
+export interface RegionFinder {
+  find(jpeg: Buffer, context: RegionContext): Promise<FindRegionsResult>;
 }
 
 /** Which call this is, so recorded responses can be replayed per call. */
@@ -65,6 +85,7 @@ export interface Providers {
   transcriber: Transcriber;
   describer: SceneDescriber;
   analyst: Analyst;
+  regions: RegionFinder;
 }
 
 /** A provider failed in a way the creator can act on (missing key, refusal, bad response). */

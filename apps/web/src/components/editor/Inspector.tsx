@@ -1,7 +1,8 @@
-import { CARD_ANCHORS, NO_BEST_MOVE, TEXT_CAPS, autoHoldSec, evalWarnings, momentWarnings, type Moment } from '@als/schema';
+import { CARD_ANCHORS, NO_BEST_MOVE, TEXT_CAPS, autoHoldSec, evalWarnings, momentWarnings, placedByHand, regionsFresh, type Card, type Moment } from '@als/schema';
 import { sourceFrameToOut } from '@als/composition';
-import type { ReactNode } from 'react';
-import { deleteMoment, retime, setMomentEval, updateMoment } from '../../editor/doc.ts';
+import { useState, type ReactNode } from 'react';
+import { deleteMoment, retime, setCardByHand, setMomentEval, updateMoment } from '../../editor/doc.ts';
+import { reevaluatePlacement } from '../../editor/placement.ts';
 import { useEditor, useEditorStore, usePlayback } from '../../editor/context.tsx';
 import { formatTime } from '../../lib/format.ts';
 import { BarPanel, BeatInspector, EVAL_HINT, EvalInput, Warnings } from './BarPanels.tsx';
@@ -45,6 +46,8 @@ export function Inspector() {
 
   const set = (patch: Partial<Moment>, coalesce?: string) =>
     store.getState().edit((d) => updateMoment(d, moment.id, patch), coalesce ? { coalesce: `${moment.id}.${coalesce}` } : undefined);
+  const setCard = (card: Card, coalesce?: string) =>
+    store.getState().edit((d) => setCardByHand(d, moment.id, card), coalesce ? { coalesce: `${moment.id}.${coalesce}` } : undefined);
   const utterances = project.transcript?.utterances ?? [];
   const evidence = moment.evidence.utteranceIds.map((id) => utterances.find((u) => u.id === id)).filter((u) => u !== undefined);
   const speakerName = (label: string) => characters.find((c) => c.speakerLabels.includes(label))?.name ?? `Speaker ${label}`;
@@ -159,7 +162,8 @@ export function Inspector() {
             value={moment.card.anchor}
             onChange={(e) => {
               const anchor = e.target.value as Moment['card']['anchor'];
-              set({ card: anchor === 'custom' ? { anchor, x: 0.05, y: 0.4, scale: moment.card.scale } : { anchor, scale: moment.card.scale } });
+              const { x, y, scale } = moment.card;
+              setCard(anchor === 'custom' ? { anchor, x: x ?? 0.05, y: y ?? 0.4, scale } : { anchor, scale });
             }}
             className="input"
           >
@@ -177,11 +181,13 @@ export function Inspector() {
             max={2}
             step={0.05}
             value={moment.card.scale}
-            onChange={(e) => set({ card: { ...moment.card, scale: Number(e.target.value) } }, 'scale')}
+            onChange={(e) => setCard({ ...moment.card, scale: Number(e.target.value) }, 'scale')}
             className="mt-2 w-full accent-sky-400"
           />
         </Field>
       </div>
+
+      <PlacementStatus moment={moment} />
 
       <div className="flex items-center justify-between rounded-md border border-neutral-800 px-2 py-1.5 text-xs">
         <span className="text-neutral-400">
@@ -242,4 +248,36 @@ export function Inspector() {
 
 export function Kbd({ children }: { children: ReactNode }) {
   return <kbd className="rounded border border-neutral-700 bg-neutral-800 px-1 font-sans text-[10px] text-neutral-300">{children}</kbd>;
+}
+
+/** How the card got where it is, and Re-evaluate: place it clear of faces now. */
+function PlacementStatus({ moment }: { moment: Moment }) {
+  const store = useEditorStore();
+  const [busy, setBusy] = useState(false);
+  const auto = moment.card.placement === 'auto';
+  const text = placedByHand(moment.card)
+    ? 'Placed by you. Retiming keeps it here.'
+    : auto && regionsFresh(moment)
+      ? 'Placed clear of faces. Follows the move if it is retimed.'
+      : auto
+        ? 'Finding faces on this frame…'
+        : 'In the look\'s corner.';
+  return (
+    <div className="-mt-1 flex items-center justify-between gap-2 text-[11px] text-neutral-500" data-testid="placement-status">
+      <span>{text}</span>
+      <button
+        type="button"
+        disabled={busy}
+        data-testid="reevaluate-placement"
+        title="Place this card clear of the faces on its frame, replacing any position or size set by hand"
+        onClick={() => {
+          setBusy(true);
+          void reevaluatePlacement(store, moment.id).finally(() => setBusy(false));
+        }}
+        className="shrink-0 rounded border border-neutral-700 px-2 py-0.5 text-neutral-200 hover:border-neutral-500 disabled:opacity-50"
+      >
+        {busy ? 'Looking…' : 'Re-evaluate'}
+      </button>
+    </div>
+  );
 }

@@ -348,6 +348,10 @@ Ship original SVG badges built on the standard chess annotation glyphs, which no
 - Freeze treatment: none, slight dim, or slow push-in on the frozen frame (default theme: 10% dim, decided Oct 12, 2026, replacing none)
 - Timing: default hold, card in and out durations, optional sting sound
 
+**Card placement** (built Oct 13, 2026)
+
+The creator places each card by hand, clear of faces. Drafts do the same: Gemini finds every head and its eyes-to-mouth box on the frozen frame, and `autoPlaceCard()` (`packages/composition/src/placement.ts`) searches the safe area, clear of the evaluation bar, its players and the subtitles. The order of what matters, the user's: eyes and mouths stay visible; then a slightly smaller card (92%, then 85%, never smaller); then the rest of a face; then the move's subject. A covered face beats a tiny card. Cards set by hand keep their position and size through retimes; automatic ones are placed again on the new frame; Re-evaluate places any card again.
+
 **Matching the creator**
 
 Built early, Oct 12, 2026, from four screenshots and five clips (`media/creator-ref/`): the `creator` theme matches their card layout ("<Move> is <phrase>", a move-number line with the annotation symbol, the breakdown typing out, "Better was", a motif chip), the round badge beside the card, Arial, measured sizes and four sampled rating colours, and their hold timing. The other six rating colours are placeholders until a video with those ratings is sampled. A theme editor screen with live preview would make later tweaks fast for them.
@@ -360,6 +364,7 @@ Estimates from list prices in `analysis/prices.ts` for one 3-minute clip, until 
 | --- | --- | --- | --- | --- |
 | ElevenLabs (Scribe v2) | Transcript, speakers | about $0.012 ($0.22 per hour, plus 20% for character-name key terms) | none | Nothing separate: it draws on the account's plan credits. A 30 s test cost $0.002 |
 | Gemini (3.5 Flash-Lite) | Scene notes from video | about $0.02 | none | $5 prepay covers about 200 clips. Prepay credits at zero return a 402 and stop analysis |
+| Gemini (3.5 Flash-Lite, medium image resolution) | Faces and the move's subject on each frozen frame, for card placement | about $0.004 (BB1's 7 cards: $0.0039, measured Oct 13) | about $0.0005 per retime or Re-evaluate; frames already looked at are free | Shares the scene-notes prepay |
 | Anthropic (Opus 5.5 Analyst, Haiku 5.5 naming) | Pass A, Pass B, speaker naming | about $0.25 to $0.40 | about $0.01 (Sonnet 5.5) | $10 covers about 30 clips of testing |
 
 Rule of thumb: a clip costs under half a dollar all in, and Claude is nine tenths of it. Re-running only the Analyst costs the Claude share again and nothing else. Pitch prep (two demo episodes plus tuning the style corpus, about 30 runs) fits inside $15 of Anthropic and $5 of Gemini.

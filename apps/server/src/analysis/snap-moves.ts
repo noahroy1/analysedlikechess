@@ -79,7 +79,7 @@ export function snapMoves(project: Project, candidates: Candidate[], moves: Anno
       ...(actorId ? { actorId } : {}),
       classification,
       ...text,
-      card: { anchor: theme.layout.anchor, scale: 1 },
+      card: { anchor: theme.layout.anchor, scale: 1, placement: 'auto' },
       evidence: { utteranceIds: evidence.map((u) => u.id), note: candidate.action },
       origin: 'ai',
       status: 'draft',

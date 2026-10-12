@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { MoveDraftSchema } from './analyst.ts';
 import { EvalBarSchema, EvalSchema } from './eval.ts';
 import { AnalysisSchema, CharacterSchema, IngestSchema, MomentSchema, SourceSchema, UsageSchema } from './project.ts';
+import { FrameRegionsSchema } from './regions.ts';
 import { SubtitleSchema } from './subtitles.ts';
 
 /** Containers the upload accepts. The proxy makes any of them browser-safe. */
@@ -83,6 +84,19 @@ export const RegenerateResultSchema = z.object({
   costUsd: z.number().nonnegative(),
 });
 export type RegenerateResult = z.infer<typeof RegenerateResultSchema>;
+
+/** Find the faces and subject on a move's frozen frame, for placing its card. Saves nothing. */
+export const RegionsRequestSchema = z.object({ moment: MomentSchema });
+export type RegionsRequest = z.infer<typeof RegionsRequestSchema>;
+
+export const RegionsResultSchema = z.object({
+  regions: FrameRegionsSchema,
+  model: z.string(),
+  usage: UsageSchema,
+  /** 0 when the frame was already looked at with the same prompt. */
+  costUsd: z.number().nonnegative(),
+});
+export type RegionsResult = z.infer<typeof RegionsResultSchema>;
 
 /**
  * Re-evaluate the bar (Pass C alone) for the editor's current track. Without

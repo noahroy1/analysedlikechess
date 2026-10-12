@@ -5,6 +5,7 @@ import {
   HistoryEntrySchema,
   PortraitResultSchema,
   RegenerateResultSchema,
+  RegionsResultSchema,
   RenderEventSchema,
   RenderJobSchema,
   SoundBankSchema,
@@ -16,6 +17,7 @@ import {
   type Moment,
   type PortraitRequest,
   type RegenerateResult,
+  type RegionsResult,
   type RenderEvent,
   type RenderJob,
   type RenderRequest,
@@ -158,6 +160,16 @@ export const startAnalysis = (id: string, body: AnalyzeRequest = {}) =>
   });
 
 /** Pass B for one moment; returns a proposal and saves nothing. */
+/** Faces and subject on a move's frozen frame; cached on the server per frame, so asking again is free. */
+export const findRegions = async (id: string, moment: Moment): Promise<RegionsResult> =>
+  RegionsResultSchema.parse(
+    await request(`/projects/${id}/regions`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ moment }),
+    }),
+  );
+
 export const regenerateMoment = async (id: string, moment: Moment, instruction?: string): Promise<RegenerateResult> =>
   RegenerateResultSchema.parse(
     await request(`/projects/${id}/regenerate`, {
@@ -168,7 +180,7 @@ export const regenerateMoment = async (id: string, moment: Moment, instruction?:
   );
 
 export const getUsage = async (id: string) =>
-  (await request(`/projects/${id}/usage`)) as Record<'regenerate' | 'evaluate', { count: number; costUsd: number }>;
+  (await request(`/projects/${id}/usage`)) as Record<'regenerate' | 'evaluate' | 'regions', { count: number; costUsd: number }>;
 
 /** Pass C for the editor's track; returns a proposal for the whole bar and saves nothing. */
 export const evaluateTrack = async (id: string, body: EvaluateRequest): Promise<EvaluateResult> =>

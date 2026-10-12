@@ -4,4 +4,6 @@
 
 `recorded/` holds one response per provider call, replayed by tests (rule 5: tests never call cloud APIs) and by the dev server when `ANALYSIS_REPLAY_DIR` points here.
 
-**Current files are synthetic stand-ins** in each provider's documented response shape (`_synthetic` in `elevenlabs.json`). To replace them with real responses, set the API keys, then run the server with `ANALYSIS_RECORD_DIR=fixtures/dialogue/recorded`, upload this clip, and let analysis (and one Regenerate) finish.
+`gemini-regions.json` is real (Oct 13, 2026): Gemini 3.5 Flash-Lite's faces-and-subject answer for one frame of the local BB1 reference clip (two faces, each with its eyes-and-mouth box), recorded through `geminiRegions`. It holds only Gemini's boxes, no image. This clip's synthetic shots have no faces, so a recording from them would test nothing; replay gives this one answer for every frame.
+
+**The other files are synthetic stand-ins** in each provider's documented response shape (`_synthetic` in `elevenlabs.json`). To replace them with real responses, set the API keys, then run the server with `ANALYSIS_RECORD_DIR=fixtures/dialogue/recorded`, upload this clip, and let analysis (and one Regenerate) finish.

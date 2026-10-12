@@ -9,10 +9,10 @@ Single-user local web app: upload a movie scene clip, draft chess-style move ann
 - `pnpm test` / `pnpm lint` / `pnpm typecheck`: individually.
 - `scripts/make-sample-clip.sh`: regenerates `fixtures/sample/source.mp4` (needs system ffmpeg).
 - `scripts/make-dialogue-clip.sh`: regenerates `fixtures/dialogue/source.mp4`, a rights-free two-voice scene (macOS `say`) for analysis tests.
-- `ANALYSIS_REPLAY_DIR=$PWD/fixtures/dialogue/recorded pnpm dev`: runs analysis on recorded responses, no keys or API calls. `ANALYSIS_RECORD_DIR` records real ones.
+- `ANALYSIS_REPLAY_DIR=$PWD/fixtures/dialogue/recorded pnpm dev`: runs analysis on recorded responses, no keys or API calls. Card placement replays one recorded Gemini answer for every frame. `ANALYSIS_RECORD_DIR` records real ones.
 - `ANALYST_HANDOFF_DIR=<dir> pnpm dev`: dev only, replaces the Claude calls with request/answer files a Claude Code session writes by hand (see Status).
 - `pnpm seed:sample`: creates a project from the fixture (3 moments). `pnpm seed:moments <projectId> <file>` replaces a project's moments, e.g. `fixtures/demo/doakes-moments.json` for the Dexter demo clip.
-- `scripts/browser/`: headless-Chrome checks (`phase2-checks.mjs`, `phase3-checks.mjs`, `typeout-checks.mjs`, `format-checks.mjs`, `evalbar-checks.mjs`, `sound-checks.mjs`, `subtitle-checks.mjs`, `render-checks.mjs`) over the DevTools protocol (no dependencies) against a running `pnpm dev`. The dev build exposes the Player as `window.__alsPlayer`.
+- `scripts/browser/`: headless-Chrome checks (`phase2-checks.mjs`, `phase3-checks.mjs`, `typeout-checks.mjs`, `format-checks.mjs`, `evalbar-checks.mjs`, `sound-checks.mjs`, `subtitle-checks.mjs`, `render-checks.mjs`, `placement-checks.mjs`) over the DevTools protocol (no dependencies) against a running `pnpm dev`. The dev build exposes the Player as `window.__alsPlayer`.
 - `scripts/ref/hold-phases.mjs <clip> <crop>`: times a reference clip's hold phases (freeze, badge, card, type-out, exit) from frame changes.
 
 ## Layout
@@ -39,6 +39,7 @@ Single-user local web app: upload a movie scene clip, draft chess-style move ann
 - Hard invariants (moment spacing, ordering, references) live in `ProjectSchema`. Soft rules (text caps, `bestMove` on best/brilliant) are `momentWarnings()`, so the editor warns without blocking saves.
 - The output is the source with a hold at each moment. `buildTimeline()` in `packages/composition` is the only mapping between source and output frames; the Player, timeline UI and renderer all use it.
 - `<Episode>` renders one `<Sequence>` per play-then-hold segment so the same `@remotion/media` `<Video>` plays into its `<Freeze>`; premounting loads the next segment. Verified frame-exact in the Player (Phase 2 spike), so the extracted-still fallback is not needed.
+- Card placement: a card's `placement` is `auto` (placed clear of faces, and placed again when its move is retimed), `user` (set by hand; never moved), or absent (older cards: the theme's corner unless custom or resized, see `placedByHand()`). Each move keeps the `regions` (heads, eyes-to-mouth boxes, subject) of the frame it was looked at; `regionsFresh()` says whether they still match its time. `autoPlaceCard()` (`packages/composition/src/placement.ts`, plain TypeScript so the server uses it too) is the only placement logic; its weights put eyes and mouths first, a smaller card (never below `MIN_AUTO_SCALE`) second, the rest of a face third. Gemini answers are cached per frame and prompt in `analysis/regions-cache.json` (bump `REGIONS_PROMPT_VERSION` when the prompt changes); editor spend goes to `analysis/regions-usage.json`. Placement runs on discrete events only (regions arriving, a new look, Re-evaluate), never while typing, so a card never moves under the cursor.
 - Rendering (`apps/server/src/render/`): `episodeProps()` (`packages/schema/src/episode.ts`) is the one way a document becomes `<Episode>` props, used by the Player and the renderer. A render reads a snapshot of the saved version (`renders/<id>.json`), loads the original source (not the proxy), portraits and sounds from this server over HTTP with absolute URLs, and writes `renders/<id>.mp4` (H.264 CRF 18, AAC 320k, BT.709). The bundle is made once and again only when composition, schema or theme sources change. Renders are listed in `renders/renders.json`; live progress goes out over `/api/events` as `render` events.
 - Ingest stages are cached by content hash in each project's `ingest.json`. Bump a step's `STEP_VERSION` in `apps/server/src/ingest/ingest.ts` when its command changes.
 - Cut detection uses ffmpeg `scdet` plus peak picking (`apps/server/src/media/cuts.ts`), tuned on dark film footage where real cuts score only 5-10. Check changes against a contact sheet of real footage, not just the synthetic fixture.
@@ -65,7 +66,7 @@ Read this first in a new session. It says where the work stands, what to do next
 - **Branch:** work now happens on `main` (the user asked for this on Oct 12; commit and push to `main`). `main` was fast-forwarded to the tip of `format-iterations`, and all phase branches (`phase-0-scaffold` … `phase-4-analysis`, `format-iterations`) are pushed to GitHub as history; do not add new per-phase branches. `apps/server/.env.example` shows as deleted in the working tree from before Oct 12; it is not ours, so leave it out of commits (`git add -A -- . ':!apps/server/.env.example'`).
 - **Done:** Phases 0-5 (Phase 4 has two owed items, below), the creator's review iterations, and all seven format iterations (log below).
 - **Not started:** Phase 6 (pitch build).
-- **Checks at the tip:** `pnpm check` passes (236 tests, including the render test). The browser checks pass: `phase2-checks`, `phase3-checks`, `typeout-checks`, `format-checks`, `evalbar-checks`, `sound-checks`, `subtitle-checks` and `render-checks` (on the sample and on a copy of BB1).
+- **Checks at the tip:** `pnpm check` passes (259 tests, including the render test). The browser checks pass: `phase2-checks`, `phase3-checks`, `typeout-checks`, `format-checks`, `evalbar-checks`, `sound-checks`, `subtitle-checks`, `render-checks` (on the sample and on a copy of BB1) and `placement-checks`.
 
 ### Next action: the user's review of Phase 5 (and iterations 5-7), then Phase 6
 
@@ -79,7 +80,7 @@ Waiting on the user:
   4. **Missing files:** `move-miss` and `hold-open` (the segment opening). Dropping them in `media/sounds` makes them play; nothing else changes.
 - **Evaluation bar (iteration 6):** review it on BB1. Its Pass C was written by hand. BB1 now has portraits.
 - **Size per rating** (`TODO(open-decision)` on `EVAL_DIRECTION`): the code fixes only the direction; the Analyst picks the size.
-- **Card placement (assessed Oct 13, not built):** the user has set the behaviour (below) and asked for Gemini's costs, which are sourced. Waiting on the go-ahead to build, with Gemini at medium resolution as the recommendation.
+- **Card placement (built Oct 13):** review it on BB1 (see "Card placement" below). Existing projects keep their cards until Re-evaluate is pressed; new analysis runs place drafts automatically.
 
 ### Format iterations (the creator's list, Oct 12; each ends with a commit and a walkthrough)
 
@@ -143,7 +144,7 @@ Waiting on the user:
 - `SUBTITLE_MAX_CHARS` 42 is right as seen in the video.
 - `game-start` plays 1 s in.
 
-### Card placement (assessed Oct 13, not built)
+### Card placement (built Oct 13; assessment first)
 
 The creator places each card by hand per shot, clear of faces (`media/creator-ref` screenshots: mid-left between two men, top-right over a curtain, upper-centre over a door), with the badge on the side toward the action. Ours use the theme's corner, which covered 40-100% of a face on 5 of 13 BB1 and Dexter freeze frames.
 
@@ -155,7 +156,11 @@ The creator places each card by hand per shot, clear of faces (`media/creator-re
   - The purpose is not to hide the drama, so eyes and mouths weigh most. On a close-up the card may cover hair, forehead, chin or shoulders, never the eyes-to-mouth band.
   - A retime keeps any position or scale the user set by hand. A card never changed by hand is placed again on the new frame.
   - A "Re-evaluate" button beside the position and scale controls places the card again on demand, replacing a manual position.
-- **Still open:** Gemini or Vision. The user asked for Gemini's costs first.
+- **Built with Gemini 3.5 Flash-Lite at medium resolution** (the user's choice). How it works:
+  - **Detection:** Gemini returns each head and a tight eyes-to-mouth box (asked for directly; boxes derived from the head sat too low on close-ups and let a card cover Walt's eyes in testing), plus the move's subject. One call is about $0.0005 and 2 s.
+  - **Weights:** any touch of eyes or mouth costs 100 plus 1000 times the share covered, more than the smallest card (85%: 90, 92%: 30), so a card that can clear them by shrinking always does. An 8% margin around them costs 200 times its share, the rest of a head 60, the subject 25. Nothing smaller than 85% is tried, so a covered face beats a tiny card.
+  - **Where it runs:** a `place` stage after `snap` (not fatal: on error the drafts keep the theme's corner); `POST /projects/:id/regions` for the editor; `useAutoPlacement()` in the editor re-places `auto` cards after a retime or a new move, folded into that edit's undo step with the store's `amend`; Re-evaluate in the Move tab (beside position and size) places any card again as its own undo step; a new look re-places `auto` cards for its card and badge.
+  - **Verified:** on BB1 live (Oct 13), Re-evaluate on all 7 moves cost $0.0039 and every hold keeps both men's eyes and mouths visible (three close-ups at 92%). `placement-checks.mjs` passes, and the card-size estimate is within 1-2% of the drawn card in both looks.
 - **Gemini costs (sourced Oct 13 from ai.google.dev pricing, updated Oct 9, 2026, and the spike's logged tokens):**
   - **Rates and image cost:** Gemini 3.5 Flash-Lite costs $0.30 per 1M input tokens and $2.50 per 1M output tokens, including thinking; `prices.ts` already matches. A Gemini 3 image costs up to 1120 tokens by default (`high`) or 560 at `medium`.
   - **Per frame, measured on 13 frames:**
@@ -237,7 +242,7 @@ To measure more, use `scripts/ref/hold-phases.mjs <clip> <crop>` for timing, PIL
 ### How each step ends (the user's standing workflow)
 
 1. Run `pnpm check`.
-2. Run the browser checks against `PROJECTS_DIR=<scratch> pnpm dev` with freshly seeded samples (`pnpm seed:sample`; each check edits its project, so seed one per check). `phase2-checks` needs the output frame count, currently 1143 for the sample under the default theme. `sound-checks` and `render-checks` also take the projects folder (`render-checks` reads the MP4 from it; `--reuse` compares the newest render without making another).
+2. Run the browser checks against `PROJECTS_DIR=<scratch> pnpm dev` with freshly seeded samples (`pnpm seed:sample`; each check edits its project, so seed one per check). `phase2-checks` needs the output frame count, currently 1143 for the sample under the default theme. `sound-checks` and `render-checks` also take the projects folder (`render-checks` reads the MP4 from it; `--reuse` compares the newest render without making another). `placement-checks` needs the dev server started with `ANALYSIS_REPLAY_DIR=$PWD/fixtures/dialogue/recorded`, so Gemini is replayed.
 3. Look at screenshots.
 4. Commit.
 5. Update this section.

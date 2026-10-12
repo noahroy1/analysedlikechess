@@ -14,8 +14,11 @@ import {
   type Subtitle,
   type Theme,
   type Transcript,
+  type Card,
+  type FrameRegions,
   subtitlesFromTranscript,
 } from '@als/schema';
+import { autoPlaceCard, moveNumbers } from '@als/composition';
 
 /** The part of a project the editor changes: the annotation track, the cast, the look, the evaluation bar and the subtitles. */
 export interface Doc {
@@ -94,7 +97,8 @@ export function addMoment(
     classification: 'good',
     moveLabel: '',
     explanation: '',
-    card: { anchor: theme.layout.anchor, scale: 1 },
+    // Placed clear of faces once its frame has been looked at.
+    card: { anchor: theme.layout.anchor, scale: 1, placement: 'auto' },
     evidence: { utteranceIds: init.utteranceIds ?? [] },
     origin: 'user',
     status: 'draft',
@@ -172,6 +176,50 @@ export function deleteCharacter(doc: Doc, id: string): Doc {
       },
     }),
   };
+}
+
+/** Frame size in composition pixels: the source's. */
+export interface FrameSize {
+  width: number;
+  height: number;
+}
+
+/** A card moved, resized or re-anchored by hand: automatic placement leaves it alone from now on. */
+export function setCardByHand(doc: Doc, id: string, card: Card): Doc {
+  return updateMoment(doc, id, { card: { ...card, placement: 'user' } });
+}
+
+/** The grey line's text on a card ("2... Walter White"): placement needs it for the card's height. */
+function whoLine(doc: Doc, moment: Moment): string {
+  const number = moveNumbers(doc.moments, doc.characters).get(moment.id);
+  const name = doc.characters.find((c) => c.id === moment.actorId)?.name;
+  return [number, name].filter(Boolean).join(' ');
+}
+
+/** Places a move's card clear of its frame's faces, from now on automatically (Re-evaluate). */
+export function placeCard(doc: Doc, id: string, regions: FrameRegions, theme: Theme, frame: FrameSize): Doc {
+  const moment = doc.moments.find((m) => m.id === id);
+  if (!moment) throw new EditError('That move no longer exists.');
+  const placed = autoPlaceCard({ moment: { ...moment, regions }, theme, frame, who: whoLine(doc, moment) });
+  return updateMoment(doc, id, { regions, ...(placed ? { card: placed.card } : {}) });
+}
+
+/**
+ * Regions that arrive after a retime or for a new move, if they still apply:
+ * the move is still at that frame and its card is still placed automatically.
+ */
+export function applyFoundRegions(doc: Doc, id: string, regions: FrameRegions, theme: Theme, frame: FrameSize): Doc {
+  const moment = doc.moments.find((m) => m.id === id);
+  if (!moment || moment.card.placement !== 'auto' || Math.abs(moment.sourceTime - regions.sourceTime) > 1e-4) return doc;
+  return placeCard(doc, id, regions, theme, frame);
+}
+
+/** Automatic cards whose regions are current go where they fit now (a new look changes the card's size and badge). */
+export function replaceAutoCards(doc: Doc, theme: Theme, frame: FrameSize): Doc {
+  return doc.moments.reduce(
+    (d, m) => (m.card.placement === 'auto' && m.regions && Math.abs(m.regions.sourceTime - m.sourceTime) < 1e-4 ? placeCard(d, m.id, m.regions, theme, frame) : d),
+    doc,
+  );
 }
 
 /** Switches the project's look; unlocked holds follow the new theme's timing. */

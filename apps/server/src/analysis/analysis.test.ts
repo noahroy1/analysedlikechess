@@ -11,17 +11,19 @@ import {
   EvaluateResultSchema,
   ProjectSchema,
   RegenerateResultSchema,
+  RegionsResultSchema,
   evalWarnings,
   type Project,
 } from '@als/schema';
-import { defaultTheme } from '@als/theme/themes';
+import { autoPlaceCard } from '@als/composition/placement';
+import { defaultTheme, getTheme } from '@als/theme/themes';
 import { makeTestApp, DIALOGUE_RECORDING } from '../test-helpers.ts';
 import { AnalysisService } from './service.ts';
 import { makeProviders } from './providers/index.ts';
 import { handoffAnalyst } from './providers/replay.ts';
 import { ProviderError } from './providers/types.ts';
 import { parseScribe } from './providers/elevenlabs.ts';
-import { parseNotes } from './providers/gemini.ts';
+import { parseNotes, parseRegions } from './providers/gemini.ts';
 import { assignSides } from './sides.ts';
 import { snapMoves } from './snap-moves.ts';
 import { castNames, timelineText } from './timeline-text.ts';
@@ -65,6 +67,33 @@ describe('parseNotes', () => {
       { start: 0, end: 2, text: '[Red] Early' },
       { start: 8, end: 10, text: 'Late' },
     ]);
+  });
+});
+
+describe('parseRegions', () => {
+  it('turns Gemini boxes into frame fractions, faces with their eyes and mouth', async () => {
+    const { raw } = await recorded('gemini-regions');
+    const regions = parseRegions(raw);
+    expect(regions.faces).toHaveLength(2);
+    expect(regions.faces.every((f) => f.eyesMouth)).toBe(true);
+    for (const f of regions.faces) {
+      // The eyes and mouth sit inside the head.
+      expect(f.eyesMouth!.x).toBeGreaterThanOrEqual(f.head.x);
+      expect(f.eyesMouth!.y + f.eyesMouth!.h).toBeLessThanOrEqual(f.head.y + f.head.h + 1e-9);
+    }
+    expect(regions.subject).toBeUndefined();
+  });
+
+  it('orders swapped corners, clamps to the frame and drops empty boxes', () => {
+    const regions = parseRegions({
+      faces: [
+        { head: [600, 900, 100, 400], eyes_mouth: [] },
+        { head: [10, 10, 10, 10], eyes_mouth: [] },
+      ],
+      subject: [{ box_2d: [-50, 800, 400, 1200] }],
+    });
+    expect(regions.faces).toEqual([{ head: { x: 0.4, y: 0.1, w: 0.5, h: 0.5 } }]);
+    expect(regions.subject).toEqual({ x: 0.8, y: 0, w: 0.19999999999999996, h: 0.4 });
   });
 });
 
@@ -230,6 +259,7 @@ describe('analysis pipeline', () => {
       ['decisions', 'done'],
       ['annotate', 'done'],
       ['snap', 'done'],
+      ['place', 'done'],
       ['evaluate', 'done'],
     ]);
     expect(project.moments).toHaveLength(3);
@@ -265,6 +295,22 @@ describe('analysis pipeline', () => {
     expect(evalWarnings(project.evalBar, project.moments, project.context.characters).size).toBe(0);
   });
 
+  it('places each draft card clear of the eyes and mouths on its frame', () => {
+    const theme = getTheme(project.themeId);
+    const frame = { width: project.source.width, height: project.source.height };
+    for (const m of project.moments) {
+      expect(m.card).toMatchObject({ anchor: 'custom', placement: 'auto' });
+      expect(m.regions?.sourceTime).toBe(m.sourceTime);
+      // The recorded answer has two faces, one with its eyes and mouth in view.
+      expect(m.regions?.faces).toHaveLength(2);
+      const again = autoPlaceCard({ moment: m, theme, frame, who: '' });
+      expect(again?.covered.eyesMouth).toBe(0);
+    }
+    const place = project.analysis.stages.find((s) => s.name === 'place')!;
+    expect(place.model).toBe('replay/gemini-regions');
+    expect(place.costUsd).toBeGreaterThan(0);
+  });
+
   it("cites only evidence that exists in the transcript", () => {
     const ids = new Set(project.transcript!.utterances.map((u) => u.id));
     for (const m of project.moments) {
@@ -289,7 +335,7 @@ describe('analysis pipeline', () => {
   it('shows tokens and cost per stage', () => {
     const byName = Object.fromEntries(project.analysis.stages.map((s) => [s.name, s]));
     expect(byName.transcribe!.usage?.audioSec).toBeCloseTo(30.8, 0);
-    for (const name of ['describe', 'speakers', 'decisions', 'annotate', 'evaluate']) {
+    for (const name of ['describe', 'speakers', 'decisions', 'annotate', 'place', 'evaluate']) {
       expect(byName[name]!.usage?.outputTokens).toBeGreaterThan(0);
       expect(byName[name]!.model).toBeTruthy();
     }
@@ -337,6 +383,7 @@ describe('analysis pipeline', () => {
       ['decisions', 'done'],
       ['annotate', 'done'],
       ['snap', 'done'],
+      ['place', 'done'],
       ['evaluate', 'done'],
     ]);
     expect(rerun.moments.find((m) => m.id === approved.id)?.moveLabel).toBe('Approved edit');
@@ -360,7 +407,7 @@ describe('analysis pipeline', () => {
     expect(result.costUsd).toBeGreaterThan(0);
     expect((await env.store.read(project.id)).version).toBe(before.version);
     const usage = await (await env.app.request(`/api/projects/${project.id}/usage`)).json();
-    expect(usage).toEqual({ regenerate: { count: 1, costUsd: result.costUsd }, evaluate: { count: 0, costUsd: 0 } });
+    expect(usage).toEqual({ regenerate: { count: 1, costUsd: result.costUsd }, evaluate: { count: 0, costUsd: 0 }, regions: { count: 0, costUsd: 0 } });
   });
 
   it('re-evaluates the bar as a proposal, placing beats for a track that has none', async () => {
@@ -378,6 +425,31 @@ describe('analysis pipeline', () => {
     expect((await env.store.read(project.id)).version).toBe(before.version);
     const usage = (await (await env.app.request(`/api/projects/${project.id}/usage`)).json()) as { evaluate: unknown };
     expect(usage.evaluate).toEqual({ count: 1, costUsd: result.costUsd });
+  });
+
+  it('finds faces for the editor: free for a frame already looked at, one logged call for a new one', async () => {
+    const before = await env.store.read(project.id);
+    const moment = before.moments[0]!;
+    const ask = async (m: typeof moment) => {
+      const res = await env.app.request(`/api/projects/${project.id}/regions`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ moment: m }),
+      });
+      expect(res.status).toBe(200);
+      return RegionsResultSchema.parse(await res.json());
+    };
+    const cached = await ask(moment);
+    expect(cached.costUsd).toBe(0);
+    expect(cached.regions).toEqual(moment.regions);
+
+    const retimed = await ask({ ...moment, sourceTime: moment.sourceTime + 0.5 });
+    expect(retimed.costUsd).toBeGreaterThan(0);
+    expect(retimed.regions.sourceTime).toBe(moment.sourceTime + 0.5);
+    expect((await env.store.read(project.id)).version).toBe(before.version);
+    const usage = (await (await env.app.request(`/api/projects/${project.id}/usage`)).json()) as { regions: { count: number; costUsd: number } };
+    expect(usage.regions.count).toBe(1);
+    expect(usage.regions.costUsd).toBeCloseTo(retimed.costUsd, 6);
   });
 
   it('refuses to analyse without API keys and says which', async () => {

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { ClassificationSchema } from './classification.ts';
 import { EvalBarSchema, EvalSchema } from './eval.ts';
+import { FrameRegionsSchema } from './regions.ts';
 import { MIN_MOMENT_GAP_SEC } from './rules.ts';
 import { SubtitleSchema } from './subtitles.ts';
 
@@ -83,12 +84,22 @@ export const CardSchema = z
     x: Unit.optional(),
     y: Unit.optional(),
     scale: z.number().positive(),
+    /**
+     * `auto`: placed clear of the frame's faces, and placed again when the move is
+     * retimed. `user`: set by hand, never moved. Absent (older cards): by hand
+     * if custom-placed or resized, else the theme's corner.
+     */
+    placement: z.enum(['auto', 'user']).optional(),
   })
   .refine((c) => c.anchor !== 'custom' || (c.x !== undefined && c.y !== undefined), {
     message: 'a custom anchor needs x and y',
     path: ['anchor'],
   });
 export type Card = z.infer<typeof CardSchema>;
+
+/** A card the creator moved or resized: automatic placement leaves it alone. */
+export const placedByHand = (card: Card): boolean =>
+  card.placement === 'user' || (card.placement === undefined && (card.anchor === 'custom' || card.scale !== 1));
 
 export const MomentSchema = z.object({
   id: Id,
@@ -110,6 +121,8 @@ export const MomentSchema = z.object({
   /** The chess idea behind the move, shown as a chip: "Sacrifice", "Zwischenzug". */
   motif: z.string().optional(),
   card: CardSchema,
+  /** Faces and the move's subject on the frozen frame, for placing the card. */
+  regions: FrameRegionsSchema.optional(),
   /** The evaluation bar after this move. Without one the bar holds. */
   eval: EvalSchema.optional(),
   /** Why the AI chose this time. */

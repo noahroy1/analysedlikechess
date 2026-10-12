@@ -46,7 +46,7 @@ export interface EditorUsage {
   costUsd: number;
 }
 
-export type EditorCall = 'regenerate' | 'evaluate';
+export type EditorCall = 'regenerate' | 'evaluate' | 'regions';
 
 const usageFile = (store: ProjectStore, id: string, kind: EditorCall) => store.file(id, `analysis/${kind}-usage.json`);
 

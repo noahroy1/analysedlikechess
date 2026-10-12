@@ -14,6 +14,7 @@ import {
   EvaluateRequestSchema,
   PortraitRequestSchema,
   RegenerateRequestSchema,
+  RegionsRequestSchema,
   RenderRequestSchema,
   SERVABLE_FILE,
   UPLOAD_EXTENSIONS,
@@ -213,6 +214,12 @@ export function createApp({ store, queue, analysis, sounds, renders }: AppDeps) 
   app.post('/projects/:id/regenerate', async (c) => {
     const { moment, instruction } = RegenerateRequestSchema.parse(await c.req.json());
     return c.json(await analysis.regenerate(c.req.param('id'), moment, instruction));
+  });
+
+  /** Faces and subject on a move's frozen frame (cached per frame). A proposal: the editor places the card. */
+  app.post('/projects/:id/regions', async (c) => {
+    const { moment } = RegionsRequestSchema.parse(await c.req.json());
+    return c.json(await analysis.regions(c.req.param('id'), moment));
   });
 
   /** Re-evaluate the bar for the editor's track (Pass C alone). A proposal: the project is not saved. */

@@ -1,7 +1,7 @@
 import { CARD_ANCHORS, NO_BEST_MOVE, TEXT_CAPS, type Card, type Moment } from '@als/schema';
 import { MoveCard, cardRect, moveNumbers, type CardField } from '@als/composition';
 import { useLayoutEffect, useMemo, useRef, useState, type PointerEvent } from 'react';
-import { updateMoment } from '../../editor/doc.ts';
+import { setCardByHand, updateMoment } from '../../editor/doc.ts';
 import { useEditor, useEditorStore } from '../../editor/context.tsx';
 import { ClassificationPicker } from './ClassificationPicker.tsx';
 import { EditableText } from './EditableText.tsx';
@@ -62,7 +62,7 @@ export function EditLayer({ moment, width, height, scale }: EditLayerProps) {
       { coalesce: `${moment.id}.${field}` },
     );
 
-  const setCard = (card: Card) => store.getState().gesture((d) => updateMoment(d, moment.id, { card }));
+  const setCard = (card: Card) => store.getState().gesture((d) => setCardByHand(d, moment.id, card));
 
   /** Drag to move: the card becomes custom-placed, or snaps back to a corner. */
   const onDragStart = (e: PointerEvent<HTMLDivElement>) => {

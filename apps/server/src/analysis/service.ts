@@ -7,6 +7,7 @@ import {
   type EvaluateResult,
   type Moment,
   type RegenerateResult,
+  type RegionsResult,
   type StyleCorpus,
 } from '@als/schema';
 import { JobQueue, stageSignature } from '../jobs.ts';
@@ -15,7 +16,8 @@ import { missingKeys, type AnalysisConfig } from './config.ts';
 import { pendingAnalysis, runAnalysis, type AnalysisOptions } from './pipeline.ts';
 import type { Providers } from './providers/index.ts';
 import { reevaluate } from './reevaluate.ts';
-import { readUsage, regenerateMoment, type EditorUsage } from './regenerate.ts';
+import { findRegions } from './regions.ts';
+import { logUsage, readUsage, regenerateMoment, type EditorUsage } from './regenerate.ts';
 
 export class AnalysisBusyError extends Error {}
 
@@ -78,8 +80,20 @@ export class AnalysisService {
     return reevaluate({ store: this.store, providers: this.providers, config: this.config, style: this.style }, project, request);
   }
 
-  async usage(id: string): Promise<Record<'regenerate' | 'evaluate', EditorUsage>> {
-    const [regenerate, evaluate] = await Promise.all([readUsage(this.store, id, 'regenerate'), readUsage(this.store, id, 'evaluate')]);
-    return { regenerate, evaluate };
+  /** Faces and subject on a move's frozen frame, for the editor to place its card. Saves nothing. */
+  async regions(id: string, moment: Moment): Promise<RegionsResult> {
+    const project = await this.store.read(id);
+    const result = await findRegions({ store: this.store, providers: this.providers, config: this.config }, project, moment);
+    if (result.costUsd > 0) await logUsage(this.store, id, 'regions', result.costUsd);
+    return result;
+  }
+
+  async usage(id: string): Promise<Record<'regenerate' | 'evaluate' | 'regions', EditorUsage>> {
+    const [regenerate, evaluate, regions] = await Promise.all([
+      readUsage(this.store, id, 'regenerate'),
+      readUsage(this.store, id, 'evaluate'),
+      readUsage(this.store, id, 'regions'),
+    ]);
+    return { regenerate, evaluate, regions };
   }
 }

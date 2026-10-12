@@ -1,0 +1,51 @@
+{
+  "raw": {
+    "faces": [
+      {
+        "head": [
+          18,
+          211,
+          626,
+          461
+        ],
+        "eyes_mouth": [
+          201,
+          313,
+          502,
+          459
+        ]
+      },
+      {
+        "head": [
+          0,
+          708,
+          1000,
+          1000
+        ],
+        "eyes_mouth": [
+          0,
+          792,
+          600,
+          1000
+        ]
+      }
+    ],
+    "subject": []
+  },
+  "usageMetadata": {
+    "promptTokenCount": 754,
+    "candidatesTokenCount": 103,
+    "totalTokenCount": 857,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 227
+      },
+      {
+        "modality": "IMAGE",
+        "tokenCount": 527
+      }
+    ],
+    "serviceTier": "standard"
+  }
+}

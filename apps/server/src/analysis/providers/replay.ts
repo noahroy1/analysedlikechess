@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { z } from 'zod';
 import { UsageSchema } from '@als/schema';
 import { costUsd } from '../prices.ts';
-import { GeminiNotesSchema, parseNotes } from './gemini.ts';
+import { GeminiNotesSchema, GeminiRegionsSchema, parseNotes, parseRegions } from './gemini.ts';
 import { parseScribe } from './elevenlabs.ts';
 import { ProviderError, type Analyst, type Providers } from './types.ts';
 
@@ -11,10 +11,9 @@ import { ProviderError, type Analyst, type Providers } from './types.ts';
 // recorded with ANALYSIS_RECORD_DIR. The same replay lets the app run without keys.
 
 const RecordedClaude = z.object({ output: z.unknown(), model: z.string(), usage: UsageSchema });
-const RecordedGemini = z.object({
-  raw: GeminiNotesSchema,
-  usageMetadata: z.looseObject({ promptTokenCount: z.number().optional(), candidatesTokenCount: z.number().optional() }).optional(),
-});
+const UsageMetadata = z.looseObject({ promptTokenCount: z.number().optional(), candidatesTokenCount: z.number().optional() }).optional();
+const RecordedGemini = z.object({ raw: GeminiNotesSchema, usageMetadata: UsageMetadata });
+const RecordedRegions = z.object({ raw: GeminiRegionsSchema, usageMetadata: UsageMetadata });
 
 async function readJson(dir: string, name: string): Promise<unknown> {
   try {
@@ -46,6 +45,17 @@ export function replayProviders(dir: string): Providers {
           outputTokens: recorded.usageMetadata?.candidatesTokenCount ?? 0,
         };
         return { notes: parseNotes(recorded.raw, durationSec), model: 'replay/gemini', usage, costUsd: costUsd('gemini-3.5-flash-lite', usage) };
+      },
+    },
+    // One recorded frame answers for every frame.
+    regions: {
+      async find() {
+        const recorded = RecordedRegions.parse(await readJson(dir, 'gemini-regions'));
+        const usage = {
+          inputTokens: recorded.usageMetadata?.promptTokenCount ?? 0,
+          outputTokens: recorded.usageMetadata?.candidatesTokenCount ?? 0,
+        };
+        return { ...parseRegions(recorded.raw), model: 'replay/gemini-regions', usage, costUsd: costUsd('gemini-3.5-flash-lite', usage) };
       },
     },
     analyst: {

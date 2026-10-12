@@ -14,6 +14,7 @@ const LABELS: Record<string, string> = {
   decisions: 'Find decision points',
   annotate: 'Rate and write moves',
   snap: 'Place on frames',
+  place: 'Place cards clear of faces',
 };
 
 const STATUS_STYLE: Record<Stage['status'], string> = {

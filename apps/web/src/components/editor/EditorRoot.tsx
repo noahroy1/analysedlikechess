@@ -1,8 +1,8 @@
 import type { Analysis, HistoryEntry, Ingest, Project } from '@als/schema';
 import { useEffect, useRef, useState } from 'react';
-import { THEMES } from '@als/theme';
+import { THEMES, getTheme } from '@als/theme';
 import { EditorProvider, useEditor, useEditorStore } from '../../editor/context.tsx';
-import { setTheme } from '../../editor/doc.ts';
+import { replaceAutoCards, setTheme } from '../../editor/doc.ts';
 import { createEditorStore, type EditorStore, type SaveStatus } from '../../editor/store.ts';
 import { getProject, listHistory, restoreVersion, saveProject } from '../../lib/api.ts';
 import { formatFps, formatTime } from '../../lib/format.ts';
@@ -187,13 +187,15 @@ function SaveIndicator() {
 function ThemePicker() {
   const store = useEditorStore();
   const themeId = useEditor((s) => s.doc.themeId);
+  const { width, height } = useEditor((s) => s.project.source);
   return (
     <label className="flex items-center gap-1.5 text-xs text-neutral-400" title="Card look (holds follow its timing)">
       Look
       <select
         value={themeId}
         data-testid="theme-picker"
-        onChange={(e) => store.getState().edit((d) => setTheme(d, e.target.value))}
+        // Cards placed automatically move to fit the new look's card and badge.
+        onChange={(e) => store.getState().edit((d) => replaceAutoCards(setTheme(d, e.target.value), getTheme(e.target.value), { width, height }))}
         className="rounded-md border border-neutral-700 bg-neutral-900 px-2 py-1 text-xs text-neutral-200"
       >
         {THEMES.map((t) => (

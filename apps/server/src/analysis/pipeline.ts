@@ -26,14 +26,15 @@ import { applyEvaluation, evaluationItems, placeBeats } from './evaluate.ts';
 import { annotationTask, decisionPointsTask, evaluationTask, speakerNamingTask, systemPrompt, targetMoveCount } from './prompts.ts';
 import type { Providers } from './providers/index.ts';
 import { assignSides } from './sides.ts';
+import { placeCards } from './regions.ts';
 import { snapMoves } from './snap-moves.ts';
 import { castNames, timelineText } from './timeline-text.ts';
 
-export const ANALYSIS_STAGES = ['transcribe', 'describe', 'speakers', 'decisions', 'annotate', 'snap', 'evaluate'] as const;
+export const ANALYSIS_STAGES = ['transcribe', 'describe', 'speakers', 'decisions', 'annotate', 'snap', 'place', 'evaluate'] as const;
 type StageName = (typeof ANALYSIS_STAGES)[number];
 
 /** Bump a step's version when its prompt or parsing changes, so cached outputs are redone. */
-const STEP_VERSION: Record<Exclude<StageName, 'snap'>, number> = {
+const STEP_VERSION: Record<Exclude<StageName, 'snap' | 'place'>, number> = {
   transcribe: 1,
   describe: 1,
   speakers: 1,
@@ -299,6 +300,34 @@ export async function runAnalysis(
       p.context.characters = assignSides(p.context.characters, p.moments, passB.protagonist);
     }, true);
     if (snapped.dropped.length) console.log(`analysis ${id}: dropped`, snapped.dropped);
+
+    // Place each new card clear of the frame's faces. Not fatal: without it the
+    // drafts keep the theme's corner and can be placed later from the editor.
+    const placeStage = stageOf('place');
+    placeStage.status = 'running';
+    emit();
+    try {
+      const started = performance.now();
+      const placed = await placeCards({ store, providers, config }, project, getTheme(project.themeId));
+      Object.assign(placeStage, {
+        status: 'done',
+        durationMs: Math.round(performance.now() - started),
+        usage: placed.usage,
+        costUsd: round6(placed.costUsd),
+        ...(placed.model ? { model: placed.model } : {}),
+      });
+      if (placed.model) analysis.models.place = placed.model;
+      await persist((p) => {
+        // Only the cards it placed: anything else on the track is as it was.
+        const byId = new Map(placed.moments.map((m) => [m.id, m]));
+        p.moments = p.moments.map((m) => byId.get(m.id) ?? m);
+      });
+    } catch (error) {
+      placeStage.status = 'error';
+      placeStage.error = error instanceof Error ? error.message : String(error);
+      console.warn(`analysis ${id}: card placement failed:`, error);
+    }
+    emit();
 
     // Stage 5: the evaluation bar (Pass C). One call values every card and
     // beat together, so the bar tells one story instead of wobbling. Evals the

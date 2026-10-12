@@ -5,7 +5,9 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./timeline": "./src/timeline.ts"
+    "./timeline": "./src/timeline.ts",
+    "./placement": "./src/placement.ts",
+    "./notation": "./src/notation.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"

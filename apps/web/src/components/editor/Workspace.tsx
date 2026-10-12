@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { addBeatAt } from '../../editor/bar.ts';
 import { EditError, addMoment, deleteBeat, deleteMoment, retime, setClassification, setPortrait, setStatus } from '../../editor/doc.ts';
 import { PlaybackProvider, useEditor, useEditorStore, type Playback } from '../../editor/context.tsx';
+import { useAutoPlacement } from '../../editor/placement.ts';
 import { snapTime } from '../../editor/snapping.ts';
 import { createPortrait, fileUrl, getSoundBank } from '../../lib/api.ts';
 import { formatTime } from '../../lib/format.ts';
@@ -35,6 +36,7 @@ export interface WorkspaceProps {
 /** Player with the edit layer, transport, timeline and transcript, flanked by the panels. */
 export function Workspace({ left, right }: WorkspaceProps) {
   const store = useEditorStore();
+  useAutoPlacement();
   const project = useEditor((s) => s.project);
   const moments = useEditor((s) => s.doc.moments);
   const characters = useEditor((s) => s.doc.characters);

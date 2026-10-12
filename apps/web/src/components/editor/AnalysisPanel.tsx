@@ -21,7 +21,7 @@ export function AnalysisPanel({ analysis, onStarted }: AnalysisPanelProps) {
   const proposalCost = useEditor((s) => s.proposal?.costUsd);
   const { fps, timeline, seek, player } = usePlayback();
   const [config, setConfig] = useState<AnalysisConfigInfo | null>(null);
-  const [regen, setRegen] = useState<{ count: number; costUsd: number } | null>(null);
+  const [usage, setUsage] = useState<Awaited<ReturnType<typeof getUsage>> | null>(null);
   const [secondsPerMove, setSecondsPerMove] = useState(analysis.secondsPerMove);
   const [error, setError] = useState<string | null>(null);
   const running = analysis.status === 'pending' || analysis.status === 'running';
@@ -30,7 +30,7 @@ export function AnalysisPanel({ analysis, onStarted }: AnalysisPanelProps) {
     void getAnalysisConfig().then(setConfig, () => undefined);
   }, []);
   useEffect(() => {
-    void getUsage(project.id).then((u) => setRegen(u.regenerate), () => undefined);
+    void getUsage(project.id).then(setUsage, () => undefined);
   }, [project.id, proposalCost, analysis.status]);
 
   const run = async (rerun?: 'analyst' | 'all') => {
@@ -83,11 +83,20 @@ export function AnalysisPanel({ analysis, onStarted }: AnalysisPanelProps) {
           <p className="text-xs text-neutral-500">{running ? 'Starting…' : 'Not analysed yet.'}</p>
         )}
         {analysis.error && !analysis.stages.some((s) => s.error) && <p className="mt-2 text-xs text-red-300">{analysis.error}</p>}
-        {regen && regen.count > 0 && (
-          <p className="mt-2 text-xs text-neutral-500 tabular-nums">
-            Regenerate: {regen.count} call{regen.count === 1 ? '' : 's'} · {formatUsd(regen.costUsd)}
-          </p>
-        )}
+        {usage &&
+          (
+            [
+              ['regenerate', 'Regenerate'],
+              ['evaluate', 'Re-evaluate bar'],
+              ['regions', 'Card placement'],
+            ] as const
+          ).map(([kind, label]) =>
+            usage[kind].count > 0 ? (
+              <p key={kind} className="mt-2 text-xs text-neutral-500 tabular-nums">
+                {label}: {usage[kind].count} call{usage[kind].count === 1 ? '' : 's'} · {formatUsd(usage[kind].costUsd)}
+              </p>
+            ) : null,
+          )}
       </section>
 
       <section className="space-y-2">

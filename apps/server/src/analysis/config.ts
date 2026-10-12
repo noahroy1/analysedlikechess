@@ -17,6 +17,8 @@ export interface AnalysisConfig {
     analyst: string;
     /** Single-moment Regenerate, faster. */
     regen: string;
+    /** Faces and the move's subject on a frozen frame, for placing cards. */
+    regions: string;
   };
   /** Run analysis on its own once ingest finishes. */
   autoAnalyze: boolean;
@@ -49,6 +51,7 @@ export function loadAnalysisConfig(env: NodeJS.ProcessEnv = process.env): Analys
       naming: blank(env.NAMING_MODEL) ?? 'claude-haiku-5-5',
       analyst: blank(env.ANALYST_MODEL) ?? 'claude-opus-5-5',
       regen: blank(env.REGEN_MODEL) ?? 'claude-sonnet-5-5',
+      regions: blank(env.REGIONS_MODEL) ?? 'gemini-3.5-flash-lite',
     },
     autoAnalyze: (blank(env.AUTO_ANALYZE) ?? 'true') !== 'false',
     sceneFps: Number(blank(env.SCENE_FPS) ?? 1),

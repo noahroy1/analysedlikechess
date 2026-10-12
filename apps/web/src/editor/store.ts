@@ -64,6 +64,12 @@ export interface EditorDeps {
 export interface EditorActions {
   /** Applies a change to the doc as one undo step (or merged, see EditOptions). */
   edit: (recipe: (doc: Doc) => Doc, options?: EditOptions) => void;
+  /**
+   * Folds a follow-up into the last undo step, e.g. a card placed once a
+   * retimed frame has been looked at: one undo takes back both. Waits (returns
+   * false) while a drag is in progress.
+   */
+  amend: (recipe: (doc: Doc) => Doc) => boolean;
   /** Starts a drag: edits until `endGesture` apply live but undo as one step. */
   beginGesture: () => void;
   gesture: (recipe: (doc: Doc) => Doc) => void;
@@ -155,6 +161,12 @@ export function createEditorStore(initial: Project, deps: EditorDeps): EditorSto
       portraitCrop: null,
 
       edit: (recipe, options) => commit(normalized(recipe(get().doc)), options?.coalesce),
+      amend: (recipe) => {
+        if (gestureBase) return false;
+        const next = normalized(recipe(get().doc));
+        if (next !== get().doc) set(withTheme(next));
+        return true;
+      },
 
       beginGesture: () => {
         gestureBase = get().doc;
