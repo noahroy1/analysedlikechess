@@ -84,7 +84,24 @@ export interface EditorActions {
 
 export type EditorStore = StoreApi<EditorState & EditorActions>;
 
-const docOf = (project: Project): Doc => ({ moments: project.moments, characters: project.context.characters, themeId: project.themeId });
+const docOf = (project: Project): Doc => ({
+  moments: project.moments,
+  characters: project.context.characters,
+  themeId: project.themeId,
+  ...(project.evalBar ? { evalBar: project.evalBar } : {}),
+});
+
+/** The project with the doc's changes applied. */
+const applyDoc = (project: Project, doc: Doc): Project => {
+  const { evalBar: _, ...rest } = project;
+  return {
+    ...rest,
+    moments: doc.moments,
+    context: { ...project.context, characters: doc.characters },
+    themeId: doc.themeId,
+    ...(doc.evalBar ? { evalBar: doc.evalBar } : {}),
+  };
+};
 
 /** The theme follows the document, so switching it undoes like any other edit. */
 const withTheme = (doc: Doc) => ({ doc, theme: getTheme(doc.themeId) });
@@ -232,19 +249,20 @@ export function createEditorStore(initial: Project, deps: EditorDeps): EditorSto
       store.setState({ saveStatus: 'saved' });
       return;
     }
-    const check = ProjectSchema.safeParse({
-      ...project,
-      moments: doc.moments,
-      context: { ...project.context, characters: doc.characters },
-      themeId: doc.themeId,
-    });
+    const check = ProjectSchema.safeParse(applyDoc(project, doc));
     if (!check.success) {
       store.setState({ saveStatus: 'invalid', saveError: check.error.issues[0]?.message ?? 'invalid project' });
       return;
     }
     store.setState({ saveStatus: 'saving', saveError: null });
     try {
-      const outcome = await deps.save({ version: baseVersion, moments: doc.moments, characters: doc.characters, themeId: doc.themeId });
+      const outcome = await deps.save({
+        version: baseVersion,
+        moments: doc.moments,
+        characters: doc.characters,
+        themeId: doc.themeId,
+        ...(doc.evalBar ? { evalBar: doc.evalBar } : {}),
+      });
       if (outcome.kind === 'conflict') {
         saveAgain = false;
         await reloadAfterConflict();
@@ -253,13 +271,7 @@ export function createEditorStore(initial: Project, deps: EditorDeps): EditorSto
       savedDoc = doc;
       store.setState((s) => ({
         baseVersion: outcome.version!,
-        project: {
-          ...s.project,
-          version: outcome.version!,
-          moments: doc.moments,
-          context: { ...s.project.context, characters: doc.characters },
-          themeId: doc.themeId,
-        },
+        project: { ...applyDoc(s.project, doc), version: outcome.version! },
         saveStatus: s.doc === doc ? 'saved' : 'pending',
       }));
     } catch (error) {

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { EvalBarSchema } from './eval.ts';
 import { CharacterSchema, MomentSchema } from './project.ts';
 import { ThemeSchema } from './theme.ts';
 
@@ -13,5 +14,9 @@ export const EpisodePropsSchema = z.object({
   moments: z.array(MomentSchema),
   characters: z.array(CharacterSchema),
   theme: ThemeSchema,
+  /** The bar's start and beats; moves carry their own evals. */
+  evalBar: EvalBarSchema.optional(),
+  /** Portrait URLs by character id, loadable by the Player and the renderer. */
+  portraits: z.record(z.string(), z.string()).optional(),
 });
 export type EpisodeProps = z.infer<typeof EpisodePropsSchema>;

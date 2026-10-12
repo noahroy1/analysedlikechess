@@ -49,6 +49,26 @@ export const creatorTheme: Theme = {
     scale: 1,
     safeMargin: { x: 0.17, top: 0.055, bottom: 0.14 },
   },
+  // Measured on style-ref-*.png (1080p): a Chess.com-style bar whose coloured
+  // part spans x 26-67 and y 112-968, in a 4 px dark frame, between 76 px portraits.
+  evalBar: {
+    left: 26,
+    width: 42,
+    top: 112,
+    bottom: 112,
+    frameWidth: 4,
+    frameColor: 'rgba(12, 10, 6, 0.6)',
+    whiteColor: '#fefefe',
+    blackColor: '#403d3a',
+    labelSize: 15,
+    whiteTextColor: '#403d3a',
+    blackTextColor: '#fefefe',
+    portraitSize: 76,
+    nameSize: 28,
+    sideSize: 18,
+    nameColor: '#ffffff',
+    sideColor: '#d9d6d1',
+  },
   // The dim lands on the first frozen frame; the card cuts away as playback resumes.
   freeze: { treatment: 'dim', dim: 0.1, pushIn: 1.04, dimInSec: 0 },
   timing: {

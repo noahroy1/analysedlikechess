@@ -1,8 +1,10 @@
-import { typeOutStartSec, type EpisodeProps, type Moment, type Theme } from '@als/schema';
+import { DEFAULT_START_EVAL, evalKeyframes, typeOutStartSec, type EpisodeProps, type Moment, type Theme } from '@als/schema';
 import { Audio, Video } from '@remotion/media';
 import { useMemo } from 'react';
 import { AbsoluteFill, Freeze, Sequence, useCurrentFrame, useVideoConfig } from 'remotion';
 import { cardMotion, revealAt, type FrameSize } from './card.ts';
+import { EvalBar, barPlayers } from './EvalBar.tsx';
+import { evalBarAt, placeKeyframes } from './eval-bar.ts';
 import { MoveCard } from './MoveCard.tsx';
 import { moveNumbers } from './notation.ts';
 import { buildTimeline, type Segment } from './timeline.ts';
@@ -12,9 +14,15 @@ import { buildTimeline, type Segment } from './timeline.ts';
  * moment. Pure: everything arrives through props, and every frame is derived
  * from the frame number, so the Player and the renderer draw identical frames.
  */
-export function Episode({ src, durationSec, moments, characters, theme }: EpisodeProps) {
+export function Episode({ src, durationSec, moments, characters, theme, evalBar, portraits }: EpisodeProps) {
   const { fps, width, height } = useVideoConfig();
+  const frame = useCurrentFrame();
   const timeline = useMemo(() => buildTimeline(moments, fps, durationSec), [moments, fps, durationSec]);
+  const evalTrack = useMemo(
+    () => placeKeyframes(evalKeyframes(evalBar, moments, characters), timeline),
+    [evalBar, moments, characters, timeline],
+  );
+  const players = useMemo(() => barPlayers(characters, moments, portraits), [characters, moments, portraits]);
   const names = useMemo(() => new Map(characters.map((c) => [c.id, c.name])), [characters]);
   const numbers = useMemo(() => moveNumbers(moments, characters), [moments, characters]);
 
@@ -49,6 +57,15 @@ export function Episode({ src, durationSec, moments, characters, theme }: Episod
           </Sequence>
         );
       })}
+      {theme.evalBar && (
+        <EvalBar
+          state={evalBarAt(evalBar?.start ?? DEFAULT_START_EVAL, evalTrack, frame, fps)}
+          players={players}
+          style={theme.evalBar}
+          fontFamily={theme.card.fontFamily}
+          frame={{ width, height }}
+        />
+      )}
     </AbsoluteFill>
   );
 }

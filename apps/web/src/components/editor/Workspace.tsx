@@ -38,6 +38,7 @@ export function Workspace({ left, right }: WorkspaceProps) {
   const characters = useEditor((s) => s.doc.characters);
   const theme = useEditor((s) => s.theme);
   const selectedId = useEditor((s) => s.selectedId);
+  const evalBar = useEditor((s) => s.doc.evalBar);
   const player = useRef<PlayerRef>(null);
   const stage = useRef<HTMLDivElement>(null);
   const [frame, setFrame] = useState(0);
@@ -56,8 +57,15 @@ export function Workspace({ left, right }: WorkspaceProps) {
   );
 
   const inputProps = useMemo<EpisodeProps>(
-    () => ({ src: fileUrl(project.id, source.proxy), durationSec: source.durationSec, moments, characters, theme }),
-    [project.id, source.proxy, source.durationSec, moments, characters, theme],
+    () => ({
+      src: fileUrl(project.id, source.proxy),
+      durationSec: source.durationSec,
+      moments,
+      characters,
+      theme,
+      ...(evalBar ? { evalBar } : {}),
+    }),
+    [project.id, source.proxy, source.durationSec, moments, characters, theme, evalBar],
   );
 
   // Handlers attached once read the latest values here.

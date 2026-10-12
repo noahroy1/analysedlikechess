@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { ClassificationSchema } from './classification.ts';
+import { EvalBarSchema, EvalSchema } from './eval.ts';
 import { MIN_MOMENT_GAP_SEC } from './rules.ts';
 
 // All times are source-clip seconds. Frames are always derived, never stored.
@@ -106,6 +107,8 @@ export const MomentSchema = z.object({
   /** The chess idea behind the move, shown as a chip: "Sacrifice", "Zwischenzug". */
   motif: z.string().optional(),
   card: CardSchema,
+  /** The evaluation bar after this move. Without one the bar holds. */
+  eval: EvalSchema.optional(),
   /** Why the AI chose this time. */
   evidence: z.object({
     utteranceIds: z.array(Id),
@@ -202,6 +205,8 @@ export const ProjectSchema = z
     /** The annotation track, sorted by sourceTime. */
     moments: z.array(MomentSchema),
     themeId: Id,
+    /** The evaluation bar's start and its beats; absent until analysis or the editor sets it. */
+    evalBar: EvalBarSchema.optional(),
     ingest: IngestSchema,
     analysis: AnalysisSchema,
   })
@@ -263,6 +268,19 @@ export const ProjectSchema = z
           );
         }
       }
+    });
+
+    // Moves and beats share one id space, so the evaluation pass can name either.
+    const beats = project.evalBar?.beats ?? [];
+    const momentIds = new Set(project.moments.map((m) => m.id));
+    for (const id of duplicates(beats.map((b) => b.id))) issue(`duplicate beat id "${id}"`, ['evalBar', 'beats']);
+    beats.forEach((b, i) => {
+      const path = ['evalBar', 'beats', i];
+      if (momentIds.has(b.id)) issue(`beat id "${b.id}" is also a moment id`, [...path, 'id']);
+      if (b.sourceTime > project.source.durationSec) issue(`beat ${b.sourceTime} is past the end of the clip`, [...path, 'sourceTime']);
+      if (b.actorId !== undefined && !characterIds.has(b.actorId)) issue(`actorId "${b.actorId}" is not a character`, [...path, 'actorId']);
+      const prev = beats[i - 1];
+      if (prev && b.sourceTime < prev.sourceTime) issue('beats must be sorted by sourceTime', [...path, 'sourceTime']);
     });
   });
 export type Project = z.infer<typeof ProjectSchema>;

@@ -4,15 +4,17 @@ import {
   autoHoldSec,
   type Character,
   type Classification,
+  type EvalBar,
   type Moment,
   type Theme,
 } from '@als/schema';
 
-/** The part of a project the editor changes: the annotation track and the cast. */
+/** The part of a project the editor changes: the annotation track, the cast, the look and the evaluation bar. */
 export interface Doc {
   moments: Moment[];
   characters: Character[];
   themeId: string;
+  evalBar?: EvalBar;
 }
 
 export class EditError extends Error {}
@@ -122,6 +124,9 @@ export function mergeCharacters(doc: Doc, fromId: string, intoId: string): Doc {
       .filter((c) => c.id !== fromId)
       .map((c) => (c.id === intoId ? { ...c, speakerLabels: [...c.speakerLabels, ...from.speakerLabels] } : c)),
     moments: doc.moments.map((m) => (m.actorId === fromId ? { ...m, actorId: intoId } : m)),
+    ...(doc.evalBar && {
+      evalBar: { ...doc.evalBar, beats: doc.evalBar.beats.map((b) => (b.actorId === fromId ? { ...b, actorId: intoId } : b)) },
+    }),
   };
 }
 
@@ -144,6 +149,16 @@ export function deleteCharacter(doc: Doc, id: string): Doc {
       if (m.actorId !== id) return m;
       const { actorId: _, ...rest } = m;
       return rest;
+    }),
+    ...(doc.evalBar && {
+      evalBar: {
+        ...doc.evalBar,
+        beats: doc.evalBar.beats.map((b) => {
+          if (b.actorId !== id) return b;
+          const { actorId: _, ...rest } = b;
+          return rest;
+        }),
+      },
     }),
   };
 }

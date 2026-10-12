@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { MoveDraftSchema } from './analyst.ts';
+import { EvalBarSchema } from './eval.ts';
 import { AnalysisSchema, CharacterSchema, IngestSchema, MomentSchema, SourceSchema, UsageSchema } from './project.ts';
 
 /** Containers the upload accepts. The proxy makes any of them browser-safe. */
@@ -75,6 +76,8 @@ export const ProjectEditSchema = z.object({
   moments: z.array(MomentSchema),
   characters: z.array(CharacterSchema),
   themeId: z.string().min(1),
+  /** Omitted until the project has a bar; once set it is always sent. */
+  evalBar: EvalBarSchema.optional(),
 });
 export type ProjectEdit = z.infer<typeof ProjectEditSchema>;
 

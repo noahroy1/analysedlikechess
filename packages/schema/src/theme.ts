@@ -82,6 +82,33 @@ export const ThemeSchema = z.object({
     /** Fractions of the frame kept clear at each edge; `bottom` clears YouTube's player controls. */
     safeMargin: z.object({ x: Unit, top: Unit, bottom: Unit }),
   }),
+  /**
+   * An evaluation bar on the left edge, Black's player at the top and White's at
+   * the bottom, each with a portrait. Absent: no bar. Sizes are for a 1080-pixel-tall frame.
+   */
+  evalBar: z
+    .object({
+      /** The bar's coloured part, without its frame. */
+      left: z.number().nonnegative(),
+      width: z.number().positive(),
+      top: z.number().nonnegative(),
+      bottom: z.number().nonnegative(),
+      /** Dark edge around the bar and the portraits. */
+      frameWidth: z.number().nonnegative(),
+      frameColor: z.string(),
+      whiteColor: z.string(),
+      blackColor: z.string(),
+      /** The value label, in each side's text colour. */
+      labelSize: z.number().positive(),
+      whiteTextColor: z.string(),
+      blackTextColor: z.string(),
+      portraitSize: z.number().positive(),
+      nameSize: z.number().positive(),
+      sideSize: z.number().positive(),
+      nameColor: z.string(),
+      sideColor: z.string(),
+    })
+    .optional(),
   freeze: z.object({
     treatment: z.enum(['none', 'dim', 'push-in']),
     /** Darkening at full strength, for `dim`. */
