@@ -1,6 +1,6 @@
-import type { Character, Moment, Shot, Theme, Transcript } from '@als/schema';
-import { shotThumbnailFile } from '@als/schema';
-import { sourceFrameToOut, type Hold, type Timeline as TimelineModel } from '@als/composition';
+import type { Character, EvalBar, EvalBeat, Moment, Shot, Theme, Transcript } from '@als/schema';
+import { DEFAULT_START_EVAL, evalFill, evalKeyframes, formatEvalSigned, shotThumbnailFile } from '@als/schema';
+import { placeKeyframes, sourceFrameToOut, type Hold, type Timeline as TimelineModel } from '@als/composition';
 import { Badge } from '@als/theme';
 import { useEffect, useMemo, useRef, useState, type PointerEvent } from 'react';
 import type { SnapKind } from '../editor/snapping.ts';
@@ -28,8 +28,10 @@ export interface TimelineProps {
   theme: Theme;
   frame: number;
   selectedId: string | null;
+  evalBar: EvalBar | undefined;
   onSeek: (frame: number) => void;
   onSelectHold: (hold: Hold) => void;
+  onSelectBeat: (beat: EvalBeat, outFrame: number) => void;
   onScrubStart?: () => void;
   onRetimeStart: (momentId: string) => void;
   /** Moves a moment to (about) `rawSec`; returns where it actually landed. */
@@ -65,6 +67,18 @@ export function Timeline(props: TimelineProps) {
   const speakerName = (label: string) => characters.find((c) => c.speakerLabels.includes(label))?.name ?? `Speaker ${label}`;
   const momentsById = useMemo(() => new Map(moments.map((m) => [m.id, m])), [moments]);
   const actorNames = useMemo(() => new Map(characters.map((c) => [c.id, c.name])), [characters]);
+  const evalTrack = useMemo(
+    () => placeKeyframes(evalKeyframes(props.evalBar, moments, characters), timeline),
+    [props.evalBar, moments, characters, timeline],
+  );
+  const beatsById = useMemo(() => new Map((props.evalBar?.beats ?? []).map((b) => [b.id, b])), [props.evalBar]);
+  // The bar's White share as a step plot over output time, settled values only.
+  const barPath = useMemo(() => {
+    const y = (fill: number) => ((1 - fill) * 100).toFixed(2);
+    let d = `M0,100 V${y(evalFill(props.evalBar?.start ?? DEFAULT_START_EVAL))}`;
+    for (const k of evalTrack) d += ` H${k.outFrame} V${y(evalFill(k.eval))}`;
+    return `${d} H${outFrames} V100 Z`;
+  }, [evalTrack, props.evalBar, outFrames]);
 
   const frameAt = (clientX: number) => {
     const rect = track.current!.getBoundingClientRect();
@@ -124,6 +138,9 @@ export function Timeline(props: TimelineProps) {
       <div className="w-16 shrink-0 border-r border-neutral-800 py-1 text-neutral-500">
         <div className="flex h-5 items-center px-2" />
         <div className="flex h-12 items-center px-2">Moves</div>
+        <div className="flex h-9 items-center px-2" title="The evaluation bar: White's share, changing at each move and beat">
+          Bar
+        </div>
         <div className="flex h-10 items-center px-2">Shots</div>
         <div className="flex h-5 items-center px-2">Speech</div>
       </div>
@@ -195,6 +212,62 @@ export function Timeline(props: TimelineProps) {
                     </span>
                   </span>
                 )}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* The evaluation bar: White's share as a step plot. Solid dots are moves, hollow ones beats. */}
+        <div className="relative h-9" data-testid="eval-lane">
+          <svg className="absolute inset-y-1 left-0 h-7 w-full" viewBox={`0 0 ${outFrames} 100`} preserveAspectRatio="none">
+            <rect x="0" y="0" width={outFrames} height="100" fill="#403d3a" />
+            <path d={barPath} fill="#f4f3f1" />
+            <line x1="0" x2={outFrames} y1="50" y2="50" stroke="#8a8783" strokeDasharray="4 4" vectorEffect="non-scaling-stroke" />
+          </svg>
+          {evalTrack.map((k) => {
+            const top = `calc(0.25rem + ${(1 - evalFill(k.eval)) * 1.75}rem)`;
+            if (k.kind === 'move') {
+              const moment = momentsById.get(k.id);
+              const color = moment ? theme.classifications[moment.classification].color : '#999';
+              return (
+                <span
+                  key={k.id}
+                  className="pointer-events-none absolute size-2 -translate-x-1/2 -translate-y-1/2 rounded-full ring-1 ring-neutral-950"
+                  style={{ left: pct(k.outFrame), top, background: color }}
+                />
+              );
+            }
+            const beat = beatsById.get(k.id);
+            if (!beat) return null;
+            const actor = beat.actorId ? actorNames.get(beat.actorId) : undefined;
+            const active = props.selectedId === beat.id;
+            return (
+              <button
+                key={k.id}
+                type="button"
+                data-testid="beat-dot"
+                data-beat-id={beat.id}
+                onPointerDown={(e) => {
+                  e.stopPropagation();
+                  if (e.button === 0) props.onSelectBeat(beat, k.outFrame);
+                }}
+                className={`group absolute z-10 size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-sky-300 bg-neutral-950 ${active ? 'outline-2 outline-offset-1 outline-white' : ''}`}
+                style={{ left: pct(k.outFrame), top }}
+              >
+                <span className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 hidden w-max max-w-64 -translate-x-1/2 rounded-md border border-neutral-700 bg-neutral-950 px-2 py-1.5 text-left text-xs text-neutral-200 shadow-lg group-hover:block">
+                  <span className="font-semibold text-sky-300">Beat {formatEvalSigned(beat.eval)}</span>
+                  <br />
+                  {actor && <span className="text-neutral-400">{actor}: </span>}
+                  {beat.action ?? <span className="text-neutral-500 italic">No description</span>}
+                  {beat.reason && (
+                    <>
+                      <br />
+                      <span className="text-neutral-400">{beat.reason}</span>
+                    </>
+                  )}
+                  <br />
+                  <span className="text-neutral-500 tabular-nums">at {formatTime(beat.sourceTime)}</span>
+                </span>
               </button>
             );
           })}

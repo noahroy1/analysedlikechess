@@ -47,12 +47,12 @@ try {
   // 1. Timeline blocks line up with the holds the composition draws.
   {
     const errors = [];
-    const trackW = await page.eval(`document.querySelector('[data-testid=timeline-track]').getBoundingClientRect().width`);
     const total = Number(process.argv[5]);
     for (const b of blocks) {
       const rect = JSON.parse(await page.eval(`JSON.stringify(document.querySelector('[data-moment-id="${b.id}"][data-testid=hold-block]').getBoundingClientRect())`));
       const track = JSON.parse(await page.eval(`JSON.stringify(document.querySelector('[data-testid=timeline-track]').getBoundingClientRect())`));
-      const framePx = trackW / total;
+      // Measured with the block: a page scrollbar coming or going in between would change the width.
+      const framePx = track.width / total;
       const leftFrames = (rect.left - track.left) / framePx;
       const widthFrames = rect.width / framePx;
       if (Math.abs(leftFrames - b.outStart) > 1 || Math.abs(widthFrames - b.frames) > 1) errors.push(`${b.id}: block at ${leftFrames.toFixed(2)}+${widthFrames.toFixed(2)} vs hold ${b.outStart}+${b.frames}`);
@@ -67,7 +67,8 @@ try {
       await page.eval(`${P}.seekTo(${b.outStart})`);
       await sleep(150);
       const head = JSON.parse(await page.eval(`JSON.stringify(document.querySelector('[data-testid=playhead]').getBoundingClientRect())`));
-      if (Math.abs(head.left - rect.left) > framePx) errors.push(`${b.id}: playhead ${head.left.toFixed(1)} vs block ${rect.left.toFixed(1)}`);
+      // The 1 px playhead snaps to whole pixels, so allow a pixel when a frame is narrower.
+      if (Math.abs(head.left - rect.left) > Math.max(framePx, 1)) errors.push(`${b.id}: playhead ${head.left.toFixed(1)} vs block ${rect.left.toFixed(1)}`);
     }
     result('timeline blocks line up with holds to within one frame', errors.length === 0, errors.join('; ') || `${blocks.length} holds`);
   }

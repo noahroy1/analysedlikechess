@@ -1,7 +1,7 @@
 import { ProjectSchema, type MoveDraft, type Project, type ProjectEdit, type Theme } from '@als/schema';
 import { getTheme } from '@als/theme';
 import { createStore, type StoreApi } from 'zustand/vanilla';
-import { normalize, type Doc } from './doc.ts';
+import { hasItem, normalize, type Doc } from './doc.ts';
 
 export const AUTOSAVE_DELAY_MS = 500;
 /** Edits with the same coalesce key this close together undo as one step (typing). */
@@ -174,7 +174,7 @@ export function createEditorStore(initial: Project, deps: EditorDeps): EditorSto
           ...withTheme(previous),
           past: past.slice(0, -1),
           future: [doc, ...future],
-          selectedId: previous.moments.some((m) => m.id === selectedId) ? selectedId : null,
+          selectedId: hasItem(previous, selectedId) ? selectedId : null,
         });
       },
       redo: () => {
@@ -186,7 +186,7 @@ export function createEditorStore(initial: Project, deps: EditorDeps): EditorSto
           ...withTheme(next),
           past: [...past, doc],
           future: future.slice(1),
-          selectedId: next.moments.some((m) => m.id === selectedId) ? selectedId : null,
+          selectedId: hasItem(next, selectedId) ? selectedId : null,
         });
       },
 
@@ -299,7 +299,7 @@ export function createEditorStore(initial: Project, deps: EditorDeps): EditorSto
       baseVersion: project.version,
       past: [],
       future: [],
-      selectedId: doc.moments.some((m) => m.id === s.selectedId) ? s.selectedId : null,
+      selectedId: hasItem(doc, s.selectedId) ? s.selectedId : null,
       saveStatus: 'saved',
       saveError: null,
     }));

@@ -1,10 +1,12 @@
-import { CARD_ANCHORS, NO_BEST_MOVE, TEXT_CAPS, autoHoldSec, momentWarnings, type Moment } from '@als/schema';
+import { CARD_ANCHORS, NO_BEST_MOVE, TEXT_CAPS, autoHoldSec, evalWarnings, momentWarnings, type Moment } from '@als/schema';
 import { sourceFrameToOut } from '@als/composition';
-import { useState, type ReactNode } from 'react';
-import { deleteMoment, retime, updateMoment } from '../../editor/doc.ts';
+import type { ReactNode } from 'react';
+import { deleteMoment, retime, setMomentEval, updateMoment } from '../../editor/doc.ts';
 import { useEditor, useEditorStore, usePlayback } from '../../editor/context.tsx';
 import { formatTime } from '../../lib/format.ts';
+import { BarPanel, BeatInspector, EVAL_HINT, EvalInput, Warnings } from './BarPanels.tsx';
 import { ClassificationPicker } from './ClassificationPicker.tsx';
+import { Field, SecondsInput } from './fields.tsx';
 import { RegeneratePanel } from './RegeneratePanel.tsx';
 
 const ANCHOR_LABELS: Record<Moment['card']['anchor'], string> = {
@@ -15,23 +17,29 @@ const ANCHOR_LABELS: Record<Moment['card']['anchor'], string> = {
   custom: 'Custom (dragged)',
 };
 
-/** Every field of the selected moment. */
+/** Every field of the selected moment or beat; with nothing selected, the evaluation bar. */
 export function Inspector() {
   const store = useEditorStore();
   const selectedId = useEditor((s) => s.selectedId);
   const moment = useEditor((s) => s.doc.moments.find((m) => m.id === s.selectedId));
-  const characters = useEditor((s) => s.doc.characters);
+  const beat = useEditor((s) => s.doc.evalBar?.beats.find((b) => b.id === s.selectedId));
+  const doc = useEditor((s) => s.doc);
+  const characters = doc.characters;
   const theme = useEditor((s) => s.theme);
   const project = useEditor((s) => s.project);
   const { fps, timeline, seek, pause } = usePlayback();
 
+  if (beat) return <BeatInspector key={beat.id} beat={beat} />;
   if (!selectedId || !moment) {
     return (
-      <p className="px-1 py-6 text-center text-xs leading-relaxed text-neutral-500">
-        Select a move on the timeline or in the list.
-        <br />
-        Press <Kbd>M</Kbd> to add one at the playhead.
-      </p>
+      <div className="space-y-4">
+        <p className="px-1 pt-6 text-center text-xs leading-relaxed text-neutral-500">
+          Select a move on the timeline or in the list.
+          <br />
+          Press <Kbd>M</Kbd> to add one at the playhead, <Kbd>B</Kbd> for a beat.
+        </p>
+        <BarPanel />
+      </div>
     );
   }
 
@@ -41,6 +49,7 @@ export function Inspector() {
   const evidence = moment.evidence.utteranceIds.map((id) => utterances.find((u) => u.id === id)).filter((u) => u !== undefined);
   const speakerName = (label: string) => characters.find((c) => c.speakerLabels.includes(label))?.name ?? `Speaker ${label}`;
   const warnings = momentWarnings(moment);
+  const barWarnings = evalWarnings(doc.evalBar, doc.moments, characters).get(moment.id) ?? [];
   const autoHold = autoHoldSec(moment, theme.timing);
 
   return (
@@ -103,13 +112,18 @@ export function Inspector() {
         />
       </Field>
 
-      {warnings.length > 0 && (
-        <ul className="rounded-md border border-amber-900/60 bg-amber-950/30 px-2 py-1.5 text-xs text-amber-300">
-          {warnings.map((w) => (
-            <li key={w.message}>{w.message}</li>
-          ))}
-        </ul>
-      )}
+      <Field label="Bar after this move">
+        <EvalInput
+          value={moment.eval}
+          optional
+          placeholder="Empty: the bar holds"
+          onCommit={(value) => store.getState().edit((d) => setMomentEval(d, moment.id, value))}
+          testId="moment-eval"
+        />
+        <span className="mt-0.5 block text-[11px] leading-snug text-neutral-500">{EVAL_HINT}</span>
+      </Field>
+
+      <Warnings messages={[...warnings.map((w) => w.message), ...barWarnings]} />
 
       <div className="grid grid-cols-2 gap-3">
         <Field label="Freezes at">
@@ -223,39 +237,6 @@ export function Inspector() {
         Delete move
       </button>
     </div>
-  );
-}
-
-function Field({ label, count, children }: { label: string; count?: [number, number]; children: ReactNode }) {
-  return (
-    <label className="block">
-      <span className="mb-1 flex justify-between text-[11px] font-medium tracking-wide text-neutral-400 uppercase">
-        {label}
-        {count && <span className={`tabular-nums normal-case ${count[0] > count[1] ? 'text-red-400' : 'text-neutral-500'}`}>{count[0]}/{count[1]}</span>}
-      </span>
-      {children}
-    </label>
-  );
-}
-
-/** A seconds field that commits on Enter or blur, snapped to 1/fps. */
-function SecondsInput({ value, fps, min = 0, onCommit }: { value: number; fps: number; min?: number; onCommit: (sec: number) => void }) {
-  // What the user is typing; null shows the current value.
-  const [draft, setDraft] = useState<string | null>(null);
-  const commit = () => {
-    const sec = Number(draft);
-    if (draft !== null && Number.isFinite(sec) && sec >= min) onCommit(Math.round(sec * fps) / fps);
-    setDraft(null);
-  };
-  return (
-    <input
-      value={draft ?? value.toFixed(2)}
-      inputMode="decimal"
-      onChange={(e) => setDraft(e.target.value)}
-      onBlur={commit}
-      onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
-      className="input tabular-nums"
-    />
   );
 }
 

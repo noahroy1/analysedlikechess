@@ -2,7 +2,8 @@ import { CLASSIFICATIONS, speechSnapTargets, type EpisodeProps } from '@als/sche
 import { Episode, buildTimeline, cardSettledFrame, sourceFrameToOut, timeMapFrame, type Hold } from '@als/composition';
 import { Player, type PlayerRef } from '@remotion/player';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { EditError, addMoment, deleteMoment, retime, setClassification, setStatus } from '../../editor/doc.ts';
+import { addBeatAt } from '../../editor/bar.ts';
+import { EditError, addMoment, deleteBeat, deleteMoment, retime, setClassification, setStatus } from '../../editor/doc.ts';
 import { PlaybackProvider, useEditor, useEditorStore, type Playback } from '../../editor/context.tsx';
 import { snapTime } from '../../editor/snapping.ts';
 import { fileUrl } from '../../lib/api.ts';
@@ -151,8 +152,9 @@ export function Workspace({ left, right }: WorkspaceProps) {
     if (target !== player.current?.getCurrentFrame()) seek(target);
   }, [timeline, seek]);
   useEffect(() => {
-    if (playing) anchor.current = null;
-    else if (editableHold) anchor.current = { momentId: editableHold.momentId, offset: frame - editableHold.outStart };
+    // Leaving the hold (playing, or the playhead moved off it) drops the anchor, so a
+    // later edit never pulls the playhead back to a card it has left.
+    anchor.current = !playing && editableHold ? { momentId: editableHold.momentId, offset: frame - editableHold.outStart } : null;
     // Only frame moves re-anchor; timeline changes are followed above.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [frame, playing]);
@@ -210,7 +212,7 @@ export function Workspace({ left, right }: WorkspaceProps) {
       const digit = /^[0-9]$/.test(e.key) ? (Number(e.key) + 9) % 10 : -1;
       const handled = (() => {
         if (digit >= 0) {
-          if (target) s.edit((d) => setClassification(d, target, CLASSIFICATIONS[digit]!));
+          if (target && s.doc.moments.some((m) => m.id === target)) s.edit((d) => setClassification(d, target, CLASSIFICATIONS[digit]!));
           return true;
         }
         switch (key) {
@@ -247,6 +249,9 @@ export function Workspace({ left, right }: WorkspaceProps) {
           case 'm':
             addAtPlayhead();
             return true;
+          case 'b':
+            addBeatAt(store, timeMapFrame(timeline, current).sourceFrame / fps);
+            return true;
           case 'a': {
             const m = s.doc.moments.find((x) => x.id === target);
             if (m) s.edit((d) => setStatus(d, [m.id], m.status === 'approved' ? 'draft' : 'approved'));
@@ -254,7 +259,11 @@ export function Workspace({ left, right }: WorkspaceProps) {
           }
           case 'delete':
           case 'backspace':
-            if (target) {
+            if (target && s.doc.evalBar?.beats.some((b) => b.id === target)) {
+              s.edit((d) => deleteBeat(d, target));
+              s.select(null);
+              s.notify('Beat deleted. Undo with ⌘Z / Ctrl+Z.');
+            } else if (target) {
               s.edit((d) => deleteMoment(d, target));
               s.select(null);
               s.notify('Move deleted. Undo with ⌘Z / Ctrl+Z.');
@@ -371,7 +380,13 @@ export function Workspace({ left, right }: WorkspaceProps) {
             theme={theme}
             frame={frame}
             selectedId={selectedId}
+            evalBar={evalBar}
             onSeek={seek}
+            onSelectBeat={(beat, outFrame) => {
+              player.current?.pause();
+              store.getState().select(beat.id);
+              seek(outFrame);
+            }}
             onSelectHold={(hold) => {
               store.getState().select(hold.momentId);
               goToHold(hold);
@@ -406,7 +421,7 @@ export function Workspace({ left, right }: WorkspaceProps) {
                 <Kbd>Del</Kbd> delete
               </>
             )}{' '}
-            · <Kbd>M</Kbd> add move · <Kbd>⌘Z</Kbd> undo · drag a block to move it (<Kbd>Shift</Kbd>: no snapping)
+            · <Kbd>M</Kbd> add move · <Kbd>B</Kbd> add beat · <Kbd>⌘Z</Kbd> undo · drag a block to move it (<Kbd>Shift</Kbd>: no snapping)
           </p>
 
           <TranscriptDrawer />

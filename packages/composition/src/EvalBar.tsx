@@ -1,4 +1,4 @@
-import { evalLeader, formatEval, type Character, type Moment, type Theme } from '@als/schema';
+import { evalLeader, formatEval, formatEvalSigned, type Character, type Moment, type Theme } from '@als/schema';
 import type { CSSProperties } from 'react';
 import type { FrameSize } from './card.ts';
 import type { EvalBarState } from './eval-bar.ts';
@@ -51,7 +51,12 @@ export function EvalBar({ state, players, style, fontFamily, frame }: EvalBarPro
   const px = (n: number) => n * u;
 
   return (
-    <div style={{ position: 'absolute', inset: 0, fontFamily, pointerEvents: 'none' }}>
+    <div
+      style={{ position: 'absolute', inset: 0, fontFamily, pointerEvents: 'none' }}
+      data-testid="eval-bar"
+      data-fill={state.fill.toFixed(4)}
+      data-label={formatEvalSigned(state.label)}
+    >
       <div
         style={{
           position: 'absolute',

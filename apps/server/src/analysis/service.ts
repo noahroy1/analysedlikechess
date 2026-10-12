@@ -3,6 +3,8 @@ import {
   StyleCorpusSchema,
   type Analysis,
   type AnalyzeRequest,
+  type EvaluateRequest,
+  type EvaluateResult,
   type Moment,
   type RegenerateResult,
   type StyleCorpus,
@@ -12,7 +14,8 @@ import type { ProjectStore } from '../projects/store.ts';
 import { missingKeys, type AnalysisConfig } from './config.ts';
 import { pendingAnalysis, runAnalysis, type AnalysisOptions } from './pipeline.ts';
 import type { Providers } from './providers/index.ts';
-import { readRegenUsage, regenerateMoment, type RegenUsage } from './regenerate.ts';
+import { reevaluate } from './reevaluate.ts';
+import { readUsage, regenerateMoment, type EditorUsage } from './regenerate.ts';
 
 export class AnalysisBusyError extends Error {}
 
@@ -70,7 +73,13 @@ export class AnalysisService {
     return regenerateMoment({ store: this.store, providers: this.providers, config: this.config, style: this.style }, project, moment, instruction);
   }
 
-  regenUsage(id: string): Promise<RegenUsage> {
-    return readRegenUsage(this.store, id);
+  async evaluate(id: string, request: EvaluateRequest): Promise<EvaluateResult> {
+    const project = await this.store.read(id);
+    return reevaluate({ store: this.store, providers: this.providers, config: this.config, style: this.style }, project, request);
+  }
+
+  async usage(id: string): Promise<Record<'regenerate' | 'evaluate', EditorUsage>> {
+    const [regenerate, evaluate] = await Promise.all([readUsage(this.store, id, 'regenerate'), readUsage(this.store, id, 'evaluate')]);
+    return { regenerate, evaluate };
   }
 }

@@ -1,10 +1,15 @@
 import {
+  DEFAULT_START_EVAL,
   MIN_MOMENT_GAP_SEC,
   NO_BEST_MOVE,
   autoHoldSec,
+  evalKeyframes,
   type Character,
   type Classification,
+  type Eval,
   type EvalBar,
+  type EvalBeat,
+  type EvaluateResult,
   type Moment,
   type Theme,
 } from '@als/schema';
@@ -37,7 +42,8 @@ export function normalize(doc: Doc, theme: Theme): Doc {
       const holdSec = autoHoldSec(m, theme.timing);
       return holdSec === m.holdSec ? m : { ...m, holdSec };
     });
-  return { ...doc, moments };
+  const evalBar = doc.evalBar && { ...doc.evalBar, beats: [...doc.evalBar.beats].sort((a, b) => a.sourceTime - b.sourceTime) };
+  return { ...doc, moments, ...(evalBar ? { evalBar } : {}) };
 }
 
 /** The closest time to `sec` where a moment fits, respecting the clip and the minimum gap. */
@@ -177,5 +183,87 @@ export function setSide(doc: Doc, id: string, side: Character['side']): Doc {
       const { side: _, ...rest } = c;
       return side ? { ...rest, side } : rest;
     }),
+  };
+}
+
+// The evaluation bar
+
+/** A move or a beat: they share one id space. */
+export const hasItem = (doc: Doc, id: string | null): boolean =>
+  id !== null && (doc.moments.some((m) => m.id === id) || (doc.evalBar?.beats.some((b) => b.id === id) ?? false));
+
+const barOf = (doc: Doc): EvalBar => doc.evalBar ?? { start: DEFAULT_START_EVAL, beats: [] };
+
+/** A move's eval; undefined clears it, so the bar holds through the move. */
+export function setMomentEval(doc: Doc, id: string, value: Eval | undefined): Doc {
+  return {
+    ...doc,
+    moments: doc.moments.map((m) => {
+      if (m.id !== id) return m;
+      const { eval: _, ...rest } = m;
+      return value ? { ...rest, eval: value } : rest;
+    }),
+  };
+}
+
+export function setStartEval(doc: Doc, start: Eval): Doc {
+  return { ...doc, evalBar: { ...barOf(doc), start } };
+}
+
+/** What the bar reads just before a source time: the latest change at or before it, else the start. */
+export function evalBefore(doc: Doc, sec: number): Eval {
+  const before = evalKeyframes(doc.evalBar, doc.moments, doc.characters).filter((k) => k.sourceTime <= sec);
+  return before.at(-1)?.eval ?? barOf(doc).start;
+}
+
+/** A new beat holding the bar's current value, so adding one never jumps the bar. */
+export function addBeat(doc: Doc, init: { sourceTime: number; actorId?: string }, durationSec: number): { doc: Doc; id: string } {
+  const sourceTime = Math.min(Math.max(init.sourceTime, 0), durationSec);
+  const beat: EvalBeat = {
+    id: newId('beat'),
+    sourceTime,
+    eval: evalBefore(doc, sourceTime),
+    ...(init.actorId ? { actorId: init.actorId } : {}),
+    origin: 'user',
+  };
+  const bar = barOf(doc);
+  return { doc: { ...doc, evalBar: { ...bar, beats: [...bar.beats, beat] } }, id: beat.id };
+}
+
+/** Changes a beat; a time is kept inside the clip. Undefined optional fields are removed. */
+export function updateBeat(doc: Doc, id: string, patch: Partial<Omit<EvalBeat, 'id'>>, durationSec: number): Doc {
+  const bar = barOf(doc);
+  const beats = bar.beats.map((b) => {
+    if (b.id !== id) return b;
+    const next: Record<string, unknown> = { ...b, ...patch };
+    if (patch.sourceTime !== undefined) next.sourceTime = Math.min(Math.max(patch.sourceTime, 0), durationSec);
+    for (const key of Object.keys(next)) if (next[key] === undefined) delete next[key];
+    return next as EvalBeat;
+  });
+  return { ...doc, evalBar: { ...bar, beats } };
+}
+
+export function deleteBeat(doc: Doc, id: string): Doc {
+  if (!doc.evalBar) return doc;
+  return { ...doc, evalBar: { ...doc.evalBar, beats: doc.evalBar.beats.filter((b) => b.id !== id) } };
+}
+
+/**
+ * Puts a Re-evaluate result on the track. Existing beats keep their place and
+ * take the new values; a track with no bar yet takes the proposed beats too.
+ * Moves without a proposed value keep theirs.
+ */
+export function applyEvaluation(doc: Doc, result: Pick<EvaluateResult, 'evalBar' | 'evals'>): Doc {
+  const proposed = new Map(result.evalBar.beats.map((b) => [b.id, b]));
+  const beats = doc.evalBar
+    ? doc.evalBar.beats.map((b) => {
+        const p = proposed.get(b.id);
+        return p ? { ...b, eval: p.eval, ...(p.reason ? { reason: p.reason } : {}) } : b;
+      })
+    : result.evalBar.beats;
+  return {
+    ...doc,
+    moments: doc.moments.map((m) => (result.evals[m.id] ? { ...m, eval: result.evals[m.id]! } : m)),
+    evalBar: { start: result.evalBar.start, beats },
   };
 }

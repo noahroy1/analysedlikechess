@@ -8,6 +8,7 @@ import {
   CUT_CLEARANCE_FRAMES,
   FREEZE_AFTER_SPEECH_SEC,
   NO_BEST_MOVE,
+  EvaluateResultSchema,
   ProjectSchema,
   RegenerateResultSchema,
   evalWarnings,
@@ -359,7 +360,24 @@ describe('analysis pipeline', () => {
     expect(result.costUsd).toBeGreaterThan(0);
     expect((await env.store.read(project.id)).version).toBe(before.version);
     const usage = await (await env.app.request(`/api/projects/${project.id}/usage`)).json();
-    expect(usage).toEqual({ regenerate: { count: 1, costUsd: result.costUsd } });
+    expect(usage).toEqual({ regenerate: { count: 1, costUsd: result.costUsd }, evaluate: { count: 0, costUsd: 0 } });
+  });
+
+  it('re-evaluates the bar as a proposal, placing beats for a track that has none', async () => {
+    const before = await env.store.read(project.id);
+    const moments = before.moments.map(({ eval: _, ...m }) => m);
+    const res = await env.app.request(`/api/projects/${project.id}/evaluate`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ moments, characters: before.context.characters }),
+    });
+    expect(res.status).toBe(200);
+    const result = EvaluateResultSchema.parse(await res.json());
+    expect(result.evalBar.beats.map((b) => b.id)).toEqual(['beat-c2', 'beat-c3', 'beat-c5']);
+    expect(result.evals).toEqual({ 'ai-c1-1': { pawns: 0.9 }, 'ai-c4-2': { pawns: 2.8 }, 'ai-c6-3': { mate: 3 } });
+    expect((await env.store.read(project.id)).version).toBe(before.version);
+    const usage = (await (await env.app.request(`/api/projects/${project.id}/usage`)).json()) as { evaluate: unknown };
+    expect(usage.evaluate).toEqual({ count: 1, costUsd: result.costUsd });
   });
 
   it('refuses to analyse without API keys and says which', async () => {

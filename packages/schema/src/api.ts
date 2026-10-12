@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { MoveDraftSchema } from './analyst.ts';
-import { EvalBarSchema } from './eval.ts';
+import { EvalBarSchema, EvalSchema } from './eval.ts';
 import { AnalysisSchema, CharacterSchema, IngestSchema, MomentSchema, SourceSchema, UsageSchema } from './project.ts';
 
 /** Containers the upload accepts. The proxy makes any of them browser-safe. */
@@ -63,6 +63,30 @@ export const RegenerateResultSchema = z.object({
   costUsd: z.number().nonnegative(),
 });
 export type RegenerateResult = z.infer<typeof RegenerateResultSchema>;
+
+/**
+ * Re-evaluate the bar (Pass C alone) for the editor's current track. Without
+ * an `evalBar`, beats are placed from the last analysis's candidates.
+ */
+export const EvaluateRequestSchema = z.object({
+  moments: z.array(MomentSchema),
+  characters: z.array(CharacterSchema),
+  evalBar: EvalBarSchema.optional(),
+});
+export type EvaluateRequest = z.infer<typeof EvaluateRequestSchema>;
+
+/** A proposal for the whole bar: nothing is saved until the editor applies it. */
+export const EvaluateResultSchema = z.object({
+  evalBar: EvalBarSchema,
+  /** Each move's new eval, by moment id. */
+  evals: z.record(z.string(), EvalSchema),
+  /** Values the rules changed, with why. */
+  adjusted: z.array(z.object({ id: z.string(), reason: z.string() })),
+  model: z.string(),
+  usage: UsageSchema,
+  costUsd: z.number().nonnegative(),
+});
+export type EvaluateResult = z.infer<typeof EvaluateResultSchema>;
 
 export const ApiErrorSchema = z.object({ error: z.string() });
 export type ApiError = z.infer<typeof ApiErrorSchema>;

@@ -60,7 +60,8 @@ export function evalWarnings(
   characters: readonly Character[],
 ): Map<string, string[]> {
   const warnings = new Map<string, string[]>();
-  if (!evalBar) return warnings;
+  // A project nobody has valued yet has nothing to warn about.
+  if (!evalBar && !moments.some((m) => m.eval)) return warnings;
   const add = (id: string, message: string) => warnings.set(id, [...(warnings.get(id) ?? []), message]);
   const names = new Map(characters.map((c) => [c.id, c.name]));
   const keyframes = evalKeyframes(evalBar, moments, characters);

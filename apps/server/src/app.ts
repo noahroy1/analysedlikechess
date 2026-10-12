@@ -11,6 +11,7 @@ import { ZodError } from 'zod';
 import {
   AnalyzeRequestSchema,
   ProjectEditSchema,
+  EvaluateRequestSchema,
   RegenerateRequestSchema,
   SERVABLE_FILE,
   UPLOAD_EXTENSIONS,
@@ -199,8 +200,14 @@ export function createApp({ store, queue, analysis }: AppDeps) {
     return c.json(await analysis.regenerate(c.req.param('id'), moment, instruction));
   });
 
-  /** Spend on Regenerate, logged beside the project so it never forces an editor reload. */
-  app.get('/projects/:id/usage', async (c) => c.json({ regenerate: await analysis.regenUsage(c.req.param('id')) }));
+  /** Re-evaluate the bar for the editor's track (Pass C alone). A proposal: the project is not saved. */
+  app.post('/projects/:id/evaluate', async (c) => {
+    const request = EvaluateRequestSchema.parse(await c.req.json());
+    return c.json(await analysis.evaluate(c.req.param('id'), request));
+  });
+
+  /** Spend on Regenerate and Re-evaluate, logged beside the project so it never forces an editor reload. */
+  app.get('/projects/:id/usage', async (c) => c.json(await analysis.usage(c.req.param('id'))));
 
   app.delete('/projects/:id', async (c) => {
     const id = c.req.param('id');

@@ -62,14 +62,13 @@ Read this first in a new session. It says where the work stands, what to do next
 - **Branch:** `format-iterations` (current tip), stacked on `phase-4-analysis` → `phase-3-editor` → `phase-2-player` → `phase-1-ingest` → `phase-0-scaffold`. **Nothing is merged into `main`**; ask before merging. `apps/server/.env.example` shows as deleted in the working tree from before Oct 12; it is not ours, so leave it out of commits (`git add -A -- . ':!apps/server/.env.example'`).
 - **Done:** Phases 0-4 (Phase 4 has two owed items, below), the creator's review iterations, and format iterations 1-4 of 7 (log below).
 - **Not started:** Phase 5 (export/render) and Phase 6 (pitch build). The format iterations were inserted before Phase 5 at the user's request; the user has not said whether Phase 5 waits for all seven.
-- **Checks at the tip:** `pnpm check` passes (182 tests). The browser checks pass: `phase2-checks`, `phase3-checks`, `typeout-checks` and `format-checks`.
+- **Checks at the tip:** `pnpm check` passes (189 tests). The browser checks pass: `phase2-checks`, `phase3-checks`, `typeout-checks`, `format-checks` and `evalbar-checks`.
 
 ### Next action: finish format iteration 6 (evaluation bar)
 
-The user started iteration 6 before answering the sounds question (iteration 5 stays blocked, below). Plan agreed Oct 12; steps 1-2 are done, see item 6 of the log. Remaining:
-- **Step 3, editor:** an eval lane under the timeline (a step plot, solid dots for cards and hollow ones for beats), a beat inspector (time, value, reason, delete), "add beat at playhead", an Eval field in the moment inspector (`parseEval`), the start value, `evalWarnings` shown like `momentWarnings`, and a **Re-evaluate** button. Re-evaluate is a Pass C endpoint that, like Regenerate, never writes `project.json`: it returns the evals, the editor applies them as one undoable edit, and its spend is logged beside the project.
+The user started iteration 6 before answering the sounds question (iteration 5 stays blocked, below). Plan agreed Oct 12; steps 1-3 are done, see item 6 of the log. Remaining:
 - **Step 4, portraits:** the user chose to crop them from the video. In the Cast tab, pause on a frame and drag a square over a face; the server crops a still into the project folder (`SERVABLE_FILE` must allow it). Feed the URLs into `EpisodeProps.portraits`. Initials stay as the fallback.
-- Then an `evalbar-checks.mjs` browser check, a walkthrough, and stop.
+- Then extend `evalbar-checks.mjs` for portraits, give a walkthrough, and stop.
 
 ### Iteration 5 (sounds): blocked
 
@@ -107,6 +106,13 @@ Also waiting on the user: whether speaker naming should prefer **first names** l
    - **Settling:** each new eval steps through 2-4 readings (`settleReadings()` in `packages/composition/src/eval-bar.ts`, seeded by id), 0.18, 0.58, 1.13 and 1.78 s into the freeze. The label changes first and the bar eases after. Beats use 1-2 readings in about 0.5 s (the user's choice: quieter than cards).
    - **Beats (the user's idea):** Pass A over-generates about twice the target. The candidates Pass B does not card become beats: the bar moves during play with no freeze, so it reacts between cards. They are placed like spoken moves and kept 2.5 s clear of any other change (`placeBeats()`).
    - **Pass C (`evaluate` stage, Opus, after snap):** one call values every card and beat together, so the bar tells one story instead of wobbling. Code then enforces the rules in `applyEvaluation()`: a rating never moves the bar the wrong way for the mover (it holds instead), beats move it at most 6% and never start a mate, and evals on kept (approved or user) moves and user beats are fixed. Sizes per rating are a `TODO(open-decision)`. `evalWarnings()` flags the same rules in the editor.
+   - **Editor:**
+     - A Bar lane under the moves shows the curve as a step plot, with solid dots for cards and hollow ones for beats (click a beat to select it).
+     - With nothing selected, the Move tab shows the bar panel: the start value, "Add beat here" (or `B`), and **Re-evaluate**.
+     - Re-evaluate is `POST /projects/:id/evaluate`, Pass C on the editor's track. Like Regenerate, it never writes `project.json`. Its result goes on as one undoable edit, and its spend goes to `analysis/evaluate-usage.json`. A track with no bar gets beats placed from the cached Pass A.
+     - Moves have a "Bar after this move" field (`parseEval`: "1.0", "-0.8", "M4", "-M6"), and the beat inspector edits time, value, who, what happened and why.
+     - `evalWarnings` show beside `momentWarnings`. `Delete` removes a selected beat.
+     - Fixed on the way: leaving a paused hold now drops the playhead anchor. Before, a later edit pulled the playhead back to the card.
    - **BB1:** has a hand-written Pass C (`analysis/recorded/claude-evaluate.json`): 7 cards and 7 beats. Hank opens up 1.5, the cancer card turns it, Walt reaches +6.1, and "Tread Lightly" flips it to M4 for Black.
    - **Dialogue fixture:** has a synthetic `claude-evaluate.json`, to be replaced with the real recording that is still owed.
 7. **Burned-in subtitles** of the dialogue. The user put these after the features that set the format apart.
@@ -176,3 +182,5 @@ To measure more, use `scripts/ref/hold-phases.mjs <clip> <crop>` for timing, PIL
 - The inspector's first input is the Regenerate box, not the label. Find fields by value or placeholder.
 - A PUT to `/api/projects/:id` needs `themeId` as well as moments and characters.
 - To set a React `<select>` from a check, use the native value setter and dispatch `change` (see `format-checks.mjs`).
+- To type into an input from a check, focus it and send `Input.insertText` (a synthetic `input` event followed at once by `blur()` commits the old value). Select a move with the Player outside any hold: a paused hold keeps its own move selected.
+- The editor is now taller than a 1150-1300 px window, so the page can show a scrollbar. Measure a container and its children in the same pass.

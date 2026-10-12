@@ -36,28 +36,31 @@ export async function regenerateMoment(
   });
   const classification = relabelLateBook(result.output.classification, moment.sourceTime);
   const draft = { ...result.output, classification, bestMove: NO_BEST_MOVE.has(classification) ? null : result.output.bestMove };
-  await logRegenUsage(deps.store, project.id, result.costUsd);
+  await logUsage(deps.store, project.id, 'regenerate', result.costUsd);
   return { draft, model: result.model, usage: result.usage, costUsd: result.costUsd };
 }
 
-export interface RegenUsage {
+/** Spend of the editor's own AI calls, which never write project.json: one log per kind beside the project. */
+export interface EditorUsage {
   count: number;
   costUsd: number;
 }
 
-const usageFile = (store: ProjectStore, id: string) => store.file(id, 'analysis/regenerate-usage.json');
+export type EditorCall = 'regenerate' | 'evaluate';
 
-export async function readRegenUsage(store: ProjectStore, id: string): Promise<RegenUsage> {
-  return readFile(usageFile(store, id), 'utf8')
-    .then((t) => JSON.parse(t) as RegenUsage)
+const usageFile = (store: ProjectStore, id: string, kind: EditorCall) => store.file(id, `analysis/${kind}-usage.json`);
+
+export async function readUsage(store: ProjectStore, id: string, kind: EditorCall): Promise<EditorUsage> {
+  return readFile(usageFile(store, id, kind), 'utf8')
+    .then((t) => JSON.parse(t) as EditorUsage)
     .catch(() => ({ count: 0, costUsd: 0 }));
 }
 
-async function logRegenUsage(store: ProjectStore, id: string, costUsd: number) {
-  const usage = await readRegenUsage(store, id);
+export async function logUsage(store: ProjectStore, id: string, kind: EditorCall, costUsd: number) {
+  const usage = await readUsage(store, id, kind);
   await mkdir(store.file(id, 'analysis'), { recursive: true });
   await writeFile(
-    usageFile(store, id),
+    usageFile(store, id, kind),
     JSON.stringify({ count: usage.count + 1, costUsd: Math.round((usage.costUsd + costUsd) * 1e6) / 1e6 }),
   );
 }

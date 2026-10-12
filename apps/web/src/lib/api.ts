@@ -1,11 +1,14 @@
 import {
   AnalysisEventSchema,
   ApiErrorSchema,
+  EvaluateResultSchema,
   HistoryEntrySchema,
   RegenerateResultSchema,
   SaveResultSchema,
   type AnalysisEvent,
   type AnalyzeRequest,
+  type EvaluateRequest,
+  type EvaluateResult,
   type Moment,
   type RegenerateResult,
   type HistoryEntry,
@@ -148,4 +151,14 @@ export const regenerateMoment = async (id: string, moment: Moment, instruction?:
   );
 
 export const getUsage = async (id: string) =>
-  (await request(`/projects/${id}/usage`)) as { regenerate: { count: number; costUsd: number } };
+  (await request(`/projects/${id}/usage`)) as Record<'regenerate' | 'evaluate', { count: number; costUsd: number }>;
+
+/** Pass C for the editor's track; returns a proposal for the whole bar and saves nothing. */
+export const evaluateTrack = async (id: string, body: EvaluateRequest): Promise<EvaluateResult> =>
+  EvaluateResultSchema.parse(
+    await request(`/projects/${id}/evaluate`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    }),
+  );
