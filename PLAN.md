@@ -232,6 +232,7 @@ outDuration(sourceDuration, moments) => number;
 - Play segments render the video trimmed to their source range.
 - Hold segments wrap the video in Remotion's `<Freeze>` at the moment's frame and draw `<MoveCard>` over it. If seeking inside the Player proves unreliable during the Phase 2 spike, fall back to a still extracted with ffmpeg at the exact frame (re-extracted whenever a moment is retimed).
 - Source audio stops during a hold, because source time is not advancing. The theme can add an optional sting sound when the card appears.
+- Burned-in subtitles (format iteration 7) follow source time, so the line spoken before a freeze stays up through the hold. They are built from the transcript and editable in the Subtitles tab; the theme's `subtitles` block sets the look.
 - Chess sounds (format iteration 5) are shared by every theme: `soundCues()` places game start/end, the ten-second warning, a move sound on the badge and typing under the type-out. The files are the user's, local in `media/sounds` and never committed; `EpisodeProps.sounds` carries their URLs and lengths.
 - The card animates from hold progress only, for example in over 0.25 s and out over 0.2 s, so the preview and the render stay identical.
 - The composition must stay pure: no editor state, no network, no clocks. Everything comes in through props.

@@ -12,7 +12,7 @@ Single-user local web app: upload a movie scene clip, draft chess-style move ann
 - `ANALYSIS_REPLAY_DIR=$PWD/fixtures/dialogue/recorded pnpm dev`: runs analysis on recorded responses, no keys or API calls. `ANALYSIS_RECORD_DIR` records real ones.
 - `ANALYST_HANDOFF_DIR=<dir> pnpm dev`: dev only, replaces the Claude calls with request/answer files a Claude Code session writes by hand (see Status).
 - `pnpm seed:sample`: creates a project from the fixture (3 moments). `pnpm seed:moments <projectId> <file>` replaces a project's moments, e.g. `fixtures/demo/doakes-moments.json` for the Dexter demo clip.
-- `scripts/browser/`: headless-Chrome checks (`phase2-checks.mjs`, `phase3-checks.mjs`, `typeout-checks.mjs`, `format-checks.mjs`, `evalbar-checks.mjs`, `sound-checks.mjs`) over the DevTools protocol (no dependencies) against a running `pnpm dev`. The dev build exposes the Player as `window.__alsPlayer`.
+- `scripts/browser/`: headless-Chrome checks (`phase2-checks.mjs`, `phase3-checks.mjs`, `typeout-checks.mjs`, `format-checks.mjs`, `evalbar-checks.mjs`, `sound-checks.mjs`, `subtitle-checks.mjs`) over the DevTools protocol (no dependencies) against a running `pnpm dev`. The dev build exposes the Player as `window.__alsPlayer`.
 - `scripts/ref/hold-phases.mjs <clip> <crop>`: times a reference clip's hold phases (freeze, badge, card, type-out, exit) from frame changes.
 
 ## Layout
@@ -34,6 +34,7 @@ Single-user local web app: upload a movie scene clip, draft chess-style move ann
 - The edit layer draws the same `<MoveCard>` over the Player through its `editing` slots; the render path never passes them.
 - Analysis (`apps/server/src/analysis/`): providers sit behind `Transcriber` / `SceneDescriber` / `Analyst` (ElevenLabs Scribe v2, Gemini, Claude). Stages cache by input hash in `<project>/analysis/manifest.json`; `rerun: 'analyst'` redoes only Pass A/B. Analyst schemas are built per clip with enums for cast, candidate and utterance ids. Prices for cost logging are in `analysis/prices.ts`. Regenerate never writes `project.json` (so an open editor is not forced to reload); its spend goes to `analysis/regenerate-usage.json`.
 - The server imports `@als/theme/themes` (no JSX); the web app imports `@als/theme`. Themes: `default` (the app's own `stacked` card) and `creator` (the creator's `headline` card); a project's `themeId` is part of the editor document, so switching is saved and undoable and unlocked holds follow the new timing.
+- Subtitles live in source time (`packages/schema/src/subtitles.ts`): a hold shows the line spoken before its freeze. Until the first edit they follow the transcript (`subtitlesFromTranscript()`, so `doc.subtitles` is absent); the first edit stores the whole list in the document, and "Rebuild from transcript" removes it again. The look is the theme's optional `subtitles` block, drawn over the dim.
 - Chess sounds are shared by every theme, never on the theme. Files are `<id>.<ext>` per `SOUND_IDS` (`packages/schema/src/sounds.ts`); the server lists them with probed lengths at `GET /api/sounds`, and missing files are skipped. `soundCues()` (`packages/composition/src/sounds.ts`) is the only placement logic, so the Player and the render agree.
 - Hard invariants (moment spacing, ordering, references) live in `ProjectSchema`. Soft rules (text caps, `bestMove` on best/brilliant) are `momentWarnings()`, so the editor warns without blocking saves.
 - The output is the source with a hold at each moment. `buildTimeline()` in `packages/composition` is the only mapping between source and output frames; the Player, timeline UI and renderer all use it.
@@ -61,11 +62,11 @@ Read this first in a new session. It says where the work stands, what to do next
 ### Where things stand
 
 - **Branch:** work now happens on `main` (the user asked for this on Oct 12; commit and push to `main`). `main` was fast-forwarded to the tip of `format-iterations`, and all phase branches (`phase-0-scaffold` … `phase-4-analysis`, `format-iterations`) are pushed to GitHub as history; do not add new per-phase branches. `apps/server/.env.example` shows as deleted in the working tree from before Oct 12; it is not ours, so leave it out of commits (`git add -A -- . ':!apps/server/.env.example'`).
-- **Done:** Phases 0-4 (Phase 4 has two owed items, below), the creator's review iterations, and format iterations 1-6 of 7 (log below). Iteration 7 (subtitles) is next.
-- **Not started:** Phase 5 (export/render) and Phase 6 (pitch build). The format iterations were inserted before Phase 5 at the user's request; the user has not said whether Phase 5 waits for all seven.
-- **Checks at the tip:** `pnpm check` passes (211 tests). The browser checks pass: `phase2-checks`, `phase3-checks`, `typeout-checks`, `format-checks`, `evalbar-checks` and `sound-checks`.
+- **Done:** Phases 0-4 (Phase 4 has two owed items, below), the creator's review iterations, and all seven format iterations (log below).
+- **Not started:** Phase 5 (export/render) and Phase 6 (pitch build). The format iterations were inserted before Phase 5 at the user's request and are now all built; Phase 5 is next once the user has reviewed them.
+- **Checks at the tip:** `pnpm check` passes (224 tests). The browser checks pass: `phase2-checks`, `phase3-checks`, `typeout-checks`, `format-checks`, `evalbar-checks`, `sound-checks` and `subtitle-checks`.
 
-### Next action: the user's review of iterations 5 and 6, then iteration 7
+### Next action: the user's review of iterations 5-7, then Phase 5
 
 Waiting on the user:
 - **Sounds (iteration 5):** listen in Preview mode. Four questions are open:
@@ -73,7 +74,8 @@ Waiting on the user:
   2. **`move-capture`** is served but nothing plays it yet. Which moves should?
   3. **Inaccuracies** play `move-mistake`, as the creator's clips do (0.99 match), not `move-self`/`move-opponent` as the user's rule said. One line to undo: `BORROWED` in `sounds.ts`.
   4. **Missing files:** `move-miss` and `hold-open` (the segment opening). Dropping them in `media/sounds` makes them play; nothing else changes.
-- **Evaluation bar (iteration 6):** review it on BB1. Its Pass C was written by hand. BB1 has no portraits yet; the user crops them in the Cast tab.
+- **Subtitles (iteration 7):** review them on BB1 (Subtitles tab). One open decision: `SUBTITLE_MAX_CHARS` (42). The creator's lines seen so far are short single sentences, and how they split a long one is unknown.
+- **Evaluation bar (iteration 6):** review it on BB1. Its Pass C was written by hand. BB1 now has portraits.
 - **Size per rating** (`TODO(open-decision)` on `EVAL_DIRECTION`): the code fixes only the direction; the Analyst picks the size.
 - Whether speaker naming should prefer **first names** like the creator ("Frank", "Carl") over full names ("Walter White"). For now names can be edited in the Cast tab.
 
@@ -118,7 +120,20 @@ Waiting on the user:
      - `EpisodeProps.portraits` maps character ids to URLs. Without one, the bar shows initials in the side's colours. The bar shows the character with the most moves on each side.
    - **BB1:** has a hand-written Pass C (`analysis/recorded/claude-evaluate.json`): 7 cards and 7 beats. Hank opens up 1.5, the cancer card turns it, Walt reaches +6.1, and "Tread Lightly" flips it to M4 for Black.
    - **Dialogue fixture:** has a synthetic `claude-evaluate.json`, to be replaced with the real recording that is still owed.
-7. **Burned-in subtitles** of the dialogue. The user put these after the features that set the format apart.
+7. **Burned-in subtitles (done).** Measured on the creator's clips (Oct 12):
+   - **Look:** Arial Bold 50 px, white, with a 5 px black outline outside the letters. One line, centred, baseline 65 px above the bottom, no box, not dimmed by the hold.
+   - **Timing:** lines are on throughout and hold through a freeze. They go off 0.18 s of source time after playback resumes, so about 0.3 s after the last word. Gaps between lines stay empty.
+   - A 1080p frame of ours matches the creator's within 1-2 px (width 634 vs 638, letter height 37 vs 37, centre 958 vs 958).
+   - **Building lines:**
+     - `subtitlesFromTranscript()` gives one sentence per line from its first word to `SUBTITLE_TAIL_SEC` (0.3 s) after its last.
+     - A sentence over `SUBTITLE_MAX_CHARS` (42, `TODO(open-decision)`) splits at the most even comma or dash where both halves fit, else at the most even word.
+     - A line stays at least 0.8 s unless the next one starts first, and gaps under 0.25 s close.
+     - A line under 0.3 s on screen (a mis-timed word) folds into an unfinished line before it.
+     - A leading "..." and sound tags are dropped.
+   - **Data:** `Project.subtitles` and `ProjectEdit.subtitles` are absent while the lines follow the transcript. `EpisodeProps.subtitles` carries the lines.
+   - **Rendering:** `<SubtitleLine>` (`packages/composition/src/Subtitles.tsx`) draws the line at the frame's source time. Themes: creator as measured; the default look has its own (system sans 600, 44 px).
+   - **Editor:** a Subtitles tab lists every line, with the live one highlighted. Click a time to show it. Text, start and end are editable, × deletes a line, and "Rebuild from transcript" drops all edits. Every change is undoable and autosaved.
+   - `subtitle-checks.mjs` covers: the line during speech and through a hold, the measured look, edit, save, reload, rebuild, undo, delete, and the default look.
 
 **Reference clip:** BB1 stays the reference until the format is proven, then BB2. `media/BB2.mov` is still the duplicate of BB1 (the user apologised and knows), so the real BB2 is needed before then.
 

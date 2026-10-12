@@ -10,6 +10,7 @@ import { projectsHref } from '../../lib/router.ts';
 import { StageList, StatusBadge } from '../StageList.tsx';
 import { AnalysisPanel } from './AnalysisPanel.tsx';
 import { CharactersPanel } from './CharactersPanel.tsx';
+import { SubtitlesPanel } from './SubtitlesPanel.tsx';
 import { Inspector } from './Inspector.tsx';
 import { MomentsPanel } from './MomentsPanel.tsx';
 import { Workspace } from './Workspace.tsx';
@@ -263,10 +264,11 @@ function HistoryMenu() {
 }
 
 function RightPanel({ ingest, analysis, onAnalysisChange }: { ingest: Ingest; analysis: Analysis; onAnalysisChange: (a: Analysis) => void }) {
-  const [tab, setTab] = useState<'move' | 'cast' | 'analysis' | 'ingest'>('move');
+  const [tab, setTab] = useState<'move' | 'cast' | 'subtitles' | 'analysis' | 'ingest'>('move');
   const tabs = [
     ['move', 'Move'],
     ['cast', 'Cast'],
+    ['subtitles', 'Subtitles'],
     ['analysis', 'Analysis'],
     ['ingest', 'Ingest'],
   ] as const;
@@ -291,6 +293,7 @@ function RightPanel({ ingest, analysis, onAnalysisChange }: { ingest: Ingest; an
       <div className="min-h-0 flex-1 overflow-y-auto p-3">
         {tab === 'move' && <Inspector />}
         {tab === 'cast' && <CharactersPanel />}
+        {tab === 'subtitles' && <SubtitlesPanel />}
         {tab === 'analysis' && <AnalysisPanel analysis={analysis} onStarted={onAnalysisChange} />}
         {tab === 'ingest' && <StageList job={ingest} />}
       </div>

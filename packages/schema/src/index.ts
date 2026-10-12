@@ -8,5 +8,6 @@ export * from './api.ts';
 export * from './theme.ts';
 export * from './episode.ts';
 export * from './sounds.ts';
+export * from './subtitles.ts';
 export * from './snap.ts';
 export * from './analyst.ts';

@@ -92,17 +92,19 @@ const docOf = (project: Project): Doc => ({
   characters: project.context.characters,
   themeId: project.themeId,
   ...(project.evalBar ? { evalBar: project.evalBar } : {}),
+  ...(project.subtitles ? { subtitles: project.subtitles } : {}),
 });
 
 /** The project with the doc's changes applied. */
 const applyDoc = (project: Project, doc: Doc): Project => {
-  const { evalBar: _, ...rest } = project;
+  const { evalBar: _, subtitles: __, ...rest } = project;
   return {
     ...rest,
     moments: doc.moments,
     context: { ...project.context, characters: doc.characters },
     themeId: doc.themeId,
     ...(doc.evalBar ? { evalBar: doc.evalBar } : {}),
+    ...(doc.subtitles ? { subtitles: doc.subtitles } : {}),
   };
 };
 
@@ -267,6 +269,7 @@ export function createEditorStore(initial: Project, deps: EditorDeps): EditorSto
         characters: doc.characters,
         themeId: doc.themeId,
         ...(doc.evalBar ? { evalBar: doc.evalBar } : {}),
+        ...(doc.subtitles ? { subtitles: doc.subtitles } : {}),
       });
       if (outcome.kind === 'conflict') {
         saveAgain = false;

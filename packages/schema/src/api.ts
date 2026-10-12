@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { MoveDraftSchema } from './analyst.ts';
 import { EvalBarSchema, EvalSchema } from './eval.ts';
 import { AnalysisSchema, CharacterSchema, IngestSchema, MomentSchema, SourceSchema, UsageSchema } from './project.ts';
+import { SubtitleSchema } from './subtitles.ts';
 
 /** Containers the upload accepts. The proxy makes any of them browser-safe. */
 export const UPLOAD_EXTENSIONS = ['mp4', 'mov', 'mkv'] as const;
@@ -121,6 +122,8 @@ export const ProjectEditSchema = z.object({
   themeId: z.string().min(1),
   /** Omitted until the project has a bar; once set it is always sent. */
   evalBar: EvalBarSchema.optional(),
+  /** Omitted while the subtitles follow the transcript. */
+  subtitles: z.array(SubtitleSchema).optional(),
 });
 export type ProjectEdit = z.infer<typeof ProjectEditSchema>;
 

@@ -1,4 +1,4 @@
-import { DEFAULT_START_EVAL, evalKeyframes, typeOutStartSec, type EpisodeProps, type Moment, type Theme } from '@als/schema';
+import { DEFAULT_START_EVAL, evalKeyframes, subtitleAt, typeOutStartSec, type EpisodeProps, type Moment, type Theme } from '@als/schema';
 import { Audio, Video } from '@remotion/media';
 import { useMemo } from 'react';
 import { AbsoluteFill, Freeze, Sequence, useCurrentFrame, useVideoConfig } from 'remotion';
@@ -8,14 +8,15 @@ import { evalBarAt, placeKeyframes } from './eval-bar.ts';
 import { MoveCard } from './MoveCard.tsx';
 import { moveNumbers } from './notation.ts';
 import { soundCues } from './sounds.ts';
-import { buildTimeline, type Segment } from './timeline.ts';
+import { SubtitleLine } from './Subtitles.tsx';
+import { buildTimeline, timeMapFrame, type Segment } from './timeline.ts';
 
 /**
  * The finished episode: the source clip with a freeze and a move card at every
  * moment. Pure: everything arrives through props, and every frame is derived
  * from the frame number, so the Player and the renderer draw identical frames.
  */
-export function Episode({ src, durationSec, moments, characters, theme, evalBar, portraits, sounds }: EpisodeProps) {
+export function Episode({ src, durationSec, moments, characters, theme, evalBar, portraits, sounds, subtitles }: EpisodeProps) {
   const { fps, width, height } = useVideoConfig();
   const frame = useCurrentFrame();
   const timeline = useMemo(() => buildTimeline(moments, fps, durationSec), [moments, fps, durationSec]);
@@ -62,6 +63,7 @@ export function Episode({ src, durationSec, moments, characters, theme, evalBar,
           </Sequence>
         );
       })}
+      {theme.subtitles && subtitles && <Subtitle subtitles={subtitles} sourceSec={timeMapFrame(timeline, frame).sourceFrame / fps} style={theme.subtitles} frame={{ width, height }} />}
       {theme.evalBar && (
         <EvalBar
           state={evalBarAt(evalBar?.start ?? DEFAULT_START_EVAL, evalTrack, frame, fps)}
@@ -86,6 +88,12 @@ export function Episode({ src, durationSec, moments, characters, theme, evalBar,
       ))}
     </AbsoluteFill>
   );
+}
+
+/** The line on screen at a source time. A hold shows its frozen frame's time, so the line spoken before it stays up. */
+function Subtitle({ subtitles, sourceSec, style, frame }: { subtitles: NonNullable<EpisodeProps['subtitles']>; sourceSec: number; style: NonNullable<Theme['subtitles']>; frame: FrameSize }) {
+  const line = subtitleAt(subtitles, sourceSec);
+  return line?.text.trim() ? <SubtitleLine text={line.text.trim()} style={style} frame={frame} /> : null;
 }
 
 interface SegmentViewProps {

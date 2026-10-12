@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { ClassificationSchema } from './classification.ts';
 import { EvalBarSchema, EvalSchema } from './eval.ts';
 import { MIN_MOMENT_GAP_SEC } from './rules.ts';
+import { SubtitleSchema } from './subtitles.ts';
 
 // All times are source-clip seconds. Frames are always derived, never stored.
 
@@ -209,6 +210,8 @@ export const ProjectSchema = z
     themeId: Id,
     /** The evaluation bar's start and its beats; absent until analysis or the editor sets it. */
     evalBar: EvalBarSchema.optional(),
+    /** Subtitles as edited; absent while they follow the transcript (`subtitlesFromTranscript`). */
+    subtitles: z.array(SubtitleSchema).optional(),
     ingest: IngestSchema,
     analysis: AnalysisSchema,
   })

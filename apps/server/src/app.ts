@@ -146,6 +146,8 @@ export function createApp({ store, queue, analysis, sounds }: AppDeps) {
       p.themeId = edit.themeId;
       if (edit.evalBar) p.evalBar = edit.evalBar;
       else delete p.evalBar;
+      if (edit.subtitles) p.subtitles = edit.subtitles;
+      else delete p.subtitles;
     });
     return c.json({ version: saved.version });
   });
@@ -153,7 +155,7 @@ export function createApp({ store, queue, analysis, sounds }: AppDeps) {
   /** The last saved versions, newest first. */
   app.get('/projects/:id/history', async (c) => c.json(await store.history(c.req.param('id'))));
 
-  /** Bring back an earlier version's moments, characters, theme and bar as a new version. */
+  /** Bring back an earlier version's moments, characters, theme, bar and subtitles as a new version. */
   app.post('/projects/:id/history/:version/restore', async (c) => {
     const id = c.req.param('id');
     const { version } = ProjectEditSchema.pick({ version: true }).parse(await c.req.json());
@@ -164,6 +166,8 @@ export function createApp({ store, queue, analysis, sounds }: AppDeps) {
       p.themeId = old.themeId;
       if (old.evalBar) p.evalBar = old.evalBar;
       else delete p.evalBar;
+      if (old.subtitles) p.subtitles = old.subtitles;
+      else delete p.subtitles;
     });
     return c.json(saved);
   });

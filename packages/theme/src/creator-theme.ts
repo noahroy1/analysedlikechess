@@ -51,6 +51,19 @@ export const creatorTheme: Theme = {
   },
   // Measured on style-ref-*.png (1080p): a Chess.com-style bar whose coloured
   // part spans x 26-67 and y 112-968, in a 4 px dark frame, between 76 px portraits.
+  // Measured on the creator's videos (Oct 12, 2026) and checked against a 1080p
+  // frame of ours: Arial Bold 50 px, white with a 5 px black outline outside the
+  // letters, centred, baseline 65 px above the bottom.
+  subtitles: {
+    fontFamily: 'Arial, "Helvetica Neue", Helvetica, sans-serif',
+    fontSize: 50,
+    fontWeight: 700,
+    color: '#ffffff',
+    strokeColor: '#000000',
+    strokeWidth: 5,
+    baseline: 65,
+    maxWidth: 0.9,
+  },
   evalBar: {
     left: 26,
     width: 42,

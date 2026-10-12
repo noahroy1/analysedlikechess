@@ -83,6 +83,25 @@ export const ThemeSchema = z.object({
     safeMargin: z.object({ x: Unit, top: Unit, bottom: Unit }),
   }),
   /**
+   * Dialogue subtitles: one centred line above the bottom edge, drawn over the
+   * hold's dim. Absent: no subtitles. Sizes are for a 1080-pixel-tall frame.
+   */
+  subtitles: z
+    .object({
+      fontFamily: z.string(),
+      fontSize: z.number().positive(),
+      fontWeight: z.number().int().positive(),
+      color: z.string(),
+      /** Outline drawn outside the letters; 0 for none. */
+      strokeColor: z.string(),
+      strokeWidth: z.number().nonnegative(),
+      /** Distance from the frame's bottom edge to the text's baseline. */
+      baseline: z.number().nonnegative(),
+      /** Widest a line may be, as a fraction of the frame; longer text wraps upward. */
+      maxWidth: z.number().min(0.2).max(1),
+    })
+    .optional(),
+  /**
    * An evaluation bar on the left edge, Black's player at the top and White's at
    * the bottom, each with a portrait. Absent: no bar. Sizes are for a 1080-pixel-tall frame.
    */

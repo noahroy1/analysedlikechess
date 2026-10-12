@@ -11,15 +11,20 @@ import {
   type EvalBeat,
   type EvaluateResult,
   type Moment,
+  type Subtitle,
   type Theme,
+  type Transcript,
+  subtitlesFromTranscript,
 } from '@als/schema';
 
-/** The part of a project the editor changes: the annotation track, the cast, the look and the evaluation bar. */
+/** The part of a project the editor changes: the annotation track, the cast, the look, the evaluation bar and the subtitles. */
 export interface Doc {
   moments: Moment[];
   characters: Character[];
   themeId: string;
   evalBar?: EvalBar;
+  /** Absent while the subtitles follow the transcript; set by the first edit. */
+  subtitles?: Subtitle[];
 }
 
 export class EditError extends Error {}
@@ -278,4 +283,43 @@ export function applyEvaluation(doc: Doc, result: Pick<EvaluateResult, 'evalBar'
     moments: doc.moments.map((m) => (result.evals[m.id] ? { ...m, eval: result.evals[m.id]! } : m)),
     evalBar: { start: result.evalBar.start, beats },
   };
+}
+
+// Subtitles. Until the first edit they follow the transcript; an edit keeps
+// the whole list in the document from then on.
+
+/** The subtitles the episode shows: as edited, else built from the transcript. */
+export const subtitlesOf = (doc: Pick<Doc, 'subtitles'>, transcript: Transcript | undefined): Subtitle[] =>
+  doc.subtitles ?? subtitlesFromTranscript(transcript);
+
+/** Shortest a subtitle can be retimed to. */
+export const MIN_SUBTITLE_SEC = 0.2;
+
+function editSubtitle(doc: Doc, transcript: Transcript | undefined, id: string, change: (s: Subtitle) => Subtitle | null): Doc {
+  const current = subtitlesOf(doc, transcript);
+  if (!current.some((s) => s.id === id)) throw new EditError('That subtitle no longer exists.');
+  const subtitles = current.flatMap((s) => {
+    if (s.id !== id) return [s];
+    const next = change(s);
+    return next ? [next] : [];
+  });
+  return { ...doc, subtitles: subtitles.sort((a, b) => a.start - b.start) };
+}
+
+export const setSubtitleText = (doc: Doc, transcript: Transcript | undefined, id: string, text: string): Doc =>
+  editSubtitle(doc, transcript, id, (s) => ({ ...s, text }));
+
+export const deleteSubtitle = (doc: Doc, transcript: Transcript | undefined, id: string): Doc =>
+  editSubtitle(doc, transcript, id, () => null);
+
+/** Moves a subtitle's start or end, keeping it at least `MIN_SUBTITLE_SEC` long. */
+export const retimeSubtitle = (doc: Doc, transcript: Transcript | undefined, id: string, edge: 'start' | 'end', sec: number): Doc =>
+  editSubtitle(doc, transcript, id, (s) =>
+    edge === 'start' ? { ...s, start: Math.min(Math.max(0, sec), s.end - MIN_SUBTITLE_SEC) } : { ...s, end: Math.max(sec, s.start + MIN_SUBTITLE_SEC) },
+  );
+
+/** Drops every subtitle edit, so the lines follow the transcript again. */
+export function followTranscript(doc: Doc): Doc {
+  const { subtitles: _, ...rest } = doc;
+  return rest;
 }

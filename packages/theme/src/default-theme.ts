@@ -47,6 +47,16 @@ export const defaultTheme: Theme = {
     safeMargin: { x: 0.04, top: 0.06, bottom: 0.14 },
   },
   // Holds darken the frozen frame by 10% (the creator's call, Oct 12, 2026).
+  subtitles: {
+    fontFamily: 'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+    fontSize: 44,
+    fontWeight: 600,
+    color: '#ffffff',
+    strokeColor: 'rgba(0, 0, 0, 0.85)',
+    strokeWidth: 4,
+    baseline: 72,
+    maxWidth: 0.8,
+  },
   freeze: { treatment: 'dim', dim: 0.1, pushIn: 1.04, dimInSec: 0.25 },
   timing: {
     badgeDelaySec: 0,
