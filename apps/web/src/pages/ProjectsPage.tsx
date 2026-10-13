@@ -30,6 +30,7 @@ export function ProjectsPage() {
       if (event.analysis.status === 'done' || event.analysis.status === 'error') void load();
       else setProjects((list) => list?.map((p) => (p.id === event.projectId ? { ...p, analysis: event.analysis } : p)) ?? null);
     },
+    reconnect: () => void load(),
   });
 
   return (

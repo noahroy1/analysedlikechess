@@ -123,24 +123,73 @@ export interface ProjectEventHandlers {
   ingest?: (event: IngestEvent) => void;
   analysis?: (event: AnalysisEvent) => void;
   render?: (event: RenderEvent) => void;
+  /** The stream came back after a gap; jobs that finished meanwhile sent nothing, so refetch. */
+  reconnect?: () => void;
 }
 
-/** Subscribes to live ingest, analysis and render progress for every project. Returns an unsubscribe function. */
+/** Twice the server's heartbeat (5 s) plus slack: a stream this quiet is dead. */
+const EVENTS_STALE_MS = 12_000;
+const EVENTS_RETRY_MS = 2_000;
+
+/**
+ * Subscribes to live ingest, analysis and render progress for every project. Returns an unsubscribe function.
+ * A server restart can leave the stream waiting but silent behind the dev proxy, or closed for good after a 502,
+ * and EventSource recovers from neither, so a stream that misses heartbeats or closes is opened again.
+ */
 export function subscribeProjectEvents(handlers: ProjectEventHandlers): () => void {
-  const source = new EventSource('/api/events');
-  source.addEventListener('ingest', (e) => {
-    const parsed = IngestEventSchema.safeParse(JSON.parse((e as MessageEvent<string>).data));
-    if (parsed.success) handlers.ingest?.(parsed.data);
-  });
-  source.addEventListener('analysis', (e) => {
-    const parsed = AnalysisEventSchema.safeParse(JSON.parse((e as MessageEvent<string>).data));
-    if (parsed.success) handlers.analysis?.(parsed.data);
-  });
-  source.addEventListener('render', (e) => {
-    const parsed = RenderEventSchema.safeParse(JSON.parse((e as MessageEvent<string>).data));
-    if (parsed.success) handlers.render?.(parsed.data);
-  });
-  return () => source.close();
+  let source: EventSource | undefined;
+  let lastHeard = 0;
+  let opened = false;
+  let retry: ReturnType<typeof setTimeout> | undefined;
+
+  const connect = () => {
+    source?.close();
+    lastHeard = Date.now();
+    const current = new EventSource('/api/events');
+    source = current;
+    const heard = () => {
+      lastHeard = Date.now();
+    };
+    current.addEventListener('open', () => {
+      heard();
+      if (opened) handlers.reconnect?.();
+      opened = true;
+    });
+    current.addEventListener('ping', heard);
+    current.addEventListener('ingest', (e) => {
+      heard();
+      const parsed = IngestEventSchema.safeParse(JSON.parse((e as MessageEvent<string>).data));
+      if (parsed.success) handlers.ingest?.(parsed.data);
+    });
+    current.addEventListener('analysis', (e) => {
+      heard();
+      const parsed = AnalysisEventSchema.safeParse(JSON.parse((e as MessageEvent<string>).data));
+      if (parsed.success) handlers.analysis?.(parsed.data);
+    });
+    current.addEventListener('render', (e) => {
+      heard();
+      const parsed = RenderEventSchema.safeParse(JSON.parse((e as MessageEvent<string>).data));
+      if (parsed.success) handlers.render?.(parsed.data);
+    });
+    current.addEventListener('error', () => {
+      // A 502 while the server restarts closes the stream for good; anything else EventSource retries itself.
+      if (current.readyState === EventSource.CLOSED && current === source) {
+        clearTimeout(retry);
+        retry = setTimeout(connect, EVENTS_RETRY_MS);
+      }
+    });
+  };
+
+  connect();
+  const watchdog = setInterval(() => {
+    // Open or still connecting: the server pings on connect and every 5 s, so silence this long means a dead stream.
+    if (source && source.readyState !== EventSource.CLOSED && Date.now() - lastHeard > EVENTS_STALE_MS) connect();
+  }, EVENTS_STALE_MS / 4);
+  return () => {
+    clearInterval(watchdog);
+    clearTimeout(retry);
+    source?.close();
+  };
 }
 
 export interface AnalysisConfigInfo {

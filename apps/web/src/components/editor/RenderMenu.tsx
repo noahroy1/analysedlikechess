@@ -43,6 +43,8 @@ export function RenderMenu() {
         if (render.status === 'failed') store.getState().notify(`Render failed: ${render.error ?? 'unknown error'}`, 'error');
       }
     },
+    // A render that ended while the stream was down sent its last update to no one.
+    reconnect: () => void refresh(),
   });
 
   const presets = RENDER_PRESETS.flatMap((p) => {

@@ -42,7 +42,8 @@ export interface AppDeps {
   renders: RenderService;
 }
 
-const SSE_HEARTBEAT_MS = 15_000;
+/** Keep in step with EVENTS_STALE_MS in apps/web/src/lib/api.ts, which reopens a stream that misses two. */
+const SSE_HEARTBEAT_MS = 5_000;
 
 export function summarize(project: Project): ProjectSummary {
   const shots = project.shots ?? [];
@@ -316,6 +317,10 @@ export function createApp({ store, queue, analysis, sounds, renders }: AppDeps) 
       const sendAnalysis = ({ projectId, state }: { projectId: string; state: Project['analysis'] }) =>
         write('analysis', { projectId, analysis: state });
       const sendRender = ({ projectId, state }: { projectId: string; state: RenderJob }) => write('render', { projectId, render: state });
+      // Send something at once so the stream opens now: until the first write nothing reaches the browser,
+      // and a restart before then leaves it waiting forever behind the dev proxy. EventSource drops empty data.
+      const ping = () => stream.writeSSE({ event: 'ping', data: 'ok' }).catch(() => undefined);
+      await ping();
       for (const update of queue.snapshot()) await sendIngest(update);
       for (const update of analysis.queue.snapshot()) await sendAnalysis(update);
       for (const update of renders.queue.snapshot()) await sendRender(update);
@@ -330,7 +335,7 @@ export function createApp({ store, queue, analysis, sounds, renders }: AppDeps) 
       stream.onAbort(detach);
       while (!stream.aborted) {
         await stream.sleep(SSE_HEARTBEAT_MS);
-        if (!stream.aborted) await stream.writeSSE({ event: 'ping', data: '' }).catch(() => undefined);
+        if (!stream.aborted) await ping();
       }
       detach();
     }),
