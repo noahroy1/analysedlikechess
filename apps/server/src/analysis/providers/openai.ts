@@ -15,6 +15,8 @@ export interface OpenAIOptions {
   record?: (name: string, raw: unknown) => Promise<void>;
   /** How often to poll a background response. */
   pollMs?: number;
+  /** Tier for non-interactive calls (default flex). */
+  tier?: 'flex' | 'default';
 }
 
 interface ResponseBody {
@@ -64,7 +66,7 @@ export function strictSchema(schema: AnalystCall<unknown>['schema']): Record<str
  * and the scene timeline at explicit cache breakpoints, so a repeat reads them
  * from the cache and the per-call task is never written to it.
  */
-export function openaiAnalyst({ apiKey, record, pollMs = 1500 }: OpenAIOptions): Analyst {
+export function openaiAnalyst({ apiKey, record, pollMs = 1500, tier: pipelineTier = 'flex' }: OpenAIOptions): Analyst {
   async function send(path: string, body?: unknown): Promise<{ res: Response; json: ResponseBody }> {
     try {
       const res = await fetch(`${ENDPOINT}${path}`, {
@@ -143,7 +145,7 @@ export function openaiAnalyst({ apiKey, record, pollMs = 1500 }: OpenAIOptions):
 
   return {
     async run(call) {
-      const body = await request(call, call.interactive ? 'default' : 'flex');
+      const body = await request(call, call.interactive ? 'default' : pipelineTier);
       if (body.status === 'incomplete') {
         const reason = body.incomplete_details?.reason;
         throw new ProviderError(

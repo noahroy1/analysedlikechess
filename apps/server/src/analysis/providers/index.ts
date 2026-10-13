@@ -35,7 +35,7 @@ export function makeProviders(config: AnalysisConfig): Providers {
           ? handoffAnalyst(config.handoffDir).run(call)
           : isClaude(call.model)
             ? claudeAnalyst({ apiKey: need(config.keys.anthropic, 'ANTHROPIC_API_KEY'), record }).run(call)
-            : openaiAnalyst({ apiKey: need(config.keys.openai, 'OPENAI_API_KEY'), record }).run(call),
+            : openaiAnalyst({ apiKey: need(config.keys.openai, 'OPENAI_API_KEY'), record, tier: config.openaiTier }).run(call),
     },
   };
 }

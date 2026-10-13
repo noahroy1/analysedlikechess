@@ -137,6 +137,14 @@ describe('openaiAnalyst', () => {
     expect(JSON.stringify(sent[0]!.input)).not.toContain('prompt_cache_breakpoint');
   });
 
+  it('runs pipeline calls on standard when configured', async () => {
+    const sent = stubFetch({ status: 200, body: completed(JSON.stringify(answer), { service_tier: 'default' }) });
+    await openaiAnalyst({ apiKey: 'k', tier: 'default' }).run(call);
+    expect(sent[0]!.service_tier).toBe('default');
+    expect(loadAnalysisConfig({ OPENAI_TIER: 'standard' }).openaiTier).toBe('default');
+    expect(loadAnalysisConfig({}).openaiTier).toBe('flex');
+  });
+
   it('falls back to standard when flex has no capacity', async () => {
     const sent = stubFetch(
       { status: 429, body: { error: { code: 'resource_unavailable', message: 'Resource Unavailable' } } },

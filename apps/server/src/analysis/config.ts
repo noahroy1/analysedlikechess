@@ -20,6 +20,8 @@ export interface AnalysisConfig {
     /** Faces and the move's subject on a frozen frame, for placing cards. */
     regions: string;
   };
+  /** OpenAI tier for pipeline stages: `flex` is half price but queues; `default` is standard. Interactive calls always use standard. */
+  openaiTier: 'flex' | 'default';
   /** Run analysis on its own once ingest finishes. */
   autoAnalyze: boolean;
   /** Frames per second Gemini samples from the proxy (it defaults to 1). */
@@ -55,6 +57,7 @@ export function loadAnalysisConfig(env: NodeJS.ProcessEnv = process.env): Analys
       regen: blank(env.REGEN_MODEL) ?? 'gpt-6-luna',
       regions: blank(env.REGIONS_MODEL) ?? 'gemini-3.5-flash-lite',
     },
+    openaiTier: blank(env.OPENAI_TIER) === 'standard' ? 'default' : 'flex',
     autoAnalyze: (blank(env.AUTO_ANALYZE) ?? 'true') !== 'false',
     sceneFps: Number(blank(env.SCENE_FPS) ?? 1),
     replayDir: blank(env.ANALYSIS_REPLAY_DIR),
