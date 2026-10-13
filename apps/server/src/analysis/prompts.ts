@@ -54,17 +54,18 @@ Rules:
 - A best move must be something the character could plausibly do with what they knew then.
 - ${noBest} moves never get a best move: leave it null.
 - Book is only for the scene's opening, the first ${BOOK_WINDOW_SEC} seconds. After that, rate a textbook move good.
-- Mix the ratings across the scene's arc; do not make every move a blunder.
+- Rate each move by what it does to the scene, and commit. The move that turns the scene is brilliant, great or a blunder, not good or an inaccuracy. A scene with a turn has at least one move from brilliant, great or best and at least one from mistake, miss or blunder.
+- Use the middle ratings (excellent, good, inaccuracy) only for moves that change little. Do not make every move a blunder either.
 - Credit moves only to the cast listed with the timeline.
 
 Format (the card is read during a freeze, so every field is short):
-- Label: the move's name, two or three words in Title Case, at most ${TEXT_CAPS.moveLabel} characters. A nickname for the action, not a sentence.
-- Breakdown: exactly two sentences, about 25 to 30 words, at most ${TEXT_CAPS.explanation} characters. Sentence one: what the character visibly does. Sentence two: the verdict.
-- Best move: a two to four word command in Title Case, at most ${TEXT_CAPS.bestMove} characters.
-- Motif: the chess idea the move embodies, as a one to three word chip in Title Case, at most ${TEXT_CAPS.motif} characters (Sacrifice, Zwischenzug, Quiet Move, Check, Fork, Pin, Gambit, Decoy, Deflection, Prophylaxis). Use it when a chess idea fits the move; leave it null rather than force one.
+- Label: the move's name, two or three words in Title Case, at most ${TEXT_CAPS.moveLabel} characters: a nickname for the action ("Whole Wallet", "Goes In Alone", "Talks Shop") or a name the character uses ("Barry Allen"). Never a sentence, and never an abstract noun such as Revelation, Confrontation, Deadline or Strategy.
+- Breakdown: exactly two sentences, about 25 to 30 words, at most ${TEXT_CAPS.explanation} characters. Sentence one: what the character visibly does. Sentence two: the verdict in chess terms, what the move does to the game: a mate appears, speeds up or disappears; the attack stalls; tempo, material or the initiative changes hands. One verdict, committed: no "but", "though" or "while" weighing both sides.
+- Best move: a two to four word command in Title Case, at most ${TEXT_CAPS.bestMove} characters. It is something this character would do, given who they are and what they want: a schemer schemes better, a hunter hunts better. Never the same best move twice in a scene.
+- Motif: the chess idea the move embodies, as a one to three word chip in Title Case, at most ${TEXT_CAPS.motif} characters (Sacrifice, Zwischenzug, Quiet Move, Check, Fork, Pin, Gambit, Decoy, Deflection, Prophylaxis, Blockade, Desperado, Overextension). Most moves have one: a threat is Check, giving something up is a Sacrifice, an unexpected reply that ignores the threat is a Zwischenzug. Leave it null only when none fits.
 
 Writing (every word has to earn its place):
-- Concrete over abstract: name the person, the object, the number, the place. Strong verbs, not stacked adjectives.
+- Concrete over abstract: name the person, the object, the number, the place. Strong verbs, not stacked adjectives. Never abstract summaries such as "the dynamic shifts" or "raises the stakes".
 - No filler or hedging: never "just", "really", "basically", "actually", "clearly", "simply", "kind of", "seems", "perhaps".
 - Never restate the label or the rating, and never open with a verdict word ("Textbook.", "Solid.", "Bold move.").
 - Quote dialogue only when the words are the move, and then only a few of them.
@@ -95,9 +96,17 @@ export function annotationTask(candidates: Candidate[], target: number): string 
   return `Candidates found in the scene:
 ${JSON.stringify(candidates, null, 1)}
 
-Task: pick the final ${target} moves (fewer only if the scene cannot support that many), spread across the scene's arc, and annotate each in the voice shown above: rating, label, breakdown, best move (null where the rules say so), motif and your confidence. Prefer moves an audience would argue about. Use each candidate at most once.
+Task: pick the final ${target} moves (fewer only if the scene cannot support that many), spread across the scene's arc from its opening exchange to its last line, and annotate each in the voice shown above: rating, label, breakdown, best move (null where the rules say so), motif and your confidence. Prefer moves an audience would argue about, and give both sides moves when both make choices. Use each candidate at most once.
 
-Also name the scene's protagonist, the character the audience follows, who plays White. Leave it null if no one clearly stands out.`;
+Also name the scene's protagonist, the character the audience follows, who plays White. Leave it null if no one clearly stands out.
+
+Before answering, check every card against the rules:
+- Does the rating commit? The scene's turning points are brilliant, great or blunder.
+- Is the second sentence a chess verdict (mate, attack, tempo, initiative, material) with no "but", "though" or "while"?
+- Is the label the character's words or a two word nickname, not an abstract noun?
+- Does the move have a motif if any chess idea fits?
+- Is the best move something this character would do, and different from every other card's?
+- Is the first move from the opening exchange?`;
 }
 
 /** One change of the bar, as Pass C sees it. */
@@ -143,6 +152,7 @@ Values:
 Rules:
 - The rating sets the direction for the player who moved: ${byDirection('gain')} gain them ground; ${byDirection('loss')} lose them ground; ${byDirection('either')} can go either way by a little.
 - Size follows the rating: an inaccuracy costs a little, a mistake more, a blunder can lose the game; a great or brilliant move can turn it.
+- Let the bar travel. Its swings are the story: a turning point moves it by whole pawns, not tenths, and a scene with a clear winner ends well past a clear edge. A bar that stays near level tells no story.
 - Beats are nudges, smaller than any card, and never start or end a mate.
 - Where a card's breakdown mentions the bar or the mate, match it.
 - End where the scene ends: the last value says who won the scene.

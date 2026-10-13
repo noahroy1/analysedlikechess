@@ -3,17 +3,22 @@ import { costUsd } from '../prices.ts';
 import { ProviderError, type Analyst, type AnalystCall } from './types.ts';
 
 const ENDPOINT = 'https://api.openai.com/v1/responses';
-/** Flex can queue; OpenAI's own SDKs wait 10 minutes and its examples 15. */
-const TIMEOUT_MS = 15 * 60 * 1000;
+/** A flex call still running after this is cancelled and rerun on standard; a standard one fails. */
+const DEADLINE_MS = { flex: 10 * 60 * 1000, default: 15 * 60 * 1000 };
+/** Polls that may fail in a row (a network blip) before the call gives up. */
+const POLL_RETRIES = 5;
 /** Explicit cache breakpoints exist from gpt-5.6 on; older models cache implicitly and reject them. */
 const EXPLICIT_CACHE = /^gpt-(5\.([6-9]|\d{2,})|([6-9]|\d{2,})(\.|-|$))/;
 
 export interface OpenAIOptions {
   apiKey: string;
   record?: (name: string, raw: unknown) => Promise<void>;
+  /** How often to poll a background response. */
+  pollMs?: number;
 }
 
 interface ResponseBody {
+  id?: string;
   status?: string;
   model?: string;
   service_tier?: string;
@@ -49,60 +54,91 @@ export function strictSchema(schema: AnalystCall<unknown>['schema']): Record<str
 
 /**
  * OpenAI's Responses API with strict structured outputs, called with fetch.
- * Background stages ask for the Flex tier (half price, may queue) and fall back
- * to standard when Flex has no capacity; Regenerate and Re-evaluate use standard.
- * The system prompt and the scene timeline end at explicit cache breakpoints,
- * so later passes and Regenerate read them from the cache and the per-call task
- * is never written to it.
+ * Requests run in background mode and are polled: a reasoning call can take
+ * minutes (Pass B on flex took over 13 in testing), longer than one HTTP
+ * request reliably stays open. `store: false` still applies; OpenAI keeps a
+ * background response for about 10 minutes so it can be polled.
+ * Pipeline stages ask for the Flex tier (half price, may queue) and fall back
+ * to standard when Flex has no capacity or runs past its deadline; Regenerate
+ * and Re-evaluate use standard. Those interactive calls end the system prompt
+ * and the scene timeline at explicit cache breakpoints, so a repeat reads them
+ * from the cache and the per-call task is never written to it.
  */
-export function openaiAnalyst({ apiKey, record }: OpenAIOptions): Analyst {
-  async function request(call: AnalystCall<unknown>, tier: 'flex' | 'default'): Promise<ResponseBody> {
-    const explicit = EXPLICIT_CACHE.test(call.model);
-    const breakpoint = explicit ? { prompt_cache_breakpoint: { mode: 'explicit' } } : {};
-    let res: Response;
+export function openaiAnalyst({ apiKey, record, pollMs = 1500 }: OpenAIOptions): Analyst {
+  async function send(path: string, body?: unknown): Promise<{ res: Response; json: ResponseBody }> {
     try {
-      res = await fetch(ENDPOINT, {
-        method: 'POST',
+      const res = await fetch(`${ENDPOINT}${path}`, {
+        method: body === undefined && path ? 'GET' : 'POST',
         headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-        signal: AbortSignal.timeout(TIMEOUT_MS),
-        body: JSON.stringify({
-          model: call.model,
-          service_tier: tier,
-          store: false,
-          max_output_tokens: 64000,
-          reasoning: { effort: call.effort },
-          ...(explicit ? { prompt_cache_options: { mode: 'explicit' } } : {}),
-          text: { format: { type: 'json_schema', name: call.name, strict: true, schema: strictSchema(call.schema) } },
-          input: [
-            { role: 'developer', content: [{ type: 'input_text', text: call.system, ...breakpoint }] },
-            {
-              role: 'user',
-              content: [
-                { type: 'input_text', text: call.context, ...breakpoint },
-                { type: 'input_text', text: call.task },
-              ],
-            },
-          ],
-        }),
+        signal: AbortSignal.timeout(60_000),
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
       });
+      return { res, json: (await res.json().catch(() => ({}))) as ResponseBody };
     } catch (error) {
-      if (error instanceof DOMException && error.name === 'TimeoutError') {
+      const cause = (error as Error & { cause?: Error }).cause?.message;
+      throw new ProviderError(`Could not reach OpenAI: ${(error as Error).message}${cause ? ` (${cause})` : ''}`);
+    }
+  }
+
+  async function request(call: AnalystCall<unknown>, tier: 'flex' | 'default'): Promise<ResponseBody> {
+    // The output schema is part of the cached prefix, so pipeline passes (one schema each) never reuse
+    // each other's cache and a write would cost 1.25x for nothing. Interactive calls repeat with the same
+    // schema (Regenerate, Re-evaluate), so only they set breakpoints; the rest send caching off.
+    const explicit = EXPLICIT_CACHE.test(call.model);
+    const cached = explicit && call.interactive === true;
+    const breakpoint = cached ? { prompt_cache_breakpoint: { mode: 'explicit' } } : {};
+    const { res, json } = await send('', {
+      model: call.model,
+      background: true,
+      service_tier: tier,
+      store: false,
+      max_output_tokens: 64000,
+      reasoning: { effort: call.effort },
+      ...(explicit ? { prompt_cache_options: { mode: 'explicit' } } : {}),
+      text: { format: { type: 'json_schema', name: call.name, strict: true, schema: strictSchema(call.schema) } },
+      input: [
+        { role: 'developer', content: [{ type: 'input_text', text: call.system, ...breakpoint }] },
+        {
+          role: 'user',
+          content: [
+            { type: 'input_text', text: call.context, ...breakpoint },
+            { type: 'input_text', text: call.task },
+          ],
+        },
+      ],
+    });
+    if (!res.ok) {
+      // Flex has no capacity (429 Resource Unavailable, not billed) or timed out: retry on standard.
+      if (tier === 'flex' && (res.status === 429 || res.status === 408) && json.error?.code !== 'insufficient_quota') {
+        return request(call, 'default');
+      }
+      if (res.status === 401) throw new ProviderError('The OpenAI API key was rejected');
+      if (json.error?.code === 'insufficient_quota') throw new ProviderError('The OpenAI account is out of credit');
+      if (json.error?.code === 'model_not_found') throw new ProviderError(`OpenAI: ${json.error.message} (allow it in the project's model settings)`);
+      if (res.status === 429) throw new ProviderError('OpenAI rate limit reached; try again shortly');
+      throw new ProviderError(`OpenAI request failed (${res.status}): ${json.error?.message ?? res.statusText}`);
+    }
+
+    let body = json;
+    const deadline = Date.now() + DEADLINE_MS[tier];
+    let failures = 0;
+    while (body.status === 'queued' || body.status === 'in_progress') {
+      if (Date.now() > deadline) {
+        await send(`/${body.id}/cancel`, {}).catch(() => undefined);
         if (tier === 'flex') return request(call, 'default');
         throw new ProviderError(`OpenAI took too long on the ${call.name} step`);
       }
-      throw new ProviderError(`Could not reach OpenAI: ${(error as Error).message}`);
+      await new Promise((resolve) => setTimeout(resolve, pollMs));
+      try {
+        const poll = await send(`/${body.id}`);
+        if (!poll.res.ok) throw new ProviderError(`OpenAI lost the ${call.name} response (${poll.res.status}): ${poll.json.error?.message ?? ''}`);
+        body = poll.json;
+        failures = 0;
+      } catch (error) {
+        if (++failures > POLL_RETRIES) throw error;
+      }
     }
-    const body = (await res.json().catch(() => ({}))) as ResponseBody;
-    if (res.ok) return body;
-    // Flex has no capacity (429 Resource Unavailable, not billed) or timed out: retry on standard.
-    if (tier === 'flex' && (res.status === 429 || res.status === 408) && body.error?.code !== 'insufficient_quota') {
-      return request(call, 'default');
-    }
-    if (res.status === 401) throw new ProviderError('The OpenAI API key was rejected');
-    if (body.error?.code === 'insufficient_quota') throw new ProviderError('The OpenAI account is out of credit');
-    if (body.error?.code === 'model_not_found') throw new ProviderError(`OpenAI: ${body.error.message} (allow it in the project's model settings)`);
-    if (res.status === 429) throw new ProviderError('OpenAI rate limit reached; try again shortly');
-    throw new ProviderError(`OpenAI request failed (${res.status}): ${body.error?.message ?? res.statusText}`);
+    return body;
   }
 
   return {

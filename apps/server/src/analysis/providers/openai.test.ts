@@ -33,8 +33,9 @@ function stubFetch(...replies: { status: number; body: unknown }[]) {
   const sent: Record<string, unknown>[] = [];
   vi.stubGlobal(
     'fetch',
-    vi.fn(async (_url: string, init: RequestInit) => {
-      sent.push(JSON.parse(init.body as string) as Record<string, unknown>);
+    vi.fn(async (url: string, init: RequestInit) => {
+      const body = init.body ? (JSON.parse(init.body as string) as Record<string, unknown>) : {};
+      sent.push({ url, method: init.method, ...body });
       const reply = replies.shift()!;
       return new Response(JSON.stringify(reply.body), { status: reply.status });
     }),
@@ -73,7 +74,7 @@ describe('strictSchema', () => {
 });
 
 describe('openaiAnalyst', () => {
-  it('sends a strict, cached, flex request and prices the answer by tier', async () => {
+  it('sends a strict, uncached, flex request in the background and prices the answer by tier', async () => {
     const sent = stubFetch({ status: 200, body: completed(JSON.stringify(answer)) });
     const result = await openaiAnalyst({ apiKey: 'k' }).run(call);
 
@@ -84,21 +85,48 @@ describe('openaiAnalyst', () => {
     expect(result.costUsd).toBeCloseTo(0.00026625, 8);
 
     const body = sent[0]!;
-    expect(body).toMatchObject({ model: 'gpt-6-luna', service_tier: 'flex', store: false, reasoning: { effort: 'low' } });
+    expect(body).toMatchObject({ model: 'gpt-6-luna', background: true, service_tier: 'flex', store: false, reasoning: { effort: 'low' } });
     expect(body.text).toMatchObject({ format: { type: 'json_schema', name: 'speakers', strict: true } });
-    // Breakpoints after the system prompt and the timeline; the task is never cached.
-    const parts = (body.input as { content: { text: string; prompt_cache_breakpoint?: unknown }[] }[]).flatMap((m) => m.content);
-    expect(parts.map((p) => [p.text, !!p.prompt_cache_breakpoint])).toEqual([
-      ['system', true],
-      ['context', true],
-      ['task', false],
+    // A pipeline pass has its own schema, so nothing could reuse a cache write: caching is off.
+    expect(body.prompt_cache_options).toEqual({ mode: 'explicit' });
+    expect(JSON.stringify(body.input)).not.toContain('prompt_cache_breakpoint');
+  });
+
+  it('polls a background response until it finishes', async () => {
+    const sent = stubFetch(
+      { status: 200, body: { id: 'resp_1', status: 'queued' } },
+      { status: 200, body: { id: 'resp_1', status: 'in_progress' } },
+      { status: 200, body: completed(JSON.stringify(answer)) },
+    );
+    const result = await openaiAnalyst({ apiKey: 'k', pollMs: 1 }).run(call);
+    expect(result.output).toEqual(answer);
+    expect(sent.map((r) => [r.method, r.url])).toEqual([
+      ['POST', 'https://api.openai.com/v1/responses'],
+      ['GET', 'https://api.openai.com/v1/responses/resp_1'],
+      ['GET', 'https://api.openai.com/v1/responses/resp_1'],
     ]);
+  });
+
+  it('rides out a failed poll', async () => {
+    stubFetch(
+      { status: 200, body: { id: 'resp_1', status: 'in_progress' } },
+      { status: 502, body: {} },
+      { status: 200, body: completed(JSON.stringify(answer)) },
+    );
+    expect((await openaiAnalyst({ apiKey: 'k', pollMs: 1 }).run(call)).output).toEqual(answer);
   });
 
   it('uses the standard tier for interactive calls', async () => {
     const sent = stubFetch({ status: 200, body: completed(JSON.stringify(answer), { service_tier: 'default' }) });
     const result = await openaiAnalyst({ apiKey: 'k' }).run({ ...call, interactive: true });
     expect(sent[0]!.service_tier).toBe('default');
+    // Breakpoints after the system prompt and the timeline; the task is never cached.
+    const parts = (sent[0]!.input as { content: { text: string; prompt_cache_breakpoint?: unknown }[] }[]).flatMap((m) => m.content);
+    expect(parts.map((p) => [p.text, !!p.prompt_cache_breakpoint])).toEqual([
+      ['system', true],
+      ['context', true],
+      ['task', false],
+    ]);
     expect(result.model).toBe('openai/gpt-6-luna');
   });
 
