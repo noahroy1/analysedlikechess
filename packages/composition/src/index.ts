@@ -9,3 +9,4 @@ export * from './timeline.ts';
 export * from './notation.ts';
 export * from './sounds.ts';
 export * from './placement.ts';
+export * from './layout.ts';

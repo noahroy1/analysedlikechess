@@ -32,13 +32,13 @@ const seek = async (frame) => {
   await sleep(300);
 };
 const shown = () => page.eval(`document.querySelector('[data-testid=stage] [data-testid=subtitle]')?.textContent ?? null`);
-/** The subtitle's font size and width at 1080p. Computed sizes are in composition pixels; the box is scaled by the Player too. */
+/** The subtitle's font size and width in theme units (1080p). Computed sizes are in composition pixels; the box is scaled by the Player too. */
 const measure = () =>
   page.eval(`(() => {
     const el = document.querySelector('[data-testid=stage] [data-testid=subtitle]');
     const { width, height } = ${E}.getState().project.source;
-    const to1080 = 1080 / height;
-    const scale = document.querySelector('[data-testid=stage]').getBoundingClientRect().width / width * (height / 1080);
+    const to1080 = 1080 / Math.min(width, height);
+    const scale = document.querySelector('[data-testid=stage]').getBoundingClientRect().width / width / to1080;
     const cs = getComputedStyle(el);
     return { size: parseFloat(cs.fontSize) * to1080, width: el.getBoundingClientRect().width / scale, weight: cs.fontWeight, family: cs.fontFamily, stroke: cs.webkitTextStrokeWidth, paintOrder: cs.paintOrder };
   })()`);

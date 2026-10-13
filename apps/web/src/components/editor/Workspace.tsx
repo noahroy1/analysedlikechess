@@ -44,6 +44,7 @@ export function Workspace({ left, right }: WorkspaceProps) {
   const selectedId = useEditor((s) => s.selectedId);
   const evalBar = useEditor((s) => s.doc.evalBar);
   const editedSubtitles = useEditor((s) => s.doc.subtitles);
+  const evalBarScale = useEditor((s) => s.doc.evalBarScale);
   const portraitCrop = useEditor((s) => s.portraitCrop);
   const [cropping, setCropping] = useState(false);
   const player = useRef<PlayerRef>(null);
@@ -71,10 +72,10 @@ export function Workspace({ left, right }: WorkspaceProps) {
   const inputProps = useMemo<EpisodeProps>(
     () =>
       episodeProps(
-        { durationSec: source.durationSec, moments, characters, evalBar, subtitles: editedSubtitles, transcript: project.transcript },
+        { durationSec: source.durationSec, moments, characters, evalBar, evalBarScale, subtitles: editedSubtitles, transcript: project.transcript },
         { src: fileUrl(project.id, source.proxy), theme, fileUrl: (file) => fileUrl(project.id, file), sounds },
       ),
-    [project.id, source.proxy, source.durationSec, moments, characters, theme, evalBar, sounds, editedSubtitles, project.transcript],
+    [project.id, source.proxy, source.durationSec, moments, characters, theme, evalBar, evalBarScale, sounds, editedSubtitles, project.transcript],
   );
 
   // Handlers attached once read the latest values here.

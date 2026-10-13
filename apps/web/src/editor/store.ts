@@ -94,22 +94,26 @@ export interface EditorActions {
 export type EditorStore = StoreApi<EditorState & EditorActions>;
 
 const docOf = (project: Project): Doc => ({
+  ...(project.title ? { title: project.title } : {}),
   moments: project.moments,
   characters: project.context.characters,
   themeId: project.themeId,
   ...(project.evalBar ? { evalBar: project.evalBar } : {}),
+  ...(project.evalBarScale ? { evalBarScale: project.evalBarScale } : {}),
   ...(project.subtitles ? { subtitles: project.subtitles } : {}),
 });
 
 /** The project with the doc's changes applied. */
 const applyDoc = (project: Project, doc: Doc): Project => {
-  const { evalBar: _, subtitles: __, ...rest } = project;
+  const { evalBar: _, subtitles: __, title: ___, evalBarScale: ____, ...rest } = project;
   return {
     ...rest,
+    ...(doc.title ? { title: doc.title } : {}),
     moments: doc.moments,
     context: { ...project.context, characters: doc.characters },
     themeId: doc.themeId,
     ...(doc.evalBar ? { evalBar: doc.evalBar } : {}),
+    ...(doc.evalBarScale ? { evalBarScale: doc.evalBarScale } : {}),
     ...(doc.subtitles ? { subtitles: doc.subtitles } : {}),
   };
 };
@@ -282,6 +286,8 @@ export function createEditorStore(initial: Project, deps: EditorDeps): EditorSto
         themeId: doc.themeId,
         ...(doc.evalBar ? { evalBar: doc.evalBar } : {}),
         ...(doc.subtitles ? { subtitles: doc.subtitles } : {}),
+        ...(doc.title ? { title: doc.title } : {}),
+        ...(doc.evalBarScale ? { evalBarScale: doc.evalBarScale } : {}),
       });
       if (outcome.kind === 'conflict') {
         saveAgain = false;

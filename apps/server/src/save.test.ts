@@ -44,6 +44,18 @@ describe('autosave', () => {
     expect(saved.moments[0]!.moveLabel).toBe('Renamed');
   });
 
+  it('saves the name and the bar size, and the list shows the name', async () => {
+    await put({ ...edit(1, 'x'), title: 'Grandpa’s pond', evalBarScale: 0.9 });
+    expect(await store.read(project.id)).toMatchObject({ title: 'Grandpa’s pond', evalBarScale: 0.9 });
+    const list = (await (await app.request('/api/projects')).json()) as { id: string; name: string }[];
+    expect(list.find((p) => p.id === project.id)?.name).toBe('Grandpa’s pond');
+    // Leaving them out goes back to the default name and a full-size bar.
+    await put(edit(2, 'y'));
+    const saved = await store.read(project.id);
+    expect('title' in saved || 'evalBarScale' in saved).toBe(false);
+    expect((await put({ ...edit(3, 'z'), evalBarScale: 0.5 })).status).toBe(400);
+  });
+
   it('rejects a stale version with 409 and changes nothing', async () => {
     await put(edit(1, 'First'));
     const res = await put(edit(1, 'Second'));

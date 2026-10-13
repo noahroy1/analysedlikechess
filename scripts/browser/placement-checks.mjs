@@ -149,7 +149,7 @@ try {
         })()`),
       );
       const who = [doc.characters.find((c) => c.id === m.actorId)?.name].filter(Boolean).join(' ');
-      const unit = (doc.height / 1080) * theme.layout.scale * m.card.scale;
+      const unit = (Math.min(doc.width, doc.height) / 1080) * theme.layout.scale * m.card.scale;
       const estimate = estimateCardSize(m, theme, who).height * unit;
       const actual = drawn.height / drawn.scale;
       rows.push({ look, id: m.id, estimate, actual, ratio: estimate / actual });

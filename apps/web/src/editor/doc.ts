@@ -8,6 +8,7 @@ import {
   type Classification,
   type Eval,
   type EvalBar,
+  type EvalBarScale,
   type EvalBeat,
   type EvaluateResult,
   type Moment,
@@ -20,12 +21,16 @@ import {
 } from '@als/schema';
 import { autoPlaceCard, moveNumbers } from '@als/composition';
 
-/** The part of a project the editor changes: the annotation track, the cast, the look, the evaluation bar and the subtitles. */
+/** The part of a project the editor changes: its name, the annotation track, the cast, the look, the evaluation bar and the subtitles. */
 export interface Doc {
+  /** Absent until the project is renamed. */
+  title?: string;
   moments: Moment[];
   characters: Character[];
   themeId: string;
   evalBar?: EvalBar;
+  /** The bar's size; absent is 100%. */
+  evalBarScale?: EvalBarScale;
   /** Absent while the subtitles follow the transcript; set by the first edit. */
   subtitles?: Subtitle[];
 }
@@ -200,7 +205,7 @@ function whoLine(doc: Doc, moment: Moment): string {
 export function placeCard(doc: Doc, id: string, regions: FrameRegions, theme: Theme, frame: FrameSize): Doc {
   const moment = doc.moments.find((m) => m.id === id);
   if (!moment) throw new EditError('That move no longer exists.');
-  const placed = autoPlaceCard({ moment: { ...moment, regions }, theme, frame, who: whoLine(doc, moment) });
+  const placed = autoPlaceCard({ moment: { ...moment, regions }, theme, frame, who: whoLine(doc, moment), barScale: doc.evalBarScale });
   return updateMoment(doc, id, { regions, ...(placed ? { card: placed.card } : {}) });
 }
 
@@ -225,6 +230,21 @@ export function replaceAutoCards(doc: Doc, theme: Theme, frame: FrameSize): Doc 
 /** Switches the project's look; unlocked holds follow the new theme's timing. */
 export function setTheme(doc: Doc, themeId: string): Doc {
   return doc.themeId === themeId ? doc : { ...doc, themeId };
+}
+
+/** Sizes the evaluation bar; 1 (full size) is stored as absent. Cards placed automatically move to fit the bar's new room. */
+export function setEvalBarScale(doc: Doc, scale: EvalBarScale | 1): Doc {
+  if ((doc.evalBarScale ?? 1) === scale) return doc;
+  const { evalBarScale: _, ...rest } = doc;
+  return scale === 1 ? rest : { ...rest, evalBarScale: scale };
+}
+
+/** Renames the project; a blank name goes back to the movie title or the file's name. */
+export function setTitle(doc: Doc, title: string): Doc {
+  const next = title.trim();
+  if ((doc.title ?? '') === next) return doc;
+  const { title: _, ...rest } = doc;
+  return next ? { ...rest, title: next } : rest;
 }
 
 /** The colour a character plays, for move numbers; undefined clears it. */

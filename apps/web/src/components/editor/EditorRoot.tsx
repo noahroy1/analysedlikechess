@@ -1,8 +1,8 @@
-import type { Analysis, HistoryEntry, Ingest, Project } from '@als/schema';
+import { EVAL_BAR_SCALES, projectName, type Analysis, type EvalBarScale, type HistoryEntry, type Ingest, type Project } from '@als/schema';
 import { useEffect, useRef, useState } from 'react';
 import { THEMES, getTheme } from '@als/theme';
 import { EditorProvider, useEditor, useEditorStore } from '../../editor/context.tsx';
-import { replaceAutoCards, setTheme } from '../../editor/doc.ts';
+import { replaceAutoCards, setEvalBarScale, setTheme, setTitle } from '../../editor/doc.ts';
 import { createEditorStore, type EditorStore, type SaveStatus } from '../../editor/store.ts';
 import { getProject, listHistory, restoreVersion, saveProject } from '../../lib/api.ts';
 import { formatFps, formatTime } from '../../lib/format.ts';
@@ -120,9 +120,7 @@ function Header({ ingest, analysis, onRerunIngest, onDelete }: Omit<EditorRootPr
       </a>
       <div className="min-w-0">
         <div className="flex items-center gap-2">
-          <h1 className="truncate text-lg font-semibold tracking-tight">
-            {project.context.movieTitle || source.originalName || project.id}
-          </h1>
+          <ProjectTitle />
           <StatusBadge ingest={ingest} analysis={analysis} />
         </div>
         <p className="text-xs text-neutral-500 tabular-nums">
@@ -143,6 +141,7 @@ function Header({ ingest, analysis, onRerunIngest, onDelete }: Omit<EditorRootPr
           </HeaderButton>
         </div>
         <ThemePicker />
+        <BarSizePicker />
         <HistoryMenu />
         <RenderMenu />
         <HeaderButton onClick={onRerunIngest} disabled={working} title="Re-run ingest (unchanged steps are skipped)">
@@ -201,6 +200,86 @@ function ThemePicker() {
         {THEMES.map((t) => (
           <option key={t.id} value={t.id}>
             {t.name}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+/** The project's name; click to rename. Saved and undoable like any edit; a blank name goes back to the default. */
+function ProjectTitle() {
+  const store = useEditorStore();
+  const project = useEditor((s) => s.project);
+  const title = useEditor((s) => s.doc.title);
+  // The document's title, not the last saved one, so undo shows at once.
+  const { title: _, ...untitled } = project;
+  const name = projectName(title ? { ...untitled, title } : untitled);
+  const [draft, setDraft] = useState<string | null>(null);
+
+  const commit = () => {
+    if (draft !== null) store.getState().edit((d) => setTitle(d, draft));
+    setDraft(null);
+  };
+
+  if (draft === null) {
+    return (
+      <h1 className="min-w-0 truncate text-lg font-semibold tracking-tight">
+        <button
+          type="button"
+          onClick={() => setDraft(title ?? name)}
+          title="Rename this project"
+          data-testid="project-title"
+          className="block max-w-full truncate text-left decoration-neutral-500 underline-offset-4 hover:underline"
+        >
+          {name}
+        </button>
+      </h1>
+    );
+  }
+  return (
+    <input
+      autoFocus
+      value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+      onFocus={(e) => e.target.select()}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') e.currentTarget.blur();
+        if (e.key === 'Escape') setDraft(null);
+      }}
+      maxLength={120}
+      placeholder={project.context.movieTitle || project.source.originalName || project.id}
+      aria-label="Project name"
+      data-testid="project-title-input"
+      className="w-80 max-w-full rounded-md border border-neutral-600 bg-neutral-900 px-1.5 py-0.5 text-lg font-semibold tracking-tight text-neutral-100 outline-none focus:border-neutral-400"
+    />
+  );
+}
+
+/** The evaluation bar's size, for looks with a bar. Every part shrinks; the bar still runs between the portraits. */
+function BarSizePicker() {
+  const store = useEditorStore();
+  const theme = useEditor((s) => s.theme);
+  const scale = useEditor((s) => s.doc.evalBarScale ?? 1);
+  const { width, height } = useEditor((s) => s.project.source);
+  if (!theme.evalBar) return null;
+  return (
+    <label className="flex items-center gap-1.5 text-xs text-neutral-400" title="Evaluation bar size">
+      Bar
+      <select
+        value={scale}
+        data-testid="bar-size-picker"
+        // Cards placed automatically move to fit the bar's new room.
+        onChange={(e) => {
+          const next = Number(e.target.value) as EvalBarScale | 1;
+          store.getState().edit((d) => replaceAutoCards(setEvalBarScale(d, next), theme, { width, height }));
+        }}
+        className="rounded-md border border-neutral-700 bg-neutral-900 px-2 py-1 text-xs text-neutral-200"
+      >
+        {[1, ...EVAL_BAR_SCALES].map((s) => (
+          <option key={s} value={s}>
+            {Math.round(s * 100)}%
           </option>
         ))}
       </select>

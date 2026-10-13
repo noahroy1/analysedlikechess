@@ -90,7 +90,7 @@ export async function placeCards(
     const regions = results.get(m.id)?.regions ?? m.regions;
     if (!regions) return m;
     const who = [numbers.get(m.id), m.actorId ? names.get(m.actorId) : undefined].filter(Boolean).join(' ');
-    const placed = autoPlaceCard({ moment: { ...m, regions }, theme, frame, who });
+    const placed = autoPlaceCard({ moment: { ...m, regions }, theme, frame, who, barScale: project.evalBarScale });
     return { ...m, regions, ...(placed ? { card: placed.card } : {}) };
   });
   const spent = [...results.values()];

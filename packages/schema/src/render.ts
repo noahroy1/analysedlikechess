@@ -1,19 +1,19 @@
 import { z } from 'zod';
 import type { Source } from './project.ts';
 
-/** Output size: the source's own, or scaled to a standard height. */
+/** Output size: the source's own, or scaled so its shorter side is a standard size (1080p vertical is 1080×1920). */
 export const RENDER_PRESETS = ['source', '1080p', '2160p'] as const;
 export const RenderPresetSchema = z.enum(RENDER_PRESETS);
 export type RenderPreset = z.infer<typeof RenderPresetSchema>;
 
-const PRESET_HEIGHT: Record<Exclude<RenderPreset, 'source'>, number> = { '1080p': 1080, '2160p': 2160 };
+const PRESET_SHORT_SIDE: Record<Exclude<RenderPreset, 'source'>, number> = { '1080p': 1080, '2160p': 2160 };
 
 /**
  * The scale and frame size a preset gives this source, or undefined when it
  * does not scale to whole, even dimensions (H.264 needs them).
  */
 export function presetSize(source: Pick<Source, 'width' | 'height'>, preset: RenderPreset): { scale: number; width: number; height: number } | undefined {
-  const scale = preset === 'source' ? 1 : PRESET_HEIGHT[preset] / source.height;
+  const scale = preset === 'source' ? 1 : PRESET_SHORT_SIDE[preset] / Math.min(source.width, source.height);
   const width = source.width * scale;
   const height = source.height * scale;
   const even = (n: number) => Number.isInteger(n) && n % 2 === 0;

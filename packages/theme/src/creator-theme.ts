@@ -49,8 +49,6 @@ export const creatorTheme: Theme = {
     scale: 1,
     safeMargin: { x: 0.17, top: 0.055, bottom: 0.14 },
   },
-  // Measured on style-ref-*.png (1080p): a Chess.com-style bar whose coloured
-  // part spans x 26-67 and y 112-968, in a 4 px dark frame, between 76 px portraits.
   // Measured on the creator's videos (Oct 12, 2026) and checked against a 1080p
   // frame of ours: Arial Bold 50 px, white with a 5 px black outline outside the
   // letters, centred, baseline 65 px above the bottom.
@@ -64,11 +62,15 @@ export const creatorTheme: Theme = {
     baseline: 65,
     maxWidth: 0.9,
   },
+  // Measured on style-ref-*.png (1080p): a Chess.com-style bar whose coloured
+  // part spans x 26-67 and y 112-968, in a 4 px dark frame, between 76 px portraits.
   evalBar: {
-    left: 26,
+    // 3% of the shorter side (the user's choice, Oct 13, 2026); 32 px at 1080p,
+    // where the creator's portraits sit 22-26 px from the corner.
+    inset: 0.03,
     width: 42,
-    top: 112,
-    bottom: 112,
+    // Measured: the bar's frame tucks 2 px under the top portrait and stops 6 px short of the bottom one.
+    gap: { top: -2, bottom: 6 },
     frameWidth: 4,
     frameColor: 'rgba(12, 10, 6, 0.6)',
     whiteColor: '#fefefe',

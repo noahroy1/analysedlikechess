@@ -1,4 +1,4 @@
-import { typeOutSec, typeOutStartSec, typedWords, type Card, type Theme } from '@als/schema';
+import { themeUnit, typeOutSec, typeOutStartSec, typedWords, type Card, type Theme } from '@als/schema';
 
 export interface FrameSize {
   width: number;
@@ -16,12 +16,12 @@ export interface CardRect {
   top?: number;
   bottom?: number;
   width: number;
-  /** Pixels per theme unit: theme sizes are for a 1080-pixel-tall frame. */
+  /** Pixels per theme unit at the card's scale (see `themeUnit`). */
   unit: number;
 }
 
 export function cardRect(card: Card, frame: FrameSize, theme: Theme): CardRect {
-  const unit = (frame.height / 1080) * theme.layout.scale * card.scale;
+  const unit = themeUnit(frame) * theme.layout.scale * card.scale;
   const width = theme.card.width * unit;
   const { x, top, bottom } = theme.layout.safeMargin;
   // A badge drawn beside the card needs room on the card's left.

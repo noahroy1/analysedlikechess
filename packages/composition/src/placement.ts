@@ -1,4 +1,5 @@
-import { NO_BEST_MOVE, type Box, type Card, type Moment, type Theme } from '@als/schema';
+import { NO_BEST_MOVE, themeUnit, type Box, type Card, type EvalBarScale, type Moment, type Theme } from '@als/schema';
+import { evalBarLayout, type Rect } from './layout.ts';
 
 // Places a move's card on its frozen frame, clear of what the viewer needs to
 // see. Plain TypeScript (no JSX) so the server's analysis can use it too.
@@ -42,13 +43,6 @@ const TOUCH = 0.002;
 
 const grow = (b: Box, by: number): Box => ({ x: b.x - by * b.w, y: b.y - by * b.h, w: b.w * (1 + 2 * by), h: b.h * (1 + 2 * by) });
 
-interface Rect {
-  left: number;
-  top: number;
-  right: number;
-  bottom: number;
-}
-
 export interface Placement {
   card: Card;
   /** The largest share of any face's eyes-to-mouth band, and of any face, the card covers. */
@@ -61,17 +55,19 @@ export interface PlaceInput {
   frame: { width: number; height: number };
   /** The grey line's text ("2... Walter White"), which can wrap. */
   who?: string;
+  /** The project's bar size, which sets the room the bar and its players take. */
+  barScale?: EvalBarScale | undefined;
 }
 
 /**
  * The best place for the card given the frame's regions, or undefined without
  * regions. Deterministic: the same frame and text always give the same card.
  */
-export function autoPlaceCard({ moment, theme, frame, who }: PlaceInput): Placement | undefined {
+export function autoPlaceCard({ moment, theme, frame, who, barScale }: PlaceInput): Placement | undefined {
   const regions = moment.regions;
   if (!regions) return undefined;
   const { width: W, height: H } = frame;
-  const k = H / 1080;
+  const k = themeUnit(frame);
   const toRect = (b: Box): Rect => ({ left: b.x * W, top: b.y * H, right: (b.x + b.w) * W, bottom: (b.y + b.h) * H });
   const faces = regions.faces.map((f) => ({
     face: toRect(f.head),
@@ -80,7 +76,7 @@ export function autoPlaceCard({ moment, theme, frame, who }: PlaceInput): Placem
   }));
   const subject = regions.subject ? toRect(regions.subject) : undefined;
   const bounds = placementBounds(theme, frame);
-  const zones = noGoZones(theme, frame);
+  const zones = noGoZones(theme, frame, barScale);
   const step = Math.max(4, Math.round(12 * k));
 
   const size = estimateCardSize(moment, theme, who);
@@ -124,28 +120,25 @@ export function autoPlaceCard({ moment, theme, frame, who }: PlaceInput): Placem
   return best?.placement ?? { card: { anchor: theme.layout.anchor, scale: 1, placement: 'auto' }, covered: { eyesMouth: 0, face: 0, subject: 0 } };
 }
 
-/** Where a card may go: inside the frame's safe area (YouTube's controls and the subtitles below). */
+/** Where a card may go: 3% in from the sides (of the shorter side), and inside the safe area (YouTube's controls and the subtitles below). */
 function placementBounds(theme: Theme, { width: W, height: H }: { width: number; height: number }): Rect {
-  const edge = 0.03 * W;
+  const edge = 0.03 * Math.min(W, H);
   return { left: edge, top: theme.layout.safeMargin.top * H, right: W - edge, bottom: H - theme.layout.safeMargin.bottom * H };
 }
 
+/** Room beside a portrait for a long name, in bar units. */
+const NAME_ROOM = 300;
+
 /** The evaluation bar and the players' portraits and names beside it. */
-function noGoZones(theme: Theme, { width: W, height: H }: { width: number; height: number }): Rect[] {
-  const bar = theme.evalBar;
-  if (!bar) return [];
-  const k = H / 1080;
-  const fw = bar.frameWidth;
-  const box = bar.portraitSize + 2 * fw;
-  // Room for a long name beside each portrait.
-  const tagWidth = bar.left - fw + box + 10 + 300;
-  const topTag = bar.top - fw - box + 2;
-  const bottomTag = 1080 - bar.bottom + fw + 6;
-  return [
-    { left: 0, top: 0, right: (bar.left + bar.width + fw + 24) * k, bottom: H },
-    { left: 0, top: (topTag - 8) * k, right: tagWidth * k, bottom: (topTag + box + 8) * k },
-    { left: 0, top: (bottomTag - 8) * k, right: tagWidth * k, bottom: Math.min(H, (bottomTag + box + 8) * k) },
-  ].map((r) => ({ ...r, right: Math.min(r.right, W) }));
+function noGoZones(theme: Theme, frame: { width: number; height: number }, barScale = 1): Rect[] {
+  if (!theme.evalBar) return [];
+  const { k, bar, portraits, textLeft } = evalBarLayout(theme.evalBar, frame, barScale);
+  const tag = (p: Rect): Rect => ({ left: 0, top: p.top - 8 * k, right: textLeft + NAME_ROOM * k, bottom: Math.min(frame.height, p.bottom + 8 * k) });
+  return [{ left: 0, top: 0, right: bar.right + 24 * k, bottom: frame.height }, tag(portraits.black), tag(portraits.white)].map((r) => ({
+    ...r,
+    top: Math.max(0, r.top),
+    right: Math.min(r.right, frame.width),
+  }));
 }
 
 const overlap = (a: Rect, b: Rect) =>
@@ -161,7 +154,7 @@ function coverage(parts: Rect[], region: Rect): number {
 const round4 = (n: number) => Math.round(n * 1e4) / 1e4;
 
 // Card size, estimated without a browser: the same blocks MoveCard draws, with
-// text wrapped on Arial-like character widths. Theme units (a 1080-pixel-tall frame).
+// text wrapped on Arial-like character widths. Theme units (see `themeUnit`).
 
 /** Average advance of a character, in ems, for a Helvetica/Arial-like face. */
 function charEm(ch: string): number {

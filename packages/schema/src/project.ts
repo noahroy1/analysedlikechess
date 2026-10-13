@@ -199,9 +199,19 @@ export const AnalysisSchema = z.object({
 });
 export type Analysis = z.infer<typeof AnalysisSchema>;
 
+/** Sizes the evaluation bar can be drawn at; absent is full size. Every part shrinks, and the bar still runs between the portraits. */
+export const EVAL_BAR_SCALES = [0.9, 0.8] as const;
+export const EvalBarScaleSchema = z.union([z.literal(0.9), z.literal(0.8)]);
+export type EvalBarScale = z.infer<typeof EvalBarScaleSchema>;
+
+/** Project name the creator typed; absent until renamed. */
+export const ProjectTitleSchema = z.string().trim().min(1).max(120);
+
 export const ProjectSchema = z
   .object({
     id: Id,
+    /** Set by renaming; the name otherwise falls back to the movie title or the uploaded file's name (`projectName`). */
+    title: ProjectTitleSchema.optional(),
     /** +1 on every save, used for conflict checks. */
     version: z.int().nonnegative(),
     /** ISO 8601. */
@@ -225,6 +235,8 @@ export const ProjectSchema = z
     evalBar: EvalBarSchema.optional(),
     /** Subtitles as edited; absent while they follow the transcript (`subtitlesFromTranscript`). */
     subtitles: z.array(SubtitleSchema).optional(),
+    /** The evaluation bar's size; absent is 100%. */
+    evalBarScale: EvalBarScaleSchema.optional(),
     ingest: IngestSchema,
     analysis: AnalysisSchema,
   })
@@ -302,3 +314,7 @@ export const ProjectSchema = z
     });
   });
 export type Project = z.infer<typeof ProjectSchema>;
+
+/** What the project is called: its own title, else the movie title, else the uploaded file's name. */
+export const projectName = (project: Pick<Project, 'id' | 'title' | 'context' | 'source'>): string =>
+  project.title || project.context.movieTitle || project.source.originalName || project.id;

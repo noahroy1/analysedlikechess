@@ -1,7 +1,16 @@
 import { z } from 'zod';
 import { MoveDraftSchema } from './analyst.ts';
 import { EvalBarSchema, EvalSchema } from './eval.ts';
-import { AnalysisSchema, CharacterSchema, IngestSchema, MomentSchema, SourceSchema, UsageSchema } from './project.ts';
+import {
+  AnalysisSchema,
+  CharacterSchema,
+  EvalBarScaleSchema,
+  IngestSchema,
+  MomentSchema,
+  ProjectTitleSchema,
+  SourceSchema,
+  UsageSchema,
+} from './project.ts';
 import { FrameRegionsSchema } from './regions.ts';
 import { SubtitleSchema } from './subtitles.ts';
 
@@ -138,6 +147,10 @@ export const ProjectEditSchema = z.object({
   evalBar: EvalBarSchema.optional(),
   /** Omitted while the subtitles follow the transcript. */
   subtitles: z.array(SubtitleSchema).optional(),
+  /** Omitted until the project is renamed. */
+  title: ProjectTitleSchema.optional(),
+  /** Omitted at full size. */
+  evalBarScale: EvalBarScaleSchema.optional(),
 });
 export type ProjectEdit = z.infer<typeof ProjectEditSchema>;
 

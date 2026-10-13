@@ -39,8 +39,15 @@ export const TypeOutSchema = z.object({ wordsPerSec: z.number().positive(), word
 export type TypeOut = z.infer<typeof TypeOutSchema>;
 
 /**
- * Every visual choice for cards and holds. Pixel sizes are for a 1080-pixel-tall
- * frame and scale with the frame height and the moment's `card.scale`.
+ * Pixels per theme unit. Theme sizes are for a frame whose shorter side is 1080
+ * pixels (a 1080p landscape frame, or a 1080×1920 vertical one), so text is the
+ * same size on a phone whichever way the clip is shot.
+ */
+export const themeUnit = (frame: { width: number; height: number }): number => Math.min(frame.width, frame.height) / 1080;
+
+/**
+ * Every visual choice for cards and holds. Pixel sizes are theme units (see
+ * `themeUnit`) and scale with the frame and the moment's `card.scale`.
  */
 export const ThemeSchema = z.object({
   id: z.string().min(1),
@@ -84,7 +91,7 @@ export const ThemeSchema = z.object({
   }),
   /**
    * Dialogue subtitles: one centred line above the bottom edge, drawn over the
-   * hold's dim. Absent: no subtitles. Sizes are for a 1080-pixel-tall frame.
+   * hold's dim. Absent: no subtitles. Sizes are theme units.
    */
   subtitles: z
     .object({
@@ -103,15 +110,20 @@ export const ThemeSchema = z.object({
     .optional(),
   /**
    * An evaluation bar on the left edge, Black's player at the top and White's at
-   * the bottom, each with a portrait. Absent: no bar. Sizes are for a 1080-pixel-tall frame.
+   * the bottom, each with a portrait. Absent: no bar. Sizes are theme units and
+   * shrink with the project's bar size; the corner inset does not.
    */
   evalBar: z
     .object({
-      /** The bar's coloured part, without its frame. */
-      left: z.number().nonnegative(),
+      /** Gap from the frame's corners to the portraits and the bar, as a share of the frame's shorter side. */
+      inset: z.number().min(0).max(0.2),
+      /** Width of the bar's coloured part, without its frame. */
       width: z.number().positive(),
-      top: z.number().nonnegative(),
-      bottom: z.number().nonnegative(),
+      /**
+       * Space between the bar's frame and each portrait; negative tucks the bar
+       * under it. The bar runs between the portraits, so it gets longer as they shrink.
+       */
+      gap: z.object({ top: z.number(), bottom: z.number() }),
       /** Dark edge around the bar and the portraits. */
       frameWidth: z.number().nonnegative(),
       frameColor: z.string(),

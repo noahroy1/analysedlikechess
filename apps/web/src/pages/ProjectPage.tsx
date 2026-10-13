@@ -1,4 +1,4 @@
-import type { Analysis, Ingest, Project } from '@als/schema';
+import { projectName, type Analysis, type Ingest, type Project } from '@als/schema';
 import { useCallback, useEffect, useState } from 'react';
 import { EditorRoot } from '../components/editor/EditorRoot.tsx';
 import { StageList, StatusBadge } from '../components/StageList.tsx';
@@ -56,7 +56,7 @@ export function ProjectPage({ id }: { id: string }) {
 
   const remove = async () => {
     if (!project) return;
-    if (!window.confirm(`Delete “${project.context.movieTitle || project.source.originalName || id}” and all its files?`)) return;
+    if (!window.confirm(`Delete “${projectName(project)}” and all its files?`)) return;
     await deleteProject(id);
     window.location.hash = projectsHref;
   };
@@ -94,7 +94,7 @@ export function ProjectPage({ id }: { id: string }) {
       </a>
       <header className="mt-3 flex items-center gap-2">
         <h1 className="truncate text-xl font-semibold tracking-tight">
-          {project.context.movieTitle || source.originalName || project.id}
+          {projectName(project)}
         </h1>
         <StatusBadge ingest={ingest} analysis={analysis} />
       </header>

@@ -2,6 +2,7 @@ import type { FaceRegion, FrameRegions, Moment } from '@als/schema';
 import { creatorTheme, defaultTheme } from '@als/theme';
 import { describe, expect, it } from 'vitest';
 import { MIN_AUTO_SCALE, autoPlaceCard, estimateCardSize, wrapLines } from './placement.ts';
+import { evalBarLayout } from './layout.ts';
 
 const frame = { width: 1920, height: 1080 };
 const W = frame.width;
@@ -88,8 +89,7 @@ describe('autoPlaceCard', () => {
     // Everything but the left edge is taken, so the card would go as far left as it may.
     const p = placed({ sourceTime: 1, faces: wallsAround(900, 900) }, creatorTheme);
     const badgeLeft = p.card.x! * W - (creatorTheme.card.badgeSize + creatorTheme.card.badgeGap) * p.card.scale;
-    const bar = creatorTheme.evalBar!;
-    expect(badgeLeft).toBeGreaterThanOrEqual(bar.left + bar.width);
+    expect(badgeLeft).toBeGreaterThanOrEqual(evalBarLayout(creatorTheme.evalBar!, { width: W, height: H }).bar.right);
   });
 
   it('stays inside the safe area, above YouTube’s controls and the subtitles', () => {
@@ -102,6 +102,32 @@ describe('autoPlaceCard', () => {
   it('is deterministic', () => {
     const regions = { sourceTime: 1, faces: [face(700, 200, 1100, 700)], subject: { x: 0.1, y: 0.5, w: 0.2, h: 0.2 } };
     expect(placed(regions)).toEqual(placed(regions));
+  });
+});
+
+describe('autoPlaceCard on a vertical frame', () => {
+  const vertical = { width: 576, height: 1024 };
+
+  it('fits the creator card and its badge inside the frame, clear of the bar', () => {
+    // One face low in the frame, as in a phone clip.
+    const head = { x: 0.3, y: 0.55, w: 0.4, h: 0.25 };
+    const p = autoPlaceCard({ moment: moment({ sourceTime: 1, faces: [{ head, eyesMouth: head }] }), theme: creatorTheme, frame: vertical })!;
+    expect(p.card.anchor).toBe('custom');
+    const u = (576 / 1080) * p.card.scale;
+    const size = estimateCardSize(moment(), creatorTheme);
+    const left = p.card.x! * vertical.width;
+    const badgeLeft = left - (creatorTheme.card.badgeSize + creatorTheme.card.badgeGap) * u;
+    expect(badgeLeft).toBeGreaterThanOrEqual(evalBarLayout(creatorTheme.evalBar!, vertical).bar.right);
+    expect(left + size.width * u).toBeLessThanOrEqual(vertical.width);
+    expect(p.covered.eyesMouth).toBe(0);
+  });
+
+  it('sits closer to a smaller bar', () => {
+    // A face down the right edge pushes the card as far left as the bar allows.
+    const right = { x: 0.9, y: 0, w: 0.1, h: 1 };
+    const at = (barScale?: 0.8) =>
+      autoPlaceCard({ moment: moment({ sourceTime: 1, faces: [{ head: right, eyesMouth: right }] }), theme: creatorTheme, frame: vertical, barScale })!;
+    expect(at(0.8).card.x!).toBeLessThan(at().card.x!);
   });
 });
 

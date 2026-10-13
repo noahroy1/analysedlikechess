@@ -225,6 +225,21 @@ describe('doc operations', () => {
     expect(store.getState().doc.moments[0]!.holdSec).toBe(before);
   });
 
+  it('renames the project and sizes the bar as saved, undoable edits', async () => {
+    const { store, deps } = setup();
+    store.getState().edit((d) => ops.setTitle(d, '  Grandpa’s pond  '));
+    store.getState().edit((d) => ops.setEvalBarScale(d, 0.8));
+    await vi.advanceTimersByTimeAsync(AUTOSAVE_DELAY_MS);
+    expect(deps.save).toHaveBeenLastCalledWith(expect.objectContaining({ title: 'Grandpa’s pond', evalBarScale: 0.8 }));
+    expect(store.getState().project).toMatchObject({ title: 'Grandpa’s pond', evalBarScale: 0.8 });
+    // Back to full size and a blank name: both are stored as absent.
+    expect('evalBarScale' in ops.setEvalBarScale(store.getState().doc, 1)).toBe(false);
+    expect('title' in ops.setTitle(store.getState().doc, ' ')).toBe(false);
+    store.getState().undo();
+    store.getState().undo();
+    expect(store.getState().doc.title).toBeUndefined();
+  });
+
   it('assigning a speaker label takes it off everyone else', () => {
     const next = ops.assignSpeaker(doc(), 'A', 'c-blue');
     expect(next.characters.map((c) => c.speakerLabels)).toEqual([[], ['B', 'A']]);

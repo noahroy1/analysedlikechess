@@ -5,6 +5,7 @@ import { AbsoluteFill, Freeze, Sequence, useCurrentFrame, useVideoConfig } from 
 import { cardMotion, revealAt, type FrameSize } from './card.ts';
 import { EvalBar, barPlayers } from './EvalBar.tsx';
 import { evalBarAt, placeKeyframes } from './eval-bar.ts';
+import { evalBarLayout, type BarLayout } from './layout.ts';
 import { MoveCard } from './MoveCard.tsx';
 import { moveNumbers } from './notation.ts';
 import { soundCues } from './sounds.ts';
@@ -16,7 +17,7 @@ import { buildTimeline, timeMapFrame, type Segment } from './timeline.ts';
  * moment. Pure: everything arrives through props, and every frame is derived
  * from the frame number, so the Player and the renderer draw identical frames.
  */
-export function Episode({ src, durationSec, moments, characters, theme, evalBar, portraits, sounds, subtitles }: EpisodeProps) {
+export function Episode({ src, durationSec, moments, characters, theme, evalBar, evalBarScale, portraits, sounds, subtitles }: EpisodeProps) {
   const { fps, width, height } = useVideoConfig();
   const frame = useCurrentFrame();
   const timeline = useMemo(() => buildTimeline(moments, fps, durationSec), [moments, fps, durationSec]);
@@ -25,6 +26,10 @@ export function Episode({ src, durationSec, moments, characters, theme, evalBar,
     [evalBar, moments, characters, timeline],
   );
   const players = useMemo(() => barPlayers(characters, moments, portraits), [characters, moments, portraits]);
+  const barLayout = useMemo(
+    () => (theme.evalBar ? evalBarLayout(theme.evalBar, { width, height }, evalBarScale) : undefined),
+    [theme.evalBar, width, height, evalBarScale],
+  );
   const names = useMemo(() => new Map(characters.map((c) => [c.id, c.name])), [characters]);
   const numbers = useMemo(() => moveNumbers(moments, characters), [moments, characters]);
   const cues = useMemo(
@@ -63,7 +68,7 @@ export function Episode({ src, durationSec, moments, characters, theme, evalBar,
           </Sequence>
         );
       })}
-      {theme.subtitles && subtitles && <Subtitle subtitles={subtitles} sourceSec={timeMapFrame(timeline, frame).sourceFrame / fps} style={theme.subtitles} frame={{ width, height }} />}
+      {theme.subtitles && subtitles && <Subtitle subtitles={subtitles} sourceSec={timeMapFrame(timeline, frame).sourceFrame / fps} style={theme.subtitles} frame={{ width, height }} bar={barLayout} />}
       {theme.evalBar && (
         <EvalBar
           state={evalBarAt(evalBar?.start ?? DEFAULT_START_EVAL, evalTrack, frame, fps)}
@@ -71,6 +76,7 @@ export function Episode({ src, durationSec, moments, characters, theme, evalBar,
           style={theme.evalBar}
           fontFamily={theme.card.fontFamily}
           frame={{ width, height }}
+          scale={evalBarScale}
         />
       )}
       {cues.map((cue) => (
@@ -91,9 +97,9 @@ export function Episode({ src, durationSec, moments, characters, theme, evalBar,
 }
 
 /** The line on screen at a source time. A hold shows its frozen frame's time, so the line spoken before it stays up. */
-function Subtitle({ subtitles, sourceSec, style, frame }: { subtitles: NonNullable<EpisodeProps['subtitles']>; sourceSec: number; style: NonNullable<Theme['subtitles']>; frame: FrameSize }) {
+function Subtitle({ subtitles, sourceSec, style, frame, bar }: { subtitles: NonNullable<EpisodeProps['subtitles']>; sourceSec: number; style: NonNullable<Theme['subtitles']>; frame: FrameSize; bar: BarLayout | undefined }) {
   const line = subtitleAt(subtitles, sourceSec);
-  return line?.text.trim() ? <SubtitleLine text={line.text.trim()} style={style} frame={frame} /> : null;
+  return line?.text.trim() ? <SubtitleLine text={line.text.trim()} style={style} frame={frame} bar={bar} /> : null;
 }
 
 interface SegmentViewProps {
