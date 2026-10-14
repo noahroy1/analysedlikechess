@@ -15,7 +15,7 @@ const regionsAt = (sourceTime: number): FrameRegions => ({
   faces: [{ head: { x: 0.6, y: 0.05, w: 0.3, h: 0.6 }, eyesMouth: { x: 0.65, y: 0.2, w: 0.2, h: 0.3 } }],
 });
 
-const docOf = (project: Project): ops.Doc => ({ moments: project.moments, characters: project.context.characters, themeId: project.themeId });
+const docOf = (project: Project): ops.Doc => ({ moments: project.moments, characters: project.context.characters, themeId: project.themeId, format: 'long' });
 const m1 = (doc: ops.Doc) => doc.moments.find((m) => m.id === 'm1')!;
 
 /** The sample with m1's card placed automatically on its frame. */

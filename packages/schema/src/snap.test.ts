@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { autoHoldSec, DEFAULT_REREAD_SEC, DEFAULT_TYPE_OUT, typeOutSec, typeOutStartSec } from './rules.ts';
+import { FORMAT_RULES, guessFormat, projectFormat } from './format.ts';
+import { autoHoldSec, DEFAULT_TYPE_OUT, typeOutSec, typeOutStartSec } from './rules.ts';
 import { cleanFrameRange, cleanFreezeTime, freezeAfterSpeech, speechSnapTargets } from './snap.ts';
 
 const FPS = 30;
@@ -64,26 +65,56 @@ describe('speechSnapTargets', () => {
   });
 });
 
-const defaultTiming = { badgeDelaySec: 0, badgePopSec: 0, cardInSec: 0.25, typeOut: DEFAULT_TYPE_OUT, rereadSec: DEFAULT_REREAD_SEC, cardOutSec: 0.2 };
+const defaultTiming = { badgeDelaySec: 0, badgePopSec: 0, cardInSec: 0.25, typeOut: DEFAULT_TYPE_OUT, cardOutSec: 0.2 };
+const creatorTiming = { badgeDelaySec: 0.3, badgePopSec: 0.2, cardInSec: 0.25, typeOut: DEFAULT_TYPE_OUT, cardOutSec: 0 };
+const words = (n: number) => Array.from({ length: n }, (_, i) => `w${i}`).join(' ');
 
 describe('autoHoldSec', () => {
-  // Card in and out total 0.5 s and the reread is 4 s, so expectations are exact.
-  const timing = { badgeDelaySec: 0, badgePopSec: 0, cardInSec: 0.3, typeOut: { wordsPerSec: 5, wordFadeSec: 0.2 }, rereadSec: 4, cardOutSec: 0.2 };
+  // Card in and out total 0.5 s and the long-form reread is 4 s, so expectations are exact.
+  const timing = { badgeDelaySec: 0, badgePopSec: 0, cardInSec: 0.3, typeOut: { wordsPerSec: 5, wordFadeSec: 0.2 }, cardOutSec: 0.2 };
 
   it('is the card animations plus the reread for an empty explanation', () => {
-    expect(autoHoldSec({ explanation: '' }, timing)).toBe(4.5);
-    expect(autoHoldSec({ explanation: ' \n ' }, timing)).toBe(4.5);
+    expect(autoHoldSec({ explanation: '' }, timing, 'long')).toBe(4.5);
+    expect(autoHoldSec({ explanation: ' \n ' }, timing, 'long')).toBe(4.5);
   });
 
   it('adds the type-out: a word every 1 / wordsPerSec, the last one fading in', () => {
     expect(typeOutSec('one', timing.typeOut)).toBeCloseTo(0.2);
     expect(typeOutSec(' one  two three four five six ', timing.typeOut)).toBeCloseTo(1.2);
-    expect(autoHoldSec({ explanation: 'one two three four five six' }, timing)).toBe(5.7);
+    expect(autoHoldSec({ explanation: 'one two three four five six' }, timing, 'long')).toBe(5.7);
   });
 
   it('matches the creator: a 27-word breakdown holds about 9.4 s', () => {
-    const words = Array.from({ length: 27 }, (_, i) => `w${i}`).join(' ');
-    expect(autoHoldSec({ explanation: words }, defaultTiming)).toBeCloseTo(9.3, 1);
+    expect(autoHoldSec({ explanation: words(27) }, defaultTiming, 'long')).toBeCloseTo(9.3, 1);
+  });
+
+  it('matches the short-form benchmark: its holds, set by hand, within 0.2 s on average', () => {
+    // Words in each breakdown and the hold the user set (Private Property, creator look).
+    const benchmark: [number, number][] = [[14, 5], [3, 2.7], [5, 3], [5, 2.7], [4, 2.7], [6, 3.2], [5, 2.7], [9, 4]];
+    const errors = benchmark.map(([n, hold]) => Math.abs(autoHoldSec({ explanation: words(n) }, creatorTiming, 'short') - hold));
+    expect(errors.reduce((a, b) => a + b) / errors.length).toBeLessThan(0.2);
+    expect(Math.max(...errors)).toBeLessThan(0.45);
+  });
+});
+
+describe('formats', () => {
+  it('guesses short-form for vertical clips only', () => {
+    expect(guessFormat({ width: 576, height: 1024 })).toBe('short');
+    expect(guessFormat({ width: 1920, height: 1080 })).toBe('long');
+    expect(guessFormat({ width: 1080, height: 1080 })).toBe('long');
+  });
+
+  it('keeps a format set by hand over the guess', () => {
+    expect(projectFormat({ source: { width: 576, height: 1024 } })).toBe('short');
+    expect(projectFormat({ format: 'long', source: { width: 576, height: 1024 } })).toBe('long');
+  });
+
+  it('paces short-form faster on every count', () => {
+    const { short, long } = FORMAT_RULES;
+    expect(short.secondsPerMove).toBeLessThan(long.secondsPerMove);
+    expect(short.rereadSec).toBeLessThan(long.rereadSec);
+    expect(short.textCaps.explanation).toBeLessThan(long.textCaps.explanation);
+    expect(short.beatClearanceSec).toBeLessThan(long.beatClearanceSec);
   });
 });
 

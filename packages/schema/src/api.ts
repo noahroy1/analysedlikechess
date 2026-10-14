@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { MoveDraftSchema } from './analyst.ts';
 import { EvalBarSchema, EvalSchema } from './eval.ts';
+import { FormatSchema } from './format.ts';
 import {
   AnalysisSchema,
   CharacterSchema,
@@ -75,7 +76,8 @@ export type AnalysisEvent = z.infer<typeof AnalysisEventSchema>;
 /** Start analysis. `rerun: 'analyst'` re-drafts with the cached transcript and scene notes. */
 export const AnalyzeRequestSchema = z.object({
   rerun: z.enum(['analyst', 'all']).optional(),
-  secondsPerMove: z.number().positive().optional(),
+  /** Pass B's density; null goes back to the format's, absent keeps the project's. */
+  secondsPerMove: z.number().positive().nullable().optional(),
 });
 export type AnalyzeRequest = z.infer<typeof AnalyzeRequestSchema>;
 
@@ -83,6 +85,8 @@ export type AnalyzeRequest = z.infer<typeof AnalyzeRequestSchema>;
 export const RegenerateRequestSchema = z.object({
   moment: MomentSchema,
   instruction: z.string().max(500).optional(),
+  /** The editor's format, which may not be saved yet; absent is the project's. */
+  format: FormatSchema.optional(),
 });
 export type RegenerateRequest = z.infer<typeof RegenerateRequestSchema>;
 
@@ -115,6 +119,8 @@ export const EvaluateRequestSchema = z.object({
   moments: z.array(MomentSchema),
   characters: z.array(CharacterSchema),
   evalBar: EvalBarSchema.optional(),
+  /** The editor's format, which may not be saved yet; absent is the project's. */
+  format: FormatSchema.optional(),
 });
 export type EvaluateRequest = z.infer<typeof EvaluateRequestSchema>;
 
@@ -143,6 +149,8 @@ export const ProjectEditSchema = z.object({
   moments: z.array(MomentSchema),
   characters: z.array(CharacterSchema),
   themeId: z.string().min(1),
+  /** The editor always sends it (its first value is the clip's guess); older clients omit it, which keeps the saved one. */
+  format: FormatSchema.optional(),
   /** Omitted until the project has a bar; once set it is always sent. */
   evalBar: EvalBarSchema.optional(),
   /** Omitted while the subtitles follow the transcript. */

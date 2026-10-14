@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { FORMAT_RULES, type Format } from './format.ts';
 
 /** Ordered best to worst. Keys 1 to 0 in the editor map onto this order. */
 export const CLASSIFICATIONS = [
@@ -23,12 +24,9 @@ export type Classification = z.infer<typeof ClassificationSchema>;
  */
 export const NO_BEST_MOVE: ReadonlySet<Classification> = new Set(['brilliant', 'great', 'best', 'book']);
 
-/** Book moves belong to the scene's opening: none after this many source seconds. */
-export const BOOK_WINDOW_SEC = 30;
-
-/** A textbook move after the opening is just a good one. */
-export const relabelLateBook = (classification: Classification, sourceTime: number): Classification =>
-  classification === 'book' && sourceTime > BOOK_WINDOW_SEC ? 'good' : classification;
+/** A textbook move after the opening (the format's `bookWindowSec`) is just a good one. */
+export const relabelLateBook = (classification: Classification, sourceTime: number, format: Format): Classification =>
+  classification === 'book' && sourceTime > FORMAT_RULES[format].bookWindowSec ? 'good' : classification;
 
 /** The annotation symbol written after a move, as in "Whole Wallet!!". */
 export const NOTATION: Record<Classification, string> = {

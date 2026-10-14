@@ -4,8 +4,8 @@ import {
   CLASSIFICATIONS,
   MomentSchema,
   ProjectSchema,
-  TEXT_CAPS,
   momentWarnings,
+  textCaps,
   toJsonSchema,
   type Moment,
   type Project,
@@ -33,7 +33,7 @@ describe('fixture', () => {
   it('has three moments and no soft warnings', () => {
     const project = ProjectSchema.parse(loadFixture());
     expect(project.moments).toHaveLength(3);
-    for (const moment of project.moments) expect(momentWarnings(moment)).toEqual([]);
+    for (const moment of project.moments) expect(momentWarnings(moment, 'long')).toEqual([]);
   });
 });
 
@@ -141,15 +141,22 @@ describe('momentWarnings', () => {
   const moment = (): Moment => loadFixture().moments[0]!;
 
   it('warns when text is over its cap but the moment still validates', () => {
-    const long = { ...moment(), explanation: 'x'.repeat(TEXT_CAPS.explanation + 1) };
+    const cap = textCaps('long').explanation;
+    const long = { ...moment(), explanation: 'x'.repeat(cap + 1) };
     expect(MomentSchema.safeParse(long).success).toBe(true);
-    expect(momentWarnings(long)).toEqual([
-      { field: 'explanation', message: `explanation is ${TEXT_CAPS.explanation + 1} characters, over the cap of ${TEXT_CAPS.explanation}` },
+    expect(momentWarnings(long, 'long')).toEqual([
+      { field: 'explanation', message: `explanation is ${cap + 1} characters, over the cap of ${cap}` },
     ]);
   });
 
+  it('holds short-form breakdowns to a shorter cap', () => {
+    const text = { ...moment(), explanation: 'x'.repeat(textCaps('short').explanation + 1) };
+    expect(momentWarnings(text, 'long')).toEqual([]);
+    expect(momentWarnings(text, 'short').map((w) => w.field)).toEqual(['explanation']);
+  });
+
   it('warns about a bestMove on a best or brilliant rating', () => {
-    expect(momentWarnings({ ...moment(), classification: 'best' })).toEqual([
+    expect(momentWarnings({ ...moment(), classification: 'best' }, 'long')).toEqual([
       expect.objectContaining({ field: 'bestMove' }),
     ]);
   });
@@ -170,7 +177,7 @@ describe('demo moments', () => {
     const demo = JSON.parse(readFileSync(url, 'utf8')) as { moments: unknown[] };
     for (const raw of demo.moments) {
       const moment = MomentSchema.parse(raw);
-      expect(momentWarnings(moment)).toEqual([]);
+      expect(momentWarnings(moment, 'long')).toEqual([]);
     }
   });
 });

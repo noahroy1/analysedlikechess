@@ -1,4 +1,4 @@
-import { CARD_ANCHORS, NO_BEST_MOVE, TEXT_CAPS, autoHoldSec, evalWarnings, momentWarnings, placedByHand, regionsFresh, type Card, type Moment } from '@als/schema';
+import { CARD_ANCHORS, NO_BEST_MOVE, autoHoldSec, textCaps, evalWarnings, momentWarnings, placedByHand, regionsFresh, type Card, type Moment } from '@als/schema';
 import { sourceFrameToOut } from '@als/composition';
 import { useState, type ReactNode } from 'react';
 import { deleteMoment, retime, setCardByHand, setMomentEval, updateMoment } from '../../editor/doc.ts';
@@ -51,9 +51,10 @@ export function Inspector() {
   const utterances = project.transcript?.utterances ?? [];
   const evidence = moment.evidence.utteranceIds.map((id) => utterances.find((u) => u.id === id)).filter((u) => u !== undefined);
   const speakerName = (label: string) => characters.find((c) => c.speakerLabels.includes(label))?.name ?? `Speaker ${label}`;
-  const warnings = momentWarnings(moment);
-  const barWarnings = evalWarnings(doc.evalBar, doc.moments, characters).get(moment.id) ?? [];
-  const autoHold = autoHoldSec(moment, theme.timing);
+  const warnings = momentWarnings(moment, doc.format);
+  const barWarnings = evalWarnings(doc.evalBar, doc.moments, characters, doc.format).get(moment.id) ?? [];
+  const autoHold = autoHoldSec(moment, theme.timing, doc.format);
+  const caps = textCaps(doc.format);
 
   return (
     <div className="space-y-4 text-sm" data-testid="inspector">
@@ -78,11 +79,11 @@ export function Inspector() {
         </select>
       </Field>
 
-      <Field label="Label" count={[moment.moveLabel.length, TEXT_CAPS.moveLabel]}>
+      <Field label="Label" count={[moment.moveLabel.length, caps.moveLabel]}>
         <input value={moment.moveLabel} onChange={(e) => set({ moveLabel: e.target.value }, 'moveLabel')} className="input" />
       </Field>
 
-      <Field label="Breakdown" count={[moment.explanation.length, TEXT_CAPS.explanation]}>
+      <Field label="Breakdown" count={[moment.explanation.length, caps.explanation]}>
         <textarea
           value={moment.explanation}
           onChange={(e) => set({ explanation: e.target.value.replace(/\n/g, ' ') }, 'explanation')}
@@ -96,7 +97,7 @@ export function Inspector() {
           {theme.classifications[moment.classification].label} moves have no best move.
         </p>
       ) : (
-        <Field label="Best move" count={[moment.bestMove?.length ?? 0, TEXT_CAPS.bestMove]}>
+        <Field label="Best move" count={[moment.bestMove?.length ?? 0, caps.bestMove]}>
           <textarea
             value={moment.bestMove ?? ''}
             onChange={(e) => set({ bestMove: e.target.value ? e.target.value.replace(/\n/g, ' ') : undefined }, 'bestMove')}
@@ -106,7 +107,7 @@ export function Inspector() {
         </Field>
       )}
 
-      <Field label="Motif" count={[moment.motif?.length ?? 0, TEXT_CAPS.motif]}>
+      <Field label="Motif" count={[moment.motif?.length ?? 0, caps.motif]}>
         <input
           value={moment.motif ?? ''}
           placeholder="Sacrifice, Zwischenzug, Quiet Move…"

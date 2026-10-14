@@ -1,4 +1,4 @@
-import { CARD_ANCHORS, NO_BEST_MOVE, TEXT_CAPS, type Card, type Moment } from '@als/schema';
+import { CARD_ANCHORS, NO_BEST_MOVE, textCaps, type Card, type Moment } from '@als/schema';
 import { MoveCard, cardRect, moveNumbers, type CardField } from '@als/composition';
 import { useLayoutEffect, useMemo, useRef, useState, type PointerEvent } from 'react';
 import { setCardByHand, updateMoment } from '../../editor/doc.ts';
@@ -227,13 +227,15 @@ function Toolbar(props: {
 }) {
   const { moment, picking } = props;
   const theme = useEditor((s) => s.theme);
+  const format = useEditor((s) => s.doc.format);
   const store = useEditorStore();
   const style = theme.classifications[moment.classification];
   // Above the card when there is room, otherwise below it.
   const above = props.top > 44;
-  const counters = (Object.keys(TEXT_CAPS) as CardField[])
+  const caps = textCaps(format);
+  const counters = (Object.keys(caps) as CardField[])
     .filter((f) => f !== 'bestMove' || !NO_BEST_MOVE.has(moment.classification))
-    .map((f) => ({ f, n: (moment[f] ?? '').length, cap: TEXT_CAPS[f] }));
+    .map((f) => ({ f, n: (moment[f] ?? '').length, cap: caps[f] }));
   const LABEL: Record<CardField, string> = { moveLabel: 'Label', explanation: 'Breakdown', bestMove: 'Best', motif: 'Motif' };
 
   const picker = picking && (

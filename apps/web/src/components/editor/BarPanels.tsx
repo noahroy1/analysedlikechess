@@ -62,7 +62,7 @@ export function BeatInspector({ beat }: { beat: EvalBeat }) {
   const { fps, timeline, seek, pause } = usePlayback();
   const set = (patch: Partial<Omit<EvalBeat, 'id'>>, coalesce?: string) =>
     store.getState().edit((d) => updateBeat(d, beat.id, patch, durationSec), coalesce ? { coalesce: `${beat.id}.${coalesce}` } : undefined);
-  const warnings = evalWarnings(doc.evalBar, doc.moments, doc.characters).get(beat.id) ?? [];
+  const warnings = evalWarnings(doc.evalBar, doc.moments, doc.characters, doc.format).get(beat.id) ?? [];
 
   return (
     <div className="space-y-4 text-sm" data-testid="beat-inspector">
@@ -151,7 +151,7 @@ export function BarPanel() {
   const { timeline, frame, fps } = usePlayback();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const warnings = [...evalWarnings(doc.evalBar, doc.moments, doc.characters).values()].flat().length;
+  const warnings = [...evalWarnings(doc.evalBar, doc.moments, doc.characters, doc.format).values()].flat().length;
   const valued = doc.moments.filter((m) => m.eval).length;
   const beats = doc.evalBar?.beats.length ?? 0;
 

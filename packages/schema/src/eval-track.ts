@@ -1,13 +1,12 @@
 import type { Classification } from './classification.ts';
 import {
-  BEAT_CLEARANCE_SEC,
-  BEAT_MAX_SWING,
   DEFAULT_START_EVAL,
   evalFill,
   swingFits,
   type Eval,
   type EvalBar,
 } from './eval.ts';
+import { FORMAT_RULES, type Format } from './format.ts';
 import type { Character, Moment } from './project.ts';
 
 /** One change of the bar: a move's eval at its freeze, or a beat's during play. */
@@ -58,7 +57,9 @@ export function evalWarnings(
   evalBar: EvalBar | undefined,
   moments: readonly Moment[],
   characters: readonly Character[],
+  format: Format,
 ): Map<string, string[]> {
+  const { beatMaxSwing, beatClearanceSec } = FORMAT_RULES[format];
   const warnings = new Map<string, string[]>();
   // A project nobody has valued yet has nothing to warn about.
   if (!evalBar && !moments.some((m) => m.eval)) return warnings;
@@ -76,11 +77,11 @@ export function evalWarnings(
     }
     if (k.kind === 'beat') {
       const swing = Math.abs(evalFill(k.eval) - evalFill(k.before));
-      if (swing > BEAT_MAX_SWING + 1e-9) {
-        add(k.id, `Moves the bar ${Math.round(swing * 100)}%; beats stay under ${Math.round(BEAT_MAX_SWING * 100)}% so big swings get a card`);
+      if (swing > beatMaxSwing + 1e-9) {
+        add(k.id, `Moves the bar ${Math.round(swing * 100)}%; beats stay under ${Math.round(beatMaxSwing * 100)}% so big swings get a card`);
       }
-      const near = [keyframes[i - 1], keyframes[i + 1]].find((o) => o && Math.abs(o.sourceTime - k.sourceTime) < BEAT_CLEARANCE_SEC);
-      if (near) add(k.id, `Within ${BEAT_CLEARANCE_SEC} s of another change of the bar`);
+      const near = [keyframes[i - 1], keyframes[i + 1]].find((o) => o && Math.abs(o.sourceTime - k.sourceTime) < beatClearanceSec);
+      if (near) add(k.id, `Within ${beatClearanceSec} s of another change of the bar`);
     }
   });
   return warnings;

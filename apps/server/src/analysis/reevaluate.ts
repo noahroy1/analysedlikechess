@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import {
   DEFAULT_START_EVAL,
   evaluationSchema,
+  projectFormat,
   type Annotation,
   type DecisionPoints,
   type EvalBeat,
@@ -28,7 +29,13 @@ export async function reevaluate(
   project: Project,
   request: EvaluateRequest,
 ): Promise<EvaluateResult> {
-  const current: Project = { ...project, moments: request.moments, context: { ...project.context, characters: request.characters } };
+  const current: Project = {
+    ...project,
+    moments: request.moments,
+    context: { ...project.context, characters: request.characters },
+    ...(request.format ? { format: request.format } : {}),
+  };
+  const format = projectFormat(current);
   const track = {
     moments: request.moments,
     characters: request.characters,
@@ -41,12 +48,12 @@ export async function reevaluate(
     model: deps.config.models.analyst,
     effort: 'medium',
     interactive: true,
-    system: systemPrompt(deps.style),
+    system: systemPrompt(deps.style, format),
     context: timelineText(current),
-    task: evaluationTask(items),
+    task: evaluationTask(items, format),
     schema,
   });
-  const applied = applyEvaluation(track, result.output);
+  const applied = applyEvaluation(track, result.output, format);
   await logUsage(deps.store, project.id, 'evaluate', result.costUsd);
   return {
     evalBar: applied.evalBar,

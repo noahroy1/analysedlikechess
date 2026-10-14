@@ -1,7 +1,8 @@
 import { z } from 'zod';
 import { ClassificationSchema } from './classification.ts';
 import type { Eval } from './eval.ts';
-import { TEXT_CAPS } from './rules.ts';
+import type { Format } from './format.ts';
+import { textCaps } from './rules.ts';
 
 // Structured outputs for the analysis pipeline. They are built per clip so the
 // cast, the candidate ids and the transcript's utterance ids are enums: the
@@ -36,6 +37,13 @@ export const decisionPointsSchema = (cast: readonly string[], utteranceIds: read
         action: z.string().describe('What the character did, in a sentence'),
         alternatives: z.array(z.string()).describe('Other options that were open to them'),
         evidenceUtteranceIds: z.array(enumOf(utteranceIds, 'none')).describe('Utterances that show the choice; empty for purely visual moves'),
+        moveLine: z
+          .object({
+            utteranceId: enumOf(utteranceIds, 'none'),
+            lastWords: z.string().describe('The last two to five words of the move, copied exactly from that utterance'),
+          })
+          .nullable()
+          .describe('For spoken moves, where the move is said: the video freezes right after these words, before anyone answers. Null for visual moves'),
         visualTimeSec: z.number().nullable().describe('For visual moves, when the action happens (seconds); null for spoken moves'),
       }),
     ),
@@ -43,39 +51,51 @@ export const decisionPointsSchema = (cast: readonly string[], utteranceIds: read
 export type DecisionPoints = z.infer<ReturnType<typeof decisionPointsSchema>>;
 export type Candidate = DecisionPoints['candidates'][number];
 
-const moveFields = {
-  classification: ClassificationSchema,
-  moveLabel: z.string().describe(`Move name: two or three words in Title Case (${TEXT_CAPS.moveLabel} characters at most)`),
-  explanation: z
-    .string()
-    .describe(`Two sentences: what they did, then why it earned this rating (${TEXT_CAPS.explanation} characters at most)`),
-  bestMove: z
-    .string()
-    .nullable()
-    .describe(
-      `The better move: a two to four word command in Title Case (${TEXT_CAPS.bestMove} characters at most); null for brilliant, great, best and book`,
-    ),
-  motif: z
-    .string()
-    .nullable()
-    .describe(
-      `The chess idea behind the move as a short Title Case chip (${TEXT_CAPS.motif} characters at most), e.g. Sacrifice, Zwischenzug, Quiet Move, Check, Fork, Pin, Gambit; null when none fits`,
-    ),
-  confidence: z.number().describe('0-1: how sure you are this belongs in the episode as rated'),
+const moveFields = (format: Format) => {
+  const caps = textCaps(format);
+  return {
+    classification: ClassificationSchema,
+    moveLabel: z.string().describe(`Move name: one to three words in Title Case (${caps.moveLabel} characters at most)`),
+    explanation: z
+      .string()
+      .describe(
+        format === 'short'
+          ? `One short sentence: what the move does to the game or the other side (${caps.explanation} characters at most)`
+          : `Two sentences: what they did, then why it earned this rating (${caps.explanation} characters at most)`,
+      ),
+    bestMove: z
+      .string()
+      .nullable()
+      .describe(
+        `The better move: a two to five word command in Title Case (${caps.bestMove} characters at most); null for brilliant, great, best and book`,
+      ),
+    motif: z
+      .string()
+      .nullable()
+      .describe(
+        `The chess idea behind the move as a short Title Case chip (${caps.motif} characters at most), e.g. Sacrifice, Zwischenzug, Quiet Move, Check, Fork, Pin, Gambit; null when none fits`,
+      ),
+    confidence: z.number().describe('0-1: how sure you are this belongs in the episode as rated'),
+  };
 };
 
 /** Pass B: the final moves, rated and written, and who plays White. */
-export const annotationSchema = (candidateIds: readonly string[], cast: readonly string[]) =>
+export const annotationSchema = (candidateIds: readonly string[], cast: readonly string[], format: Format) =>
   z.object({
     protagonist: enumOf(cast, 'Unknown')
       .nullable()
       .describe("The scene's protagonist, who plays White; null if no one stands out"),
-    moves: z.array(z.object({ candidateId: enumOf(candidateIds, 'none'), ...moveFields })),
+    allies: z
+      .array(enumOf(cast, 'Unknown'))
+      .describe("Everyone else on the protagonist's side (a friend, a partner, a crew member), who also plays White; empty if none"),
+    moves: z.array(z.object({ candidateId: enumOf(candidateIds, 'none'), ...moveFields(format) })),
   });
 export type Annotation = z.infer<ReturnType<typeof annotationSchema>>;
 
-/** Pass B for one moment (Regenerate, and "Make this a move"). */
-export const MoveDraftSchema = z.object(moveFields);
+/** Pass B for one moment (Regenerate, and "Make this a move"), worded for the format. */
+export const moveDraftSchema = (format: Format) => z.object(moveFields(format));
+/** Any format's draft: the descriptions differ, the shape does not. */
+export const MoveDraftSchema = moveDraftSchema('long');
 export type MoveDraft = z.infer<typeof MoveDraftSchema>;
 
 /**
@@ -111,6 +131,8 @@ export const toEval = (e: { pawns: number | null; mate: number | null }): Eval =
 export const StyleCorpusSchema = z.object({
   /** How the creator writes: humour, sentence length, recurring phrasings. */
   voice: z.string(),
+  /** The same voice cut down for short-form; the long voice is used when absent. */
+  shortVoice: z.string().optional(),
   examples: z.array(
     z.object({
       context: z.string().describe('One line of scene context'),
@@ -121,6 +143,8 @@ export const StyleCorpusSchema = z.object({
       explanation: z.string(),
       bestMove: z.string().nullable().optional(),
       motif: z.string().nullable().optional(),
+      /** The same card's breakdown cut to short-form length. */
+      shortExplanation: z.string().optional(),
     }),
   ),
 });

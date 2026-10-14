@@ -1,8 +1,8 @@
-import { EVAL_BAR_SCALES, projectName, type Analysis, type EvalBarScale, type HistoryEntry, type Ingest, type Project } from '@als/schema';
+import { EVAL_BAR_SCALES, FORMATS, FORMAT_RULES, guessFormat, projectName, type Analysis, type EvalBarScale, type Format, type HistoryEntry, type Ingest, type Project } from '@als/schema';
 import { useEffect, useRef, useState } from 'react';
 import { THEMES, getTheme } from '@als/theme';
 import { EditorProvider, useEditor, useEditorStore } from '../../editor/context.tsx';
-import { replaceAutoCards, setEvalBarScale, setTheme, setTitle } from '../../editor/doc.ts';
+import { replaceAutoCards, setEvalBarScale, setFormat, setTheme, setTitle } from '../../editor/doc.ts';
 import { createEditorStore, type EditorStore, type SaveStatus } from '../../editor/store.ts';
 import { getProject, listHistory, restoreVersion, saveProject } from '../../lib/api.ts';
 import { formatFps, formatTime } from '../../lib/format.ts';
@@ -141,6 +141,7 @@ function Header({ ingest, analysis, onRerunIngest, onDelete }: Omit<EditorRootPr
           </HeaderButton>
         </div>
         <ThemePicker />
+        <FormatPicker />
         <BarSizePicker />
         <HistoryMenu />
         <RenderMenu />
@@ -200,6 +201,38 @@ function ThemePicker() {
         {THEMES.map((t) => (
           <option key={t.id} value={t.id}>
             {t.name}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+/**
+ * Short- or long-form: cadence, text length and hold times for analysis, and
+ * the reread of every unlocked hold. Starts from the clip's shape. Undoable.
+ */
+function FormatPicker() {
+  const store = useEditorStore();
+  const format = useEditor((s) => s.doc.format);
+  const source = useEditor((s) => s.project.source);
+  const guess = guessFormat(source);
+  return (
+    <label
+      className="flex items-center gap-1.5 text-xs text-neutral-400"
+      title="Pacing: how often cards come, how much they say and how long they hold. Analysis writes for it."
+    >
+      Format
+      <select
+        value={format}
+        data-testid="format-picker"
+        onChange={(e) => store.getState().edit((d) => setFormat(d, e.target.value as Format))}
+        className="rounded-md border border-neutral-700 bg-neutral-900 px-2 py-1 text-xs text-neutral-200"
+      >
+        {FORMATS.map((f) => (
+          <option key={f} value={f}>
+            {FORMAT_RULES[f].name}
+            {f === guess ? ' (fits clip)' : ''}
           </option>
         ))}
       </select>

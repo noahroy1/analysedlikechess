@@ -1,5 +1,5 @@
 {
-  "_note": "Examples marked source: creator are the creator's cards, transcribed from media/creator-ref (Catch Me If You Can, the motel scene). Examples marked placeholder were written by Claude in the same format to cover the other ratings. TODO(open-decision): replace the placeholders with more of the creator's cards in Phase 6.",
+  "_note": "Examples marked source: creator are the creator's cards, transcribed from media/creator-ref (Catch Me If You Can, the motel scene). Examples marked placeholder were written by Claude in the same format to cover the other ratings. TODO(open-decision): replace the placeholders with more of the creator's cards in Phase 6. shortExplanation and shortVoice are Claude's cuts of the same cards for short-form (Oct 15, 2026), written from these scenes rather than from the short-form benchmark (Private Property), so the benchmark stays a fair test.",
   "voice": "Plain, exact commentary that treats the scene as a chess game. The move name is a two or three word nickname in Title Case for what the character did (Talks Shop, Whole Wallet, Goes In Alone), or a name they use in the scene (Barry Allen). The breakdown is two sentences. The first says what the character visibly does, with the specific names, objects and numbers from the scene. The second gives the verdict: what the move does to the game (a forced mate appears, speeds up, slows down or disappears; material, tempo or the initiative changes hands) or why it works on the other character. The better move is a two to four word command in Title Case (Demand ID Now, Take Backup). The wit comes from exact observation and the chess framing, never from jokes, puns or commentary on the commentary.",
   "examples": [
     {
@@ -9,7 +9,8 @@
       "moveLabel": "Goes In Alone",
       "explanation": "Carl goes up to room 201 alone with his gun drawn, leaving his agents downstairs. He wants this collar himself, but without backup the mate takes longer.",
       "bestMove": "Take Backup",
-      "motif": "Check"
+      "motif": "Check",
+      "shortExplanation": "Without backup, the mate takes longer."
     },
     {
       "context": "Carl, gun drawn, finds Frank in the motel bathroom among the forged cheques.",
@@ -18,7 +19,8 @@
       "moveLabel": "Talks Shop",
       "explanation": "Frank walks out of the bathroom and chats about the typewriter and the cheques like a colleague inspecting evidence. He ignores the gun, and the mate count holds.",
       "bestMove": null,
-      "motif": "Quiet Move"
+      "motif": "Quiet Move",
+      "shortExplanation": "Frank ignores the gun entirely."
     },
     {
       "context": "Carl has Frank at gunpoint and orders him to put his hands up.",
@@ -27,7 +29,8 @@
       "moveLabel": "Barry Allen",
       "explanation": "Instead of raising his hands, Frank scolds Carl for being late and claims to be Secret Service with the forger already in custody. The forced mate disappears.",
       "bestMove": null,
-      "motif": "Zwischenzug"
+      "motif": "Zwischenzug",
+      "shortExplanation": "The forced mate disappears."
     },
     {
       "context": "Frank, posing as Secret Service, says his partner already has the forger.",
@@ -36,7 +39,8 @@
       "moveLabel": "Pushes Back",
       "explanation": "Carl says he has no idea what the man is talking about, but he keeps listening. Arguing instead of demanding proof gives Frank time to build his story.",
       "bestMove": "Demand ID Now",
-      "motif": null
+      "motif": null,
+      "shortExplanation": "Frank gets time to build his story."
     },
     {
       "context": "Carl, still unsure, asks to see Frank's identification.",
@@ -45,7 +49,8 @@
       "moveLabel": "Whole Wallet",
       "explanation": "Frank hands over his whole wallet before Carl can ask twice, and even offers a gun he doesn't have. Giving up everything makes checking him feel rude.",
       "bestMove": null,
-      "motif": "Sacrifice"
+      "motif": "Sacrifice",
+      "shortExplanation": "Checking him now feels rude."
     },
     {
       "context": "A heist crew argues over who carries the bag out past the guards.",
@@ -54,7 +59,8 @@
       "moveLabel": "Picks The New Guy",
       "explanation": "Danny hands the bag to the newest member of the crew, the one face no guard has seen. He never tells him what is inside, so the exit rests on luck.",
       "bestMove": "Split The Haul",
-      "motif": "Decoy"
+      "motif": "Decoy",
+      "shortExplanation": "The one face no guard has seen."
     },
     {
       "context": "A babysitter hears a noise downstairs.",
@@ -63,7 +69,8 @@
       "moveLabel": "Calls A Friend",
       "explanation": "Lena hears the noise and phones her friend before she moves an inch. Someone now knows where she is, just nobody who can come and help.",
       "bestMove": "Call The Police",
-      "motif": null
+      "motif": null,
+      "shortExplanation": "Someone knows, just nobody who can help."
     },
     {
       "context": "A new sheriff walks into a saloon in a town that does not want him.",
@@ -72,7 +79,8 @@
       "moveLabel": "Orders Milk",
       "explanation": "The new sheriff steps up to the bar and asks for a glass of milk. Every stranger in a western opens this way, and the room laughs right on cue.",
       "bestMove": null,
-      "motif": "Opening Theory"
+      "motif": "Opening Theory",
+      "shortExplanation": "The saloon laughs right on cue."
     },
     {
       "context": "A man on the run realises his phone is being tracked.",
@@ -81,7 +89,8 @@
       "moveLabel": "Ditches The Phone",
       "explanation": "Marco throws his phone out of the car window on the highway. The tracker now marks the exact spot he passed, and he has no way left to call for help.",
       "bestMove": "Mail It Away",
-      "motif": null
+      "motif": null,
+      "shortExplanation": "The tracker now marks the exact spot."
     },
     {
       "context": "The villain monologues with his back to an open window.",
@@ -90,7 +99,8 @@
       "moveLabel": "Stays Seated",
       "explanation": "The ropes have been loose for a full minute and the window is open behind the villain. Jack sits through the whole speech, and the free piece is gone.",
       "bestMove": "Slip The Ropes",
-      "motif": null
+      "motif": null,
+      "shortExplanation": "The free piece is gone."
     },
     {
       "context": "A suspect is asked where she was on the night of the murder.",
@@ -99,7 +109,9 @@
       "moveLabel": "Mentions The Knife",
       "explanation": "Asked where she was that night, Ruth insists she never touched the knife. Nobody had mentioned a knife, and the interview is over in one move.",
       "bestMove": "Answer The Question",
-      "motif": "Discovered Attack"
+      "motif": "Discovered Attack",
+      "shortExplanation": "Nobody had mentioned a knife."
     }
-  ]
+  ],
+  "shortVoice": "Fast and dry, for a vertical short that viewers swipe away the moment it drags. The move name is one to three words in Title Case: the character's own words when the move is a line (Barry Allen), else a nickname for the action (Whole Wallet). The breakdown is one short sentence, read in two seconds: the payoff, meaning how the other side takes it or what the move does to the game (The forced mate disappears). It never describes the move again, because the label and the frozen frame already show it. The better move is a command in Title Case and may be playful, as long as the character would do it."
 }

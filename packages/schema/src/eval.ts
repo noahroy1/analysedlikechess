@@ -85,21 +85,17 @@ export type EvalBar = z.infer<typeof EvalBarSchema>;
 
 export const DEFAULT_START_EVAL: Eval = { pawns: 0.3 };
 
-/**
- * Beats move the bar a little, so big swings only happen on a card that
- * explains them: at most this share of the bar.
- */
-export const BEAT_MAX_SWING = 0.06;
-
-/** A beat closer than this to a move or another beat would still be settling; snapping drops it. */
-export const BEAT_CLEARANCE_SEC = 2.5;
+// How far a beat may move the bar, and how close it may sit to another change,
+// depend on the format: `beatMaxSwing` and `beatClearanceSec` in FORMAT_RULES.
 
 /**
  * Which way a rating moves the bar for the player who made it. The bar tells
  * the story, so good moves gain ground and bad ones lose it; a sound move
  * (good, book) may go either way. TODO(open-decision): sizes per rating are
- * left to the Analyst; the creator's own swings do not scale with the rating
- * (their brilliant moved the bar less than their great).
+ * only guidance to the Analyst (Pass C's prompt gives typical sizes measured
+ * on the user's short-form benchmark, Oct 15, 2026); the creator's own swings
+ * do not scale with the rating (their brilliant moved the bar less than their
+ * great), so nothing here enforces a size.
  */
 export const EVAL_DIRECTION: Record<Classification, 'gain' | 'loss' | 'either'> = {
   brilliant: 'gain',
@@ -130,11 +126,11 @@ export function swingFits(classification: Classification, side: 'white' | 'black
   return true;
 }
 
-/** Caps a beat's change at BEAT_MAX_SWING of the bar, keeping its direction. */
-export function capBeat(before: Eval, after: Eval): Eval {
+/** Caps a beat's change at `maxSwing` of the bar (the format's `beatMaxSwing`), keeping its direction. */
+export function capBeat(before: Eval, after: Eval, maxSwing: number): Eval {
   const from = evalFill(before);
   const delta = evalFill(after) - from;
-  if (Math.abs(delta) <= BEAT_MAX_SWING) return after;
-  const capped = from + Math.sign(delta) * BEAT_MAX_SWING;
+  if (Math.abs(delta) <= maxSwing) return after;
+  const capped = from + Math.sign(delta) * maxSwing;
   return capped >= 1 || capped <= 0 ? after : pawnsForFill(capped);
 }

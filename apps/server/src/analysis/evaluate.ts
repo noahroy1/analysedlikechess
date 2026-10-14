@@ -1,11 +1,11 @@
 import {
-  BEAT_CLEARANCE_SEC,
-  BEAT_MAX_SWING,
   DEFAULT_START_EVAL,
+  FORMAT_RULES,
   capBeat,
   evalFill,
   isMate,
   pawnsForFill,
+  projectFormat,
   sameEval,
   swingFits,
   toEval,
@@ -15,6 +15,7 @@ import {
   type EvalBar,
   type EvalBeat,
   type Evaluation,
+  type Format,
   type Moment,
   type Project,
 } from '@als/schema';
@@ -25,12 +26,15 @@ import { candidateTime } from './snap-moves.ts';
 /**
  * Beats: the decisions Pass A found that Pass B did not give a card. The bar
  * moves at each, so it reacts between cards. Beats the creator added stay; a
- * beat too close to a card or another beat (still settling) is dropped.
+ * beat too close to a card or another beat (still settling) is dropped, and
+ * past the format's `beatsPerCard` the most crowded ones go, so the cards
+ * still do the swinging.
  */
 export function placeBeats(project: Project, candidates: readonly Candidate[], picked: ReadonlySet<string>): EvalBeat[] {
   const kept = (project.evalBar?.beats ?? []).filter((b) => b.origin === 'user');
   const taken = [...project.moments.map((m) => m.sourceTime), ...kept.map((b) => b.sourceTime)];
-  const clear = (t: number) => taken.every((other) => Math.abs(other - t) >= BEAT_CLEARANCE_SEC);
+  const { beatClearanceSec, beatsPerCard } = FORMAT_RULES[projectFormat(project)];
+  const clear = (t: number) => taken.every((other) => Math.abs(other - t) >= beatClearanceSec);
   const placed: EvalBeat[] = [];
   for (const candidate of candidates) {
     if (picked.has(candidate.id)) continue;
@@ -47,6 +51,14 @@ export function placeBeats(project: Project, candidates: readonly Candidate[], p
       action: candidate.action,
       origin: 'ai',
     });
+  }
+  const room = Math.max(0, Math.floor(project.moments.length * beatsPerCard) - kept.length);
+  while (placed.length > room) {
+    const others = (b: EvalBeat) => taken.filter((t) => t !== b.sourceTime);
+    const space = placed.map((b) => Math.min(...others(b).map((t) => Math.abs(t - b.sourceTime))));
+    const crowded = space.indexOf(Math.min(...space));
+    taken.splice(taken.indexOf(placed[crowded]!.sourceTime), 1);
+    placed.splice(crowded, 1);
   }
   return [...kept, ...placed].sort((a, b) => a.sourceTime - b.sourceTime);
 }
@@ -94,17 +106,20 @@ export interface AppliedEvaluation extends EvalTrack {
  * Writes Pass C's answer into the track, then holds it to the rules the bar
  * keeps whatever the model says: a rating never moves the bar the wrong way
  * for the player who made it (such a move holds steady instead), beats move it
- * at most BEAT_MAX_SWING and never start a mate. Fixed values are kept as they are.
+ * at most the format's `beatMaxSwing` and never start a mate. Fixed values
+ * are kept as they are.
  */
 export function applyEvaluation(
   track: EvalTrack,
   output: Evaluation,
+  format: Format,
   fixed: ReadonlySet<string> = new Set(),
   fixedStart = false,
 ): AppliedEvaluation {
   const answers = new Map(output.evals.map((e) => [e.id, e]));
   const sides = new Map(track.characters.map((c) => [c.id, c.side]));
   const adjusted: AppliedEvaluation['adjusted'] = [];
+  const { beatMaxSwing } = FORMAT_RULES[format];
   const start = fixedStart ? track.evalBar.start : toEval(output.start);
 
   const moments = track.moments.map((m) => {
@@ -142,11 +157,11 @@ export function applyEvaluation(
     } else {
       const { b } = entry;
       if (!fixed.has(b.id)) {
-        let next = capBeat(before, b.eval);
+        let next = capBeat(before, b.eval, beatMaxSwing);
         const startsMate = isMate(next) && !(isMate(before) && Math.sign(before.mate) === Math.sign(next.mate));
         if (startsMate) {
           const from = evalFill(before);
-          next = pawnsForFill(Math.min(Math.max(evalFill(next), from - BEAT_MAX_SWING), from + BEAT_MAX_SWING));
+          next = pawnsForFill(Math.min(Math.max(evalFill(next), from - beatMaxSwing), from + beatMaxSwing));
         }
         if (!sameEval(next, b.eval)) adjusted.push({ id: b.id, reason: startsMate ? 'a beat cannot start a mate' : 'capped to a beat-sized swing' });
         b.eval = next;

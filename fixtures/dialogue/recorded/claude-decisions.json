@@ -13,6 +13,7 @@
     "evidenceUtteranceIds": [
      "u1"
     ],
+    "moveLine": null,
     "visualTimeSec": null
    },
    {
@@ -27,6 +28,7 @@
     "evidenceUtteranceIds": [
      "u2"
     ],
+    "moveLine": null,
     "visualTimeSec": null
    },
    {
@@ -41,6 +43,7 @@
     "evidenceUtteranceIds": [
      "u3"
     ],
+    "moveLine": null,
     "visualTimeSec": null
    },
    {
@@ -55,6 +58,7 @@
     "evidenceUtteranceIds": [
      "u4"
     ],
+    "moveLine": null,
     "visualTimeSec": null
    },
    {
@@ -69,6 +73,7 @@
     "evidenceUtteranceIds": [
      "u6"
     ],
+    "moveLine": null,
     "visualTimeSec": 23.4
    },
    {
@@ -84,6 +89,7 @@
      "u5",
      "u7"
     ],
+    "moveLine": null,
     "visualTimeSec": null
    }
   ]

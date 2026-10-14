@@ -14,6 +14,7 @@ import {
   type AnalyzeRequest,
   type EvaluateRequest,
   type EvaluateResult,
+  type Format,
   type Moment,
   type PortraitRequest,
   type RegenerateResult,
@@ -219,12 +220,12 @@ export const findRegions = async (id: string, moment: Moment): Promise<RegionsRe
     }),
   );
 
-export const regenerateMoment = async (id: string, moment: Moment, instruction?: string): Promise<RegenerateResult> =>
+export const regenerateMoment = async (id: string, moment: Moment, format: Format, instruction?: string): Promise<RegenerateResult> =>
   RegenerateResultSchema.parse(
     await request(`/projects/${id}/regenerate`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ moment, ...(instruction ? { instruction } : {}) }),
+      body: JSON.stringify({ moment, format, ...(instruction ? { instruction } : {}) }),
     }),
   );
 

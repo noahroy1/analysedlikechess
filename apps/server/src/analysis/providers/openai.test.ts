@@ -49,7 +49,7 @@ describe('strictSchema', () => {
   const schemas = {
     speakers: speakerNamingSchema(['A', 'B']),
     decisions: decisionPointsSchema(['Walt'], ['u1']),
-    annotate: annotationSchema(['c1'], ['Walt']),
+    annotate: annotationSchema(['c1'], ['Walt'], 'long'),
     evaluate: evaluationSchema(['m1']),
     regenerate: MoveDraftSchema,
   };

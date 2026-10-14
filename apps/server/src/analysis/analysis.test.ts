@@ -4,9 +4,10 @@ import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import {
-  BOOK_WINDOW_SEC,
   CUT_CLEARANCE_FRAMES,
+  FORMAT_RULES,
   FREEZE_AFTER_SPEECH_SEC,
+  freezeAfterSpeech,
   NO_BEST_MOVE,
   EvaluateResultSchema,
   ProjectSchema,
@@ -25,7 +26,7 @@ import { ProviderError } from './providers/types.ts';
 import { parseScribe } from './providers/elevenlabs.ts';
 import { parseNotes, parseRegions } from './providers/gemini.ts';
 import { assignSides } from './sides.ts';
-import { snapMoves } from './snap-moves.ts';
+import { candidateTime, snapMoves } from './snap-moves.ts';
 import { castNames, timelineText } from './timeline-text.ts';
 
 const recorded = async (name: string) => JSON.parse(await readFile(join(DIALOGUE_RECORDING, `${name}.json`), 'utf8'));
@@ -155,9 +156,14 @@ describe('assignSides', () => {
     expect(sides(assignSides(cast, moves, 'Speaker B'))).toEqual({ hero: 'black', foil: 'white', extra: 'black' });
   });
 
+  it("puts the protagonist's allies on White too, but never everyone", () => {
+    expect(sides(assignSides(cast, moves, 'Walter White', ['Skyler']))).toEqual({ hero: 'white', foil: 'black', extra: 'white' });
+    expect(sides(assignSides(cast, moves, 'Walter White', ['Skyler', 'Hank Schrader']))).toEqual({ hero: 'white', foil: 'black', extra: 'black' });
+  });
+
   it('flips a coin among the characters with moves when no one stands out', () => {
-    expect(sides(assignSides(cast, moves, null, () => 0.99))).toEqual({ hero: 'black', foil: 'white', extra: 'black' });
-    expect(sides(assignSides(cast, moves, null, () => 0))).toEqual({ hero: 'white', foil: 'black', extra: 'black' });
+    expect(sides(assignSides(cast, moves, null, [], () => 0.99))).toEqual({ hero: 'black', foil: 'white', extra: 'black' });
+    expect(sides(assignSides(cast, moves, null, [], () => 0))).toEqual({ hero: 'white', foil: 'black', extra: 'black' });
   });
 
   it('keeps sides that are already set', () => {
@@ -168,9 +174,9 @@ describe('assignSides', () => {
 
 describe('snapMoves', () => {
   const candidates = [
-    { id: 'c1', actor: 'Red', kind: 'spoken' as const, action: 'Splits up', alternatives: [], evidenceUtteranceIds: ['u1'], visualTimeSec: null },
-    { id: 'c2', actor: 'Blue', kind: 'visual' as const, action: 'Lights on', alternatives: [], evidenceUtteranceIds: [], visualTimeSec: 22.51 },
-    { id: 'c3', actor: 'Blue', kind: 'spoken' as const, action: 'Locks door', alternatives: [], evidenceUtteranceIds: ['u4'], visualTimeSec: null },
+    { id: 'c1', actor: 'Red', kind: 'spoken' as const, action: 'Splits up', alternatives: [], evidenceUtteranceIds: ['u1'], moveLine: null, visualTimeSec: null },
+    { id: 'c2', actor: 'Blue', kind: 'visual' as const, action: 'Lights on', alternatives: [], evidenceUtteranceIds: [], moveLine: null, visualTimeSec: 22.51 },
+    { id: 'c3', actor: 'Blue', kind: 'spoken' as const, action: 'Locks door', alternatives: [], evidenceUtteranceIds: ['u4'], moveLine: null, visualTimeSec: null },
   ];
   const move = (candidateId: string, classification: 'mistake' | 'great' | 'book', confidence = 0.8) => ({
     candidateId,
@@ -192,6 +198,17 @@ describe('snapMoves', () => {
     expect(m).toMatchObject({ actorId: 'c-red', origin: 'ai', status: 'draft', moveLabel: 'Label', motif: 'Sacrifice', evidence: { utteranceIds: ['u1'] } });
   });
 
+  it('freezes inside a long line, right after the words the move is made in', async () => {
+    // u1 is "Blue, this place gives me the creeps. Let's split up and cover more ground."
+    const project = await dialogueProject();
+    const creeps = project.transcript!.words.find((w) => w.text.startsWith('creeps'))!;
+    const quoted = { ...candidates[0]!, evidenceUtteranceIds: ['u1', 'u2'], moveLine: { utteranceId: 'u1', lastWords: 'gives me the Creeps' } };
+    expect(candidateTime(project, quoted)).toBeCloseTo(freezeAfterSpeech(creeps.end, project.shots!, 24), 5);
+    // Words not in the line fall back to the line's end, never to the reply after it.
+    const unknown = { ...quoted, moveLine: { utteranceId: 'u1', lastWords: 'nothing like this' } };
+    expect(candidateTime(project, unknown)).toBe(candidateTime(project, candidates[0]!));
+  });
+
   it('places visual moves on a clean frame, never beside a cut', async () => {
     const project = await dialogueProject();
     const { moments } = snapMoves(project, candidates, [move('c2', 'great')], defaultTheme);
@@ -210,7 +227,7 @@ describe('snapMoves', () => {
     project.source.durationSec = 60;
     const late = { ...candidates[1]!, id: 'c4', visualTimeSec: 45 };
     const { moments } = snapMoves(project, [...candidates, late], [move('c2', 'book'), move('c4', 'book')], defaultTheme);
-    expect(moments.map((m) => [m.sourceTime > BOOK_WINDOW_SEC, m.classification])).toEqual([
+    expect(moments.map((m) => [m.sourceTime > FORMAT_RULES.long.bookWindowSec, m.classification])).toEqual([
       [false, 'book'],
       [true, 'good'],
     ]);
@@ -292,7 +309,7 @@ describe('analysis pipeline', () => {
     ]);
     expect(project.evalBar?.beats.every((b) => b.reason && b.action && b.actorId)).toBe(true);
     expect(project.moments.map((m) => m.eval)).toEqual([{ pawns: 0.9 }, { pawns: 2.8 }, { mate: 3 }]);
-    expect(evalWarnings(project.evalBar, project.moments, project.context.characters).size).toBe(0);
+    expect(evalWarnings(project.evalBar, project.moments, project.context.characters, 'long').size).toBe(0);
   });
 
   it('places each draft card clear of the eyes and mouths on its frame', () => {

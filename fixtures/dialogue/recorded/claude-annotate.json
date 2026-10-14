@@ -1,6 +1,7 @@
 {
   "output": {
     "protagonist": "Blue",
+    "allies": [],
     "moves": [
       {
         "candidateId": "c1",

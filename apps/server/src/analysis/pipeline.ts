@@ -6,9 +6,11 @@ import {
   DEFAULT_START_EVAL,
   SceneNoteSchema,
   TranscriptSchema,
+  FORMAT_RULES,
   annotationSchema,
   decisionPointsSchema,
   evaluationSchema,
+  projectFormat,
   speakerNamingSchema,
   type Analysis,
   type Annotation,
@@ -38,9 +40,9 @@ const STEP_VERSION: Record<Exclude<StageName, 'snap' | 'place'>, number> = {
   transcribe: 1,
   describe: 1,
   speakers: 1,
-  decisions: 1,
-  annotate: 2,
-  evaluate: 1,
+  decisions: 3,
+  annotate: 4,
+  evaluate: 5,
 };
 
 const NAMING_SYSTEM =
@@ -62,7 +64,7 @@ export const pendingAnalysis = (previous: Analysis): Analysis => ({
   status: 'pending',
   stages: ANALYSIS_STAGES.map((name) => ({ name, status: 'pending' })),
   models: previous.models,
-  secondsPerMove: previous.secondsPerMove,
+  ...(previous.secondsPerMove ? { secondsPerMove: previous.secondsPerMove } : {}),
 });
 
 const ManifestSchema = z.object({
@@ -245,10 +247,11 @@ export async function runAnalysis(
 
     // Stage 3: the Analyst.
     const context = timelineText(project);
-    const system = systemPrompt(style);
+    const format = projectFormat(project);
+    const system = systemPrompt(style, format);
     const cast = castNames(project);
     const utteranceIds = project.transcript?.utterances.map((u) => u.id) ?? [];
-    const target = targetMoveCount(durationSec, analysis.secondsPerMove);
+    const target = targetMoveCount(durationSec, analysis.secondsPerMove ?? FORMAT_RULES[format].secondsPerMove);
 
     const passASchema = decisionPointsSchema(cast, utteranceIds);
     const passA: DecisionPoints = await step(
@@ -262,7 +265,7 @@ export async function runAnalysis(
           effort: 'medium',
           system,
           context,
-          task: decisionPointsTask(target),
+          task: decisionPointsTask(target, format),
           schema: passASchema,
         });
         return { value: r.output, model: r.model, usage: r.usage, costUsd: r.costUsd };
@@ -270,7 +273,7 @@ export async function runAnalysis(
     );
     const candidates = uniqueIds(passA.candidates);
 
-    const passBSchema = annotationSchema(candidates.map((c) => c.id), cast);
+    const passBSchema = annotationSchema(candidates.map((c) => c.id), cast, format);
     const passB: Annotation = await step(
       'annotate',
       cacheKey('annotate', STEP_VERSION.annotate, config.models.analyst, system, context, candidates, target),
@@ -282,7 +285,7 @@ export async function runAnalysis(
           effort: 'high',
           system,
           context,
-          task: annotationTask(candidates, target),
+          task: annotationTask(candidates, target, format),
           schema: passBSchema,
         });
         return { value: r.output, model: r.model, usage: r.usage, costUsd: r.costUsd };
@@ -297,7 +300,7 @@ export async function runAnalysis(
     snapStage.status = 'done';
     await persist((p) => {
       p.moments = snapped.moments;
-      p.context.characters = assignSides(p.context.characters, p.moments, passB.protagonist);
+      p.context.characters = assignSides(p.context.characters, p.moments, passB.protagonist, passB.allies);
     }, true);
     if (snapped.dropped.length) console.log(`analysis ${id}: dropped`, snapped.dropped);
 
@@ -357,13 +360,13 @@ export async function runAnalysis(
           effort: 'medium',
           system,
           context,
-          task: evaluationTask(items),
+          task: evaluationTask(items, format),
           schema: passCSchema,
         });
         return { value: r.output, model: r.model, usage: r.usage, costUsd: r.costUsd };
       },
     );
-    const applied = applyEvaluation(track, passC, fixed);
+    const applied = applyEvaluation(track, passC, format, fixed);
     analysis.status = 'done';
     await persist((p) => {
       p.moments = applied.moments;

@@ -156,8 +156,6 @@ export const ThemeSchema = z.object({
     /** The card animates in once the badge has popped; the type-out starts when it is in. */
     cardInSec: z.number().nonnegative(),
     typeOut: TypeOutSchema,
-    /** How long the finished card stays up before it leaves. */
-    rereadSec: z.number().nonnegative(),
     cardOutSec: z.number().nonnegative(),
     /** Optional sound when a card appears: a URL the Player and the renderer can both load. */
     sting: z.string().optional(),

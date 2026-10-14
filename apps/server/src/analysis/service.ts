@@ -1,10 +1,12 @@
 import { readFile } from 'node:fs/promises';
 import {
   StyleCorpusSchema,
+  projectFormat,
   type Analysis,
   type AnalyzeRequest,
   type EvaluateRequest,
   type EvaluateResult,
+  type Format,
   type Moment,
   type RegenerateResult,
   type RegionsResult,
@@ -57,7 +59,9 @@ export class AnalysisService {
     const project = await this.store.read(id);
     if (project.ingest.status !== 'done') throw new AnalysisBusyError('wait for ingest to finish');
     await this.store.update(id, (p) => {
-      p.analysis = pendingAnalysis({ ...p.analysis, ...(request.secondsPerMove ? { secondsPerMove: request.secondsPerMove } : {}) });
+      p.analysis = pendingAnalysis(p.analysis);
+      if (request.secondsPerMove) p.analysis.secondsPerMove = request.secondsPerMove;
+      else if (request.secondsPerMove === null) delete p.analysis.secondsPerMove;
     });
     this.options.set(id, { ...(request.rerun ? { rerun: request.rerun } : {}) });
     this.queue.enqueue(id);
@@ -70,9 +74,10 @@ export class AnalysisService {
     if (project?.analysis.status === 'idle') await this.start(id).catch(() => undefined);
   }
 
-  async regenerate(id: string, moment: Moment, instruction?: string): Promise<RegenerateResult> {
+  async regenerate(id: string, moment: Moment, instruction?: string, format?: Format): Promise<RegenerateResult> {
     const project = await this.store.read(id);
-    return regenerateMoment({ store: this.store, providers: this.providers, config: this.config, style: this.style }, project, moment, instruction);
+    const deps = { store: this.store, providers: this.providers, config: this.config, style: this.style };
+    return regenerateMoment(deps, project, moment, instruction, format ?? projectFormat(project));
   }
 
   async evaluate(id: string, request: EvaluateRequest): Promise<EvaluateResult> {

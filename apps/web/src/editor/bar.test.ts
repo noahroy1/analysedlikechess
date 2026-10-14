@@ -20,6 +20,7 @@ const doc: Doc = {
   moments: [moment('m1', 5, { eval: { pawns: 1 } }), moment('m2', 20, { eval: { mate: 3 } })],
   characters: [{ id: 'w', name: 'Walt', speakerLabels: [], side: 'white' }],
   themeId: 'creator',
+  format: 'long',
   evalBar: { start: { pawns: 0.2 }, beats: [{ id: 'k1', sourceTime: 10, eval: { pawns: 1.4 }, actorId: 'w', origin: 'ai' }] },
 };
 

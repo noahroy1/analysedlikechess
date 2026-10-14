@@ -1,4 +1,4 @@
-import type { Analysis } from '@als/schema';
+import { FORMAT_RULES, type Analysis } from '@als/schema';
 import { sourceFrameToOut } from '@als/composition';
 import { useEffect, useState } from 'react';
 import { assignSpeaker } from '../../editor/doc.ts';
@@ -18,11 +18,15 @@ export function AnalysisPanel({ analysis, onStarted }: AnalysisPanelProps) {
   const store = useEditorStore();
   const project = useEditor((s) => s.project);
   const characters = useEditor((s) => s.doc.characters);
+  const format = useEditor((s) => s.doc.format);
   const proposalCost = useEditor((s) => s.proposal?.costUsd);
   const { fps, timeline, seek, player } = usePlayback();
   const [config, setConfig] = useState<AnalysisConfigInfo | null>(null);
   const [usage, setUsage] = useState<Awaited<ReturnType<typeof getUsage>> | null>(null);
-  const [secondsPerMove, setSecondsPerMove] = useState(analysis.secondsPerMove);
+  // The format's density unless this project asked for its own; the field follows a format switch.
+  const [typed, setTyped] = useState<number | null>(null);
+  const formatDensity = FORMAT_RULES[format].secondsPerMove;
+  const secondsPerMove = typed ?? analysis.secondsPerMove ?? formatDensity;
   const [error, setError] = useState<string | null>(null);
   const running = analysis.status === 'pending' || analysis.status === 'running';
 
@@ -39,7 +43,7 @@ export function AnalysisPanel({ analysis, onStarted }: AnalysisPanelProps) {
     try {
       // Drafts are written into the project; save first so nothing in flight is lost.
       await store.getState().flush();
-      await startAnalysis(project.id, { ...(rerun ? { rerun } : {}), secondsPerMove });
+      await startAnalysis(project.id, { ...(rerun ? { rerun } : {}), secondsPerMove: secondsPerMove === formatDensity ? null : secondsPerMove });
       onStarted({ ...analysis, status: 'pending', stages: [] });
     } catch (e) {
       setError((e as Error).message);
@@ -104,11 +108,11 @@ export function AnalysisPanel({ analysis, onStarted }: AnalysisPanelProps) {
           About one move every
           <input
             type="number"
-            min={5}
+            min={3}
             max={120}
-            step={5}
+            step={1}
             value={secondsPerMove}
-            onChange={(e) => setSecondsPerMove(Number(e.target.value) || analysis.secondsPerMove)}
+            onChange={(e) => setTyped(Number(e.target.value) || null)}
             className="input w-16 py-1 text-center tabular-nums"
           />
           seconds

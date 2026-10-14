@@ -10,7 +10,7 @@ export async function requestRegeneration(store: EditorStore, momentId: string, 
   if (!moment) return;
   store.getState().setProposal({ momentId, status: 'loading', ...(instruction ? { instruction } : {}) });
   try {
-    const result = await regenerateMoment(project.id, moment, instruction);
+    const result = await regenerateMoment(project.id, moment, doc.format, instruction);
     // A newer request (or a discard) wins over this one.
     if (store.getState().proposal?.momentId !== momentId) return;
     store.getState().setProposal({ momentId, status: 'ready', draft: result.draft, costUsd: result.costUsd, ...(instruction ? { instruction } : {}) });

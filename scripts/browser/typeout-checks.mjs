@@ -3,6 +3,7 @@
 // Seeks through one hold and reads the card the Player draws: the explanation
 // types out word by word at the theme's speed, the best move waits for the last
 // word, and the card is complete for the reread.
+import { FORMAT_RULES } from '../../packages/schema/src/format.ts';
 import { launch, sleep } from './cdp.mjs';
 
 const [S, projectId, momentId, shots] = process.argv.slice(2);
@@ -24,10 +25,12 @@ try {
       const m = s.doc.moments.find((x) => x.id === '${momentId}');
       const t = s.theme.timing;
       const words = m.explanation.trim().split(/\\s+/).length;
-      return JSON.stringify({ m, t, words });
+      return JSON.stringify({ m, t, words, format: s.doc.format });
     })()`),
   );
   const { m, t, words } = info;
+  // The reread is the format's (short- or long-form), not the theme's.
+  const { rereadSec } = FORMAT_RULES[info.format];
   const holds = JSON.parse(await page.eval(`JSON.stringify([...document.querySelectorAll('[data-testid=hold-block]')].map((b) => ({ id: b.dataset.momentId, start: Number(b.dataset.outStart), frames: Number(b.dataset.frames) })))`));
   const hold = holds.find((h) => h.id === momentId);
   if (!hold) throw new Error(`no hold block for ${momentId}: ${JSON.stringify(holds)}`);
@@ -86,7 +89,7 @@ try {
   }
 
   const holdSec = hold.frames / fps;
-  result('the finished card stays for the reread', Math.abs(holdSec - typingEnd - t.rereadSec - t.cardOutSec) < 0.15, `hold ${holdSec.toFixed(2)} s, typing done at ${typingEnd.toFixed(2)} s, reread ${t.rereadSec} s`);
+  result('the finished card stays for the reread', Math.abs(holdSec - typingEnd - rereadSec - t.cardOutSec) < 0.15, `hold ${holdSec.toFixed(2)} s, typing done at ${typingEnd.toFixed(2)} s, reread ${rereadSec} s (${info.format}-form)`);
 } finally {
   page.close();
 }

@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
+  FORMAT_RULES,
   ProjectSchema,
   capBeat,
   evalFill,
@@ -74,10 +75,12 @@ describe('ratings and the bar', () => {
   });
 
   it('caps a beat’s swing and keeps its direction', () => {
-    expect(capBeat({ pawns: 0.3 }, { pawns: 0.6 })).toEqual({ pawns: 0.6 });
-    const capped = capBeat({ pawns: 0 }, { pawns: -4 });
+    expect(capBeat({ pawns: 0.3 }, { pawns: 0.6 }, 0.06)).toEqual({ pawns: 0.6 });
+    const capped = capBeat({ pawns: 0 }, { pawns: -4 }, 0.06);
     expect(evalFill(capped)).toBeCloseTo(0.44, 2);
-    expect(evalFill(capBeat({ mate: 5 }, { pawns: 1 }))).toBeCloseTo(0.94, 2);
+    expect(evalFill(capBeat({ mate: 5 }, { pawns: 1 }, 0.06))).toBeCloseTo(0.94, 2);
+    // Short-form beats may move further.
+    expect(evalFill(capBeat({ pawns: 0 }, { pawns: -4 }, FORMAT_RULES.short.beatMaxSwing))).toBeCloseTo(0.42, 2);
   });
 });
 
@@ -106,10 +109,20 @@ describe('the track', () => {
       { start: { pawns: 0 }, beats: [{ id: 'k1', sourceTime: m2.sourceTime + 3, eval: { pawns: 5 }, origin: 'user' }] },
       [{ ...m1, classification: 'blunder', eval: { pawns: 2 } }, m2],
       characters,
+      'long',
     );
     expect(warnings.get(m1.id)).toEqual(['The bar rises for Walt on a blunder']);
     expect(warnings.get(m2.id)).toEqual(['No eval: the bar holds through this move']);
     expect(warnings.get('k1')?.[0]).toMatch(/^Moves the bar \d+%/);
+  });
+
+  it('lets short-form beats come closer together and move further', () => {
+    const [m1] = moments as [Moment];
+    const bar = { start: { pawns: 0 }, beats: [{ id: 'k1', sourceTime: m1.sourceTime + 1.5, eval: { pawns: 1.4 }, origin: 'user' as const }] };
+    const track = [{ ...m1, eval: { pawns: 0.6 } }];
+    // 1.5 s after the move and 7% of the bar.
+    expect(evalWarnings(bar, track, characters, 'long').get('k1')).toHaveLength(2);
+    expect(evalWarnings(bar, track, characters, 'short').get('k1')).toBeUndefined();
   });
 
   it('is a hard error for a beat to share a moment’s id or come out of order', () => {

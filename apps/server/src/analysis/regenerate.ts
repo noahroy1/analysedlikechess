@@ -1,5 +1,14 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { NO_BEST_MOVE, MoveDraftSchema, relabelLateBook, type Moment, type Project, type RegenerateResult } from '@als/schema';
+import {
+  NO_BEST_MOVE,
+  moveDraftSchema,
+  projectFormat,
+  relabelLateBook,
+  type Format,
+  type Moment,
+  type Project,
+  type RegenerateResult,
+} from '@als/schema';
 import type { ProjectStore } from '../projects/store.ts';
 import type { AnalysisConfig } from './config.ts';
 import { regenerateTask, systemPrompt } from './prompts.ts';
@@ -17,6 +26,7 @@ export async function regenerateMoment(
   project: Project,
   moment: Moment,
   instruction?: string,
+  format: Format = projectFormat(project),
 ): Promise<RegenerateResult> {
   const utterances = new Map((project.transcript?.utterances ?? []).map((u) => [u.id, u]));
   const evidence = moment.evidence.utteranceIds
@@ -30,12 +40,12 @@ export async function regenerateMoment(
     model: deps.config.models.regen,
     effort: 'medium',
     interactive: true,
-    system: systemPrompt(deps.style),
+    system: systemPrompt(deps.style, format),
     context: timelineText(project),
     task: regenerateTask(moment, evidence, actor, instruction?.trim() || undefined),
-    schema: MoveDraftSchema,
+    schema: moveDraftSchema(format),
   });
-  const classification = relabelLateBook(result.output.classification, moment.sourceTime);
+  const classification = relabelLateBook(result.output.classification, moment.sourceTime, format);
   const draft = { ...result.output, classification, bestMove: NO_BEST_MOVE.has(classification) ? null : result.output.bestMove };
   await logUsage(deps.store, project.id, 'regenerate', result.costUsd);
   return { draft, model: result.model, usage: result.usage, costUsd: result.costUsd };

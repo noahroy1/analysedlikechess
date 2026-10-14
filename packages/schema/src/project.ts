@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { ClassificationSchema } from './classification.ts';
 import { EvalBarSchema, EvalSchema } from './eval.ts';
+import { FormatSchema } from './format.ts';
 import { FrameRegionsSchema } from './regions.ts';
 import { MIN_MOMENT_GAP_SEC } from './rules.ts';
 import { SubtitleSchema } from './subtitles.ts';
@@ -191,8 +192,8 @@ export const AnalysisSchema = z.object({
   stages: z.array(StageSchema),
   /** Which model produced what. */
   models: z.record(z.string(), z.string()),
-  /** Target density for Pass B: about one move per this many seconds. */
-  secondsPerMove: z.number().positive().default(20),
+  /** Target density for Pass B, about one move per this many seconds; absent follows the format (`FORMAT_RULES`). */
+  secondsPerMove: z.number().positive().optional(),
   /** Sum of every stage's cost in the last run (cached stages cost nothing). */
   costUsd: z.number().nonnegative().optional(),
   error: z.string().optional(),
@@ -231,6 +232,8 @@ export const ProjectSchema = z
     /** The annotation track, sorted by sourceTime. */
     moments: z.array(MomentSchema),
     themeId: Id,
+    /** Short- or long-form pacing; absent is guessed from the clip (`projectFormat`). */
+    format: FormatSchema.optional(),
     /** The evaluation bar's start and its beats; absent until analysis or the editor sets it. */
     evalBar: EvalBarSchema.optional(),
     /** Subtitles as edited; absent while they follow the transcript (`subtitlesFromTranscript`). */

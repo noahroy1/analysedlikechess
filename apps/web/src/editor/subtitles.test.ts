@@ -13,7 +13,7 @@ const transcript: Transcript = {
     { id: 'u2', speaker: 'B', start: 5, end: 5.3, text: 'Now.', wordRange: [2, 2] },
   ],
 };
-const doc: Doc = { moments: [], characters: [], themeId: 'creator' };
+const doc: Doc = { moments: [], characters: [], themeId: 'creator', format: 'long' };
 
 describe('subtitle edits', () => {
   it('follow the transcript until the first edit, which keeps every line', () => {

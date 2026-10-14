@@ -186,7 +186,7 @@ describe('autosave', () => {
 describe('doc operations', () => {
   const doc = (): ops.Doc => {
     const p = fixture();
-    return { moments: p.moments, characters: p.context.characters, themeId: p.themeId };
+    return { moments: p.moments, characters: p.context.characters, themeId: p.themeId, format: 'long' };
   };
 
   it('retiming never crosses a neighbour or the minimum gap', () => {
@@ -222,6 +222,18 @@ describe('doc operations', () => {
     expect(store.getState().doc.moments[0]!.holdSec).toBeGreaterThan(before);
     store.getState().undo();
     expect(store.getState()).toMatchObject({ theme: { id: 'default' } });
+    expect(store.getState().doc.moments[0]!.holdSec).toBe(before);
+  });
+
+  it('switching to short-form shortens unlocked holds, saves the format and undoes', async () => {
+    const { store, deps } = setup();
+    expect(store.getState().doc.format).toBe('long');
+    const before = store.getState().doc.moments[0]!.holdSec;
+    store.getState().edit((d) => ops.setFormat(d, 'short'));
+    expect(store.getState().doc.moments[0]!.holdSec).toBeCloseTo(before - 2.6, 5);
+    await vi.advanceTimersByTimeAsync(AUTOSAVE_DELAY_MS);
+    expect(deps.save).toHaveBeenLastCalledWith(expect.objectContaining({ format: 'short' }));
+    store.getState().undo();
     expect(store.getState().doc.moments[0]!.holdSec).toBe(before);
   });
 

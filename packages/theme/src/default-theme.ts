@@ -1,4 +1,4 @@
-import { DEFAULT_REREAD_SEC, DEFAULT_TYPE_OUT, type Theme } from '@als/schema';
+import { DEFAULT_TYPE_OUT, type Theme } from '@als/schema';
 
 /**
  * The app's own look. Colour families follow the usual chess annotation
@@ -63,7 +63,6 @@ export const defaultTheme: Theme = {
     badgePopSec: 0,
     cardInSec: 0.25,
     typeOut: DEFAULT_TYPE_OUT,
-    rereadSec: DEFAULT_REREAD_SEC,
     cardOutSec: 0.2,
   },
 };

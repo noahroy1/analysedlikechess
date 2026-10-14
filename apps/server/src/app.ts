@@ -132,7 +132,7 @@ export function createApp({ store, queue, analysis, sounds, renders }: AppDeps) 
         moments: [],
         themeId: 'default',
         ingest: pendingIngest(),
-        analysis: { status: 'idle', stages: [], models: {}, secondsPerMove: 20 },
+        analysis: { status: 'idle', stages: [], models: {} },
       });
       queue.enqueue(id);
       return c.json(project, 201);
@@ -154,6 +154,7 @@ export function createApp({ store, queue, analysis, sounds, renders }: AppDeps) 
       p.moments = edit.moments;
       p.context.characters = edit.characters;
       p.themeId = edit.themeId;
+      if (edit.format) p.format = edit.format;
       if (edit.evalBar) p.evalBar = edit.evalBar;
       else delete p.evalBar;
       if (edit.subtitles) p.subtitles = edit.subtitles;
@@ -169,7 +170,7 @@ export function createApp({ store, queue, analysis, sounds, renders }: AppDeps) 
   /** The last saved versions, newest first. */
   app.get('/projects/:id/history', async (c) => c.json(await store.history(c.req.param('id'))));
 
-  /** Bring back an earlier version's moments, characters, theme, bar and subtitles as a new version (the name stays). */
+  /** Bring back an earlier version's moments, characters, theme, format, bar and subtitles as a new version (the name stays). */
   app.post('/projects/:id/history/:version/restore', async (c) => {
     const id = c.req.param('id');
     const { version } = ProjectEditSchema.pick({ version: true }).parse(await c.req.json());
@@ -178,6 +179,8 @@ export function createApp({ store, queue, analysis, sounds, renders }: AppDeps) 
       p.moments = old.moments;
       p.context.characters = old.context.characters;
       p.themeId = old.themeId;
+      if (old.format) p.format = old.format;
+      else delete p.format;
       if (old.evalBar) p.evalBar = old.evalBar;
       else delete p.evalBar;
       if (old.subtitles) p.subtitles = old.subtitles;
@@ -220,8 +223,8 @@ export function createApp({ store, queue, analysis, sounds, renders }: AppDeps) 
 
   /** Pass B for one moment. Returns a proposal; the editor decides whether to keep it. */
   app.post('/projects/:id/regenerate', async (c) => {
-    const { moment, instruction } = RegenerateRequestSchema.parse(await c.req.json());
-    return c.json(await analysis.regenerate(c.req.param('id'), moment, instruction));
+    const { moment, instruction, format } = RegenerateRequestSchema.parse(await c.req.json());
+    return c.json(await analysis.regenerate(c.req.param('id'), moment, instruction, format));
   });
 
   /** Faces and subject on a move's frozen frame (cached per frame). A proposal: the editor places the card. */

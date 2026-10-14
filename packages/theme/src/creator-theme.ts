@@ -1,4 +1,4 @@
-import { DEFAULT_REREAD_SEC, DEFAULT_TYPE_OUT, type Theme } from '@als/schema';
+import { DEFAULT_TYPE_OUT, type Theme } from '@als/schema';
 
 /**
  * The creator's look, measured on their videos (`media/creator-ref/`, Oct 12, 2026):
@@ -91,7 +91,6 @@ export const creatorTheme: Theme = {
     badgePopSec: 0.2,
     cardInSec: 0.25,
     typeOut: DEFAULT_TYPE_OUT,
-    rereadSec: DEFAULT_REREAD_SEC,
     cardOutSec: 0,
   },
 };

@@ -25,6 +25,7 @@ export async function reevaluateBar(store: EditorStore): Promise<void> {
     moments: doc.moments,
     characters: doc.characters,
     ...(doc.evalBar ? { evalBar: doc.evalBar } : {}),
+    format: doc.format,
   });
   store.getState().edit((d) => applyEvaluation(d, result));
   const values = Object.keys(result.evals).length + result.evalBar.beats.length;

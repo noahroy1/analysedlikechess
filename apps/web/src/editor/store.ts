@@ -1,4 +1,4 @@
-import { ProjectSchema, type MoveDraft, type Project, type ProjectEdit, type Theme } from '@als/schema';
+import { ProjectSchema, projectFormat, type MoveDraft, type Project, type ProjectEdit, type Theme } from '@als/schema';
 import { getTheme } from '@als/theme';
 import { createStore, type StoreApi } from 'zustand/vanilla';
 import { hasItem, normalize, type Doc } from './doc.ts';
@@ -98,6 +98,7 @@ const docOf = (project: Project): Doc => ({
   moments: project.moments,
   characters: project.context.characters,
   themeId: project.themeId,
+  format: projectFormat(project),
   ...(project.evalBar ? { evalBar: project.evalBar } : {}),
   ...(project.evalBarScale ? { evalBarScale: project.evalBarScale } : {}),
   ...(project.subtitles ? { subtitles: project.subtitles } : {}),
@@ -112,6 +113,7 @@ const applyDoc = (project: Project, doc: Doc): Project => {
     moments: doc.moments,
     context: { ...project.context, characters: doc.characters },
     themeId: doc.themeId,
+    format: doc.format,
     ...(doc.evalBar ? { evalBar: doc.evalBar } : {}),
     ...(doc.evalBarScale ? { evalBarScale: doc.evalBarScale } : {}),
     ...(doc.subtitles ? { subtitles: doc.subtitles } : {}),
@@ -284,6 +286,7 @@ export function createEditorStore(initial: Project, deps: EditorDeps): EditorSto
         moments: doc.moments,
         characters: doc.characters,
         themeId: doc.themeId,
+        format: doc.format,
         ...(doc.evalBar ? { evalBar: doc.evalBar } : {}),
         ...(doc.subtitles ? { subtitles: doc.subtitles } : {}),
         ...(doc.title ? { title: doc.title } : {}),

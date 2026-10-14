@@ -11,6 +11,7 @@ import {
   type EvalBarScale,
   type EvalBeat,
   type EvaluateResult,
+  type Format,
   type Moment,
   type Subtitle,
   type Theme,
@@ -21,13 +22,15 @@ import {
 } from '@als/schema';
 import { autoPlaceCard, moveNumbers } from '@als/composition';
 
-/** The part of a project the editor changes: its name, the annotation track, the cast, the look, the evaluation bar and the subtitles. */
+/** The part of a project the editor changes: its name, the annotation track, the cast, the look, the format, the evaluation bar and the subtitles. */
 export interface Doc {
   /** Absent until the project is renamed. */
   title?: string;
   moments: Moment[];
   characters: Character[];
   themeId: string;
+  /** Short- or long-form pacing; a project that never set one starts from its clip's guess. */
+  format: Format;
   evalBar?: EvalBar;
   /** The bar's size; absent is 100%. */
   evalBarScale?: EvalBarScale;
@@ -52,7 +55,7 @@ export function normalize(doc: Doc, theme: Theme): Doc {
         m = rest;
       }
       if (m.holdLocked) return m;
-      const holdSec = autoHoldSec(m, theme.timing);
+      const holdSec = autoHoldSec(m, theme.timing, doc.format);
       return holdSec === m.holdSec ? m : { ...m, holdSec };
     });
   const evalBar = doc.evalBar && { ...doc.evalBar, beats: [...doc.evalBar.beats].sort((a, b) => a.sourceTime - b.sourceTime) };
@@ -230,6 +233,11 @@ export function replaceAutoCards(doc: Doc, theme: Theme, frame: FrameSize): Doc 
 /** Switches the project's look; unlocked holds follow the new theme's timing. */
 export function setTheme(doc: Doc, themeId: string): Doc {
   return doc.themeId === themeId ? doc : { ...doc, themeId };
+}
+
+/** Switches between short- and long-form; unlocked holds follow the new format's reread. */
+export function setFormat(doc: Doc, format: Format): Doc {
+  return doc.format === format ? doc : { ...doc, format };
 }
 
 /** Sizes the evaluation bar; 1 (full size) is stored as absent. Cards placed automatically move to fit the bar's new room. */

@@ -23,12 +23,13 @@ const pauseOn = async (id) => {
 const cardText = () => page.eval(`document.querySelector('[data-testid=edit-layer] [data-moment-id]').textContent`);
 const waitSaved = () => page.waitFor(`document.querySelector('[data-testid=save-status]').dataset.status === 'saved'`, 10000);
 const tab = (name) => page.eval(`[...document.querySelectorAll('button')].find((b) => b.textContent.trim() === '${name}').click()`);
-const pickTheme = (id) =>
+const pick = (testid, value) =>
   page.eval(`(() => {
-    const sel = document.querySelector('[data-testid=theme-picker]');
-    Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(sel, '${id}');
+    const sel = document.querySelector('[data-testid=${testid}]');
+    Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(sel, '${value}');
     sel.dispatchEvent(new Event('change', { bubbles: true }));
   })()`);
+const pickTheme = (id) => pick('theme-picker', id);
 
 try {
   await open();
@@ -85,6 +86,24 @@ try {
     await page.eval(`${E}.getState().undo()`);
     const undone = await page.eval(`${E}.getState().theme.id`);
     result('undo reverts a theme switch', switched === 'default' && undone === 'creator', `${switched} → undo → ${undone}`);
+  }
+
+  // 6. The format: a landscape clip starts long-form; short-form shortens every
+  // unlocked hold by the reread (4 s → 1.4 s), saves, survives a reload and undoes.
+  {
+    const hold = () => page.eval(`${E}.getState().doc.moments.map((m) => m.holdSec).join(' ')`);
+    const first = await page.eval(`${E}.getState().doc.format`);
+    const before = await hold();
+    await pick('format-picker', 'short');
+    await waitSaved();
+    const after = await hold();
+    await open();
+    const reloaded = await page.eval(`${E}.getState().doc.format`);
+    const shorter = before.split(' ').every((h, i) => Math.abs(Number(h) - 2.6 - Number(after.split(' ')[i])) < 0.051);
+    result('short-form shortens holds by the reread, saves and survives a reload', first === 'long' && shorter && reloaded === 'short', `${first}: ${before} → short: ${after}; after reload "${reloaded}"`);
+    await pick('format-picker', 'long');
+    await page.eval(`${E}.getState().undo()`);
+    result('undo reverts a format switch', (await page.eval(`${E}.getState().doc.format`)) === 'short' && (await hold()) === after);
   }
 } finally {
   page.close();
