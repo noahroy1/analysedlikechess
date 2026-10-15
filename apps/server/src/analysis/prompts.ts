@@ -1,10 +1,10 @@
 import {
+  CARD_TEXT_CAPS,
   CLASSIFICATIONS,
   EVAL_DIRECTION,
   FORMAT_RULES,
   NO_BEST_MOVE,
   formatEvalSigned,
-  textCaps,
   type Candidate,
   type Classification,
   type Eval,
@@ -29,30 +29,21 @@ const RUBRIC: Record<(typeof CLASSIFICATIONS)[number], string> = {
   blunder: 'makes a move that loses: gets caught, killed, dumped or exposed',
 };
 
-const writingRules = `Writing (every word has to earn its place):
+// The card's text is the same in both formats: the breakdown is what makes the
+// videos entertaining, so short-form trims the pacing, not the writing.
+const cardRules = `Format (the card is read during a freeze, so every field is short):
+- Label: the move's name, two or three words in Title Case, at most ${CARD_TEXT_CAPS.moveLabel} characters: a nickname for the action ("Whole Wallet", "Goes In Alone", "Talks Shop") or a name the character uses ("Barry Allen"). Never a sentence, and never an abstract noun such as Revelation, Confrontation, Deadline or Strategy.
+- Breakdown: exactly two sentences, about 25 to 30 words, at most ${CARD_TEXT_CAPS.explanation} characters. Sentence one: what the character visibly does. Sentence two: the verdict in chess terms, what the move does to the game: a mate appears, speeds up or disappears; the attack stalls; tempo, material or the initiative changes hands. One verdict, committed: no "but", "though" or "while" weighing both sides.
+- Best move: a two to four word command in Title Case, at most ${CARD_TEXT_CAPS.bestMove} characters. It is something this character would do, given who they are and what they want: a schemer schemes better, a hunter hunts better. Never the same best move twice in a scene.
+- Motif: the chess idea the move embodies, as a one to three word chip in Title Case, at most ${CARD_TEXT_CAPS.motif} characters (Sacrifice, Zwischenzug, Quiet Move, Check, Fork, Pin, Gambit, Decoy, Deflection, Prophylaxis, Blockade, Desperado, Overextension). Most moves have one: a threat is Check, giving something up is a Sacrifice, an unexpected reply that ignores the threat is a Zwischenzug. Leave it null only when none fits.
+
+Writing (every word has to earn its place):
 - Concrete over abstract: name the person, the object, the number, the place. Strong verbs, not stacked adjectives. Never abstract summaries such as "the dynamic shifts" or "raises the stakes".
 - No filler or hedging: never "just", "really", "basically", "actually", "clearly", "simply", "kind of", "seems", "perhaps".
 - Never restate the label or the rating, and never open with a verdict word ("Textbook.", "Solid.", "Bold move.").
-- Present tense. No puns, rhetorical questions, exclamation marks, dashes or semicolons.`;
-
-/** What a card holds, per format: the long one is read at leisure, the short one in two seconds. */
-function formatRules(format: Format): string {
-  const caps = textCaps(format);
-  const label = `- Label: the move's name in Title Case, at most ${caps.moveLabel} characters. When the move is a line, use the character's own words from it ("Barry Allen", "Secret Service"); otherwise a nickname for the action ("Whole Wallet", "Goes In Alone"). Never a sentence, and never an abstract noun such as Revelation, Confrontation, Deadline or Strategy.`;
-  const motif = `- Motif: the chess idea the move embodies, as a one to three word chip in Title Case, at most ${caps.motif} characters (Sacrifice, Zwischenzug, Quiet Move, Check, Fork, Pin, Gambit, Decoy, Deflection, Prophylaxis, Blockade, Desperado, Overextension). Most moves have one: a threat is Check, giving something up is a Sacrifice, an unexpected reply that ignores the threat is a Zwischenzug. Leave it null only when none fits.`;
-  if (format === 'short') {
-    return `Format: a short-form vertical video. Viewers swipe away the moment it drags, so the cards come often and each is read in about two seconds.
-${label}
-- Breakdown: one short sentence of three to ten words, at most 60 characters (never over ${caps.explanation}). It is the payoff: how the other side takes the move, or what it does to the game ("The forced mate disappears.", "Checking him now feels rude."). Never describe the move again: the label and the frozen frame already show it. Chess terms are welcome when they are short (tempo, mate, a free piece), never a lecture. Only the first card may add a second short sentence, to set the game up.
-- Best move: a two to five word command in Title Case, at most ${caps.bestMove} characters. It is something this character would do, given who they are and what they want, and it may be playful. Never the same best move twice in a scene.
-${motif}`;
-  }
-  return `Format: a long-form movie-scene breakdown. The card is read during a freeze, so every field is short.
-${label}
-- Breakdown: exactly two sentences, about 25 to 30 words, at most ${caps.explanation} characters. Sentence one: what the character visibly does. Sentence two: the verdict in chess terms, what the move does to the game: a mate appears, speeds up or disappears; the attack stalls; tempo, material or the initiative changes hands. One verdict, committed: no "but", "though" or "while" weighing both sides. Name the character in the first sentence. Quote dialogue only when the words are the move, and then only a few of them.
-- Best move: a two to four word command in Title Case, at most ${caps.bestMove} characters. It is something this character would do, given who they are and what they want: a schemer schemes better, a hunter hunts better. Never the same best move twice in a scene.
-${motif}`;
-}
+- Quote dialogue only when the words are the move, and then only a few of them.
+- Present tense, third person. Name the character in the first sentence.
+- No puns, rhetorical questions, exclamation marks, dashes or semicolons.`;
 
 /** Role, rubric, rules, voice and examples. Identical for every call on a clip, so it caches. */
 export function systemPrompt(style: StyleCorpus, format: Format): string {
@@ -64,14 +55,14 @@ export function systemPrompt(style: StyleCorpus, format: Format): string {
         `Scene: ${e.context}`,
         `Rating: ${e.classification}`,
         `Label: ${e.moveLabel}`,
-        `Breakdown: ${(short && e.shortExplanation) || e.explanation}`,
+        `Breakdown: ${e.explanation}`,
         `Best move: ${e.bestMove ?? '(none)'}`,
         `Motif: ${e.motif ?? '(none)'}`,
       ].join('\n'),
     )
     .join('\n\n');
 
-  return `You write move annotations for "Analysed Like Chess" videos. A film scene is treated like a chess game: at each key decision the video freezes, and a card rates the character's move with a chess annotation, says what it did, and suggests a better move.
+  return `You write move annotations for "Analysed Like Chess" videos. A film scene is treated like a chess game: at each key decision the video freezes, and a card rates the character's move with a chess annotation, says what they did, explains the rating, and suggests a better move.
 
 Ratings (use exactly these):
 ${CLASSIFICATIONS.map((c) => `- ${c}: the character ${RUBRIC[c]}`).join('\n')}
@@ -89,12 +80,10 @@ Rules:
   }
 - Credit moves only to the cast listed with the timeline.
 
-${formatRules(format)}
-
-${writingRules}
+${cardRules}
 
 Voice:
-${(short && style.shortVoice) || style.voice}
+${style.voice}
 
 Examples of the voice (from other scenes):
 
@@ -132,12 +121,8 @@ Also name the scene's protagonist, the character the audience follows, who plays
 
 Before answering, check every card against the rules:
 - Does the rating commit? The scene's turning points are brilliant, great or blunder.
-${
-  short
-    ? `- Is the breakdown one short sentence (two only on the first card) that gives the payoff without describing the move again?`
-    : `- Is the second sentence a chess verdict (mate, attack, tempo, initiative, material) with no "but", "though" or "while"?`
-}
-- Is the label the character's own words or a short nickname, not an abstract noun?
+- Is the second sentence a chess verdict (mate, attack, tempo, initiative, material) with no "but", "though" or "while"?
+- Is the label the character's words or a two word nickname, not an abstract noun?
 - Does the move have a motif if any chess idea fits?
 - Is the best move something this character would do, and different from every other card's?
 - Is the first move from the opening exchange?`;

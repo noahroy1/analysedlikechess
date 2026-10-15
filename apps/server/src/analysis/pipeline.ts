@@ -273,7 +273,7 @@ export async function runAnalysis(
     );
     const candidates = uniqueIds(passA.candidates);
 
-    const passBSchema = annotationSchema(candidates.map((c) => c.id), cast, format);
+    const passBSchema = annotationSchema(candidates.map((c) => c.id), cast);
     const passB: Annotation = await step(
       'annotate',
       cacheKey('annotate', STEP_VERSION.annotate, config.models.analyst, system, context, candidates, target),

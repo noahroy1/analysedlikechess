@@ -1,7 +1,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import {
   NO_BEST_MOVE,
-  moveDraftSchema,
+  MoveDraftSchema,
   projectFormat,
   relabelLateBook,
   type Format,
@@ -43,7 +43,7 @@ export async function regenerateMoment(
     system: systemPrompt(deps.style, format),
     context: timelineText(project),
     task: regenerateTask(moment, evidence, actor, instruction?.trim() || undefined),
-    schema: moveDraftSchema(format),
+    schema: MoveDraftSchema,
   });
   const classification = relabelLateBook(result.output.classification, moment.sourceTime, format);
   const draft = { ...result.output, classification, bestMove: NO_BEST_MOVE.has(classification) ? null : result.output.bestMove };

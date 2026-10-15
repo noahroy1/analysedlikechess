@@ -149,10 +149,10 @@ describe('momentWarnings', () => {
     ]);
   });
 
-  it('holds short-form breakdowns to a shorter cap', () => {
-    const text = { ...moment(), explanation: 'x'.repeat(textCaps('short').explanation + 1) };
-    expect(momentWarnings(text, 'long')).toEqual([]);
-    expect(momentWarnings(text, 'short').map((w) => w.field)).toEqual(['explanation']);
+  it('holds both formats to the same caps', () => {
+    const text = { ...moment(), explanation: 'x'.repeat(textCaps('long').explanation) };
+    expect(momentWarnings(text, 'short')).toEqual([]);
+    expect(textCaps('short')).toEqual(textCaps('long'));
   });
 
   it('warns about a bestMove on a best or brilliant rating', () => {

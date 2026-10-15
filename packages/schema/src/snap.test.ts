@@ -113,7 +113,6 @@ describe('formats', () => {
     const { short, long } = FORMAT_RULES;
     expect(short.secondsPerMove).toBeLessThan(long.secondsPerMove);
     expect(short.rereadSec).toBeLessThan(long.rereadSec);
-    expect(short.textCaps.explanation).toBeLessThan(long.textCaps.explanation);
     expect(short.beatClearanceSec).toBeLessThan(long.beatClearanceSec);
   });
 });

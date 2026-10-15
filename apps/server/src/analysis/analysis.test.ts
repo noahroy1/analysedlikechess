@@ -25,6 +25,7 @@ import { handoffAnalyst } from './providers/replay.ts';
 import { ProviderError } from './providers/types.ts';
 import { parseScribe } from './providers/elevenlabs.ts';
 import { parseNotes, parseRegions } from './providers/gemini.ts';
+import { systemPrompt } from './prompts.ts';
 import { assignSides } from './sides.ts';
 import { candidateTime, snapMoves } from './snap-moves.ts';
 import { castNames, timelineText } from './timeline-text.ts';
@@ -139,6 +140,17 @@ describe('timelineText', () => {
     const project = await dialogueProject();
     project.context.characters = [];
     expect(castNames(project)).toEqual(['Speaker A', 'Speaker B']);
+  });
+});
+
+describe('systemPrompt', () => {
+  const style = { voice: 'Dry.', examples: [] };
+  const cardText = (prompt: string) => prompt.slice(prompt.indexOf('Format ('), prompt.indexOf('Voice:'));
+
+  it('asks both formats for the same two-sentence card', () => {
+    const short = cardText(systemPrompt(style, 'short'));
+    expect(short).toContain('exactly two sentences');
+    expect(short).toEqual(cardText(systemPrompt(style, 'long')));
   });
 });
 
