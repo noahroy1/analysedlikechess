@@ -174,7 +174,7 @@ Rules:
 - Let the bar travel. Its swings are the story: a turning point moves it by whole pawns, not tenths, and a scene with a clear winner ends well past a clear edge. A bar that stays near level tells no story.
 ${
     format === 'short'
-      ? '- Keep the game alive until the last card: stay within about ±5 pawns and out of mate before it, so every card can still move the bar visibly. The cards do the swinging.\n'
+      ? '- This is a short: surprise keeps viewers watching, so the bar swings big and often, and a card may reverse it wherever the scene earns that. Keep it where the swings show: within about ±5 pawns and out of mate until the last card, since far from level each pawn moves the bar less. Every swing still follows from what happens on screen: a lead never vanishes without a card that loses it, and the curve tells one consistent story.\n'
       : ''
   }- Each value is the bar right after that change. A card carries its whole swing at the card itself, never on the beat after it: the viewer reads the rating and sees the bar move together.
 - Beats tell the story between cards in small steps: most carry the last card's direction a little further (the threat sinks in, the lie holds), and some lean toward the turn the next card makes. A beat never undoes the card before it.

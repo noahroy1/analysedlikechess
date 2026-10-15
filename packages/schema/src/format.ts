@@ -30,6 +30,8 @@ export interface FormatRules {
   name: string;
   /** Pass B's target density: about one card per this many source seconds. */
   secondsPerMove: number;
+  /** No drafted card freezes earlier than this; one that would is held until then. */
+  firstCardFloorSec: number;
   /** Drafted cards closer than this to a kept card are dropped, so cards never bunch up. */
   minCardGapSec: number;
   /** Seconds the finished card stays up after the last word, for a reread. */
@@ -55,6 +57,8 @@ export const FORMAT_RULES: Record<Format, FormatRules> = {
   long: {
     name: 'Long-form',
     secondsPerMove: 20,
+    // TODO(open-decision): no floor chosen for long-form (BB1's weak first card sat at 0.5 s).
+    firstCardFloorSec: 0,
     // Not measured: the creator's cards were about 20 s apart, so 8 s only stops bunching.
     minCardGapSec: 8,
     rereadSec: 4,
@@ -77,6 +81,8 @@ export const FORMAT_RULES: Record<Format, FormatRules> = {
   short: {
     name: 'Short-form',
     secondsPerMove: 9,
+    // The user's choice (Oct 15): the first card sets the tone and is the hook, so it comes early.
+    firstCardFloorSec: 1,
     minCardGapSec: 4,
     rereadSec: 1.4,
     textCaps: CARD_TEXT_CAPS,

@@ -72,7 +72,8 @@ export function candidateTime(project: Project, candidate: Candidate): number | 
 /**
  * Stage 4: places each annotated move on an exact frame and merges the drafts
  * into the track. Spoken moves freeze just after their last word, in that
- * word's shot; visual moves on the nearest clean frame. Moves the creator
+ * word's shot; visual moves on the nearest clean frame; none before the
+ * format's `firstCardFloorSec`. Moves the creator
  * approved or added are kept; AI drafts are replaced.
  */
 export function snapMoves(project: Project, candidates: Candidate[], moves: Annotation['moves'], theme: Theme): SnapResult {
@@ -82,14 +83,19 @@ export function snapMoves(project: Project, candidates: Candidate[], moves: Anno
 
   const characterFor = (name: string) => characterByName(project.context.characters, name)?.id;
   const format = projectFormat(project);
+  const { firstCardFloorSec } = FORMAT_RULES[format];
+  const { fps } = project.source;
+  // The first clean frame from the floor on: a move said earlier waits for it.
+  const floor = firstCardFloorSec > 0 ? Math.max(firstCardFloorSec, cleanFreezeTime(firstCardFloorSec, project.shots ?? [], fps)) : 0;
 
   const placed: Moment[] = [];
   moves.forEach((move, index) => {
     const candidate = byId.get(move.candidateId);
     if (!candidate) return dropped.push({ candidateId: move.candidateId, reason: 'unknown candidate' });
     const evidence = candidate.evidenceUtteranceIds.map((id) => utterances.get(id)).filter((u) => u !== undefined);
-    const sourceTime = candidateTime(project, candidate);
-    if (sourceTime === undefined) return dropped.push({ candidateId: candidate.id, reason: 'no evidence or time to place it' });
+    const time = candidateTime(project, candidate);
+    if (time === undefined) return dropped.push({ candidateId: candidate.id, reason: 'no evidence or time to place it' });
+    const sourceTime = Math.max(time, floor);
 
     const actorId = characterFor(candidate.actor);
     const classification = relabelLateBook(move.classification, sourceTime, format);

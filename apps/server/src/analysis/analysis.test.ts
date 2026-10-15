@@ -245,6 +245,15 @@ describe('snapMoves', () => {
     ]);
   });
 
+  it('holds a short-form move made before the floor until then', async () => {
+    const project = await dialogueProject();
+    project.format = 'short';
+    const early = { ...candidates[1]!, id: 'c0', visualTimeSec: 0.2 };
+    const { moments } = snapMoves(project, [early], [move('c0', 'book')], defaultTheme);
+    expect(moments[0]!.sourceTime).toBeGreaterThanOrEqual(FORMAT_RULES.short.firstCardFloorSec);
+    expect(moments[0]!.sourceTime).toBeLessThan(FORMAT_RULES.short.firstCardFloorSec + 0.5);
+  });
+
   it("keeps the creator's moves and drops drafts too close to them", async () => {
     const project = await dialogueProject();
     const first = snapMoves(project, candidates, [move('c1', 'mistake')], defaultTheme).moments[0]!;

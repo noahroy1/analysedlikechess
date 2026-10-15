@@ -253,10 +253,12 @@ export async function runAnalysis(
     const utteranceIds = project.transcript?.utterances.map((u) => u.id) ?? [];
     const target = targetMoveCount(durationSec, analysis.secondsPerMove ?? FORMAT_RULES[format].secondsPerMove);
 
+    // Each key holds the whole prompt, task included, so a changed prompt is a new request.
     const passASchema = decisionPointsSchema(cast, utteranceIds);
+    const passATask = decisionPointsTask(target, format);
     const passA: DecisionPoints = await step(
       'decisions',
-      cacheKey('decisions', STEP_VERSION.decisions, config.models.analyst, system, context, target),
+      cacheKey('decisions', STEP_VERSION.decisions, config.models.analyst, system, context, passATask),
       passASchema,
       async () => {
         const r = await providers.analyst.run({
@@ -265,7 +267,7 @@ export async function runAnalysis(
           effort: 'medium',
           system,
           context,
-          task: decisionPointsTask(target, format),
+          task: passATask,
           schema: passASchema,
         });
         return { value: r.output, model: r.model, usage: r.usage, costUsd: r.costUsd };
@@ -274,9 +276,10 @@ export async function runAnalysis(
     const candidates = uniqueIds(passA.candidates);
 
     const passBSchema = annotationSchema(candidates.map((c) => c.id), cast);
+    const passBTask = annotationTask(candidates, target, format);
     const passB: Annotation = await step(
       'annotate',
-      cacheKey('annotate', STEP_VERSION.annotate, config.models.analyst, system, context, candidates, target),
+      cacheKey('annotate', STEP_VERSION.annotate, config.models.analyst, system, context, passBTask),
       passBSchema,
       async () => {
         const r = await providers.analyst.run({
@@ -285,7 +288,7 @@ export async function runAnalysis(
           effort: 'high',
           system,
           context,
-          task: annotationTask(candidates, target, format),
+          task: passBTask,
           schema: passBSchema,
         });
         return { value: r.output, model: r.model, usage: r.usage, costUsd: r.costUsd };
@@ -349,9 +352,10 @@ export async function runAnalysis(
     };
     const items = evaluationItems(track, fixed);
     const passCSchema = evaluationSchema(items.map((i) => i.id));
+    const passCTask = evaluationTask(items, format);
     const passC = await step(
       'evaluate',
-      cacheKey('evaluate', STEP_VERSION.evaluate, config.models.analyst, system, context, items),
+      cacheKey('evaluate', STEP_VERSION.evaluate, config.models.analyst, system, context, passCTask),
       passCSchema,
       async () => {
         const r = await providers.analyst.run({
@@ -360,7 +364,7 @@ export async function runAnalysis(
           effort: 'medium',
           system,
           context,
-          task: evaluationTask(items, format),
+          task: passCTask,
           schema: passCSchema,
         });
         return { value: r.output, model: r.model, usage: r.usage, costUsd: r.costUsd };
