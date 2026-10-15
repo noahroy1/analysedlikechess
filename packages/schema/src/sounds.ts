@@ -7,7 +7,7 @@ import type { Classification } from './classification.ts';
  * server's sounds folder (`media/sounds` by default); a missing file is skipped.
  */
 export const SOUND_IDS = [
-  // The video's first and last frames, and ten seconds before the end.
+  // The video's first frame, the clip's last (before any game review), and ten seconds before it.
   'game-start',
   'game-end',
   'game-ten-seconds-remaining',

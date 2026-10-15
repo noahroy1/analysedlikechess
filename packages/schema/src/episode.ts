@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { EvalBarSchema } from './eval.ts';
+import { GameReviewSchema } from './game-review.ts';
 import { CharacterSchema, EvalBarScaleSchema, MomentSchema, type Character, type Project } from './project.ts';
 import { SoundBankSchema, type SoundBank } from './sounds.ts';
 import { SubtitleSchema, subtitlesFromTranscript } from './subtitles.ts';
@@ -26,11 +27,13 @@ export const EpisodePropsSchema = z.object({
   sounds: SoundBankSchema.optional(),
   /** Lines of dialogue, drawn in the theme's subtitle style. */
   subtitles: z.array(SubtitleSchema).optional(),
+  /** Accuracy and summary for the closing review, where the theme has one. */
+  gameReview: GameReviewSchema.optional(),
 });
 export type EpisodeProps = z.infer<typeof EpisodePropsSchema>;
 
 /** The parts of a project (or of the editor's unsaved document) an episode is drawn from. */
-export type EpisodeDoc = Pick<Project, 'moments' | 'evalBar' | 'evalBarScale' | 'subtitles' | 'transcript'> & {
+export type EpisodeDoc = Pick<Project, 'moments' | 'evalBar' | 'evalBarScale' | 'subtitles' | 'transcript' | 'gameReview'> & {
   characters: Character[];
   durationSec: number;
 };
@@ -59,6 +62,7 @@ export const episodeProps = (doc: EpisodeDoc, media: EpisodeMedia): EpisodeProps
   portraits: Object.fromEntries(doc.characters.flatMap((c) => (c.portrait ? [[c.id, media.fileUrl(c.portrait)]] : []))),
   ...(media.sounds ? { sounds: media.sounds } : {}),
   subtitles: doc.subtitles ?? subtitlesFromTranscript(doc.transcript),
+  ...(doc.gameReview ? { gameReview: doc.gameReview } : {}),
 });
 
 /** What the renderer's composition receives: the episode plus the frame it is drawn at. */

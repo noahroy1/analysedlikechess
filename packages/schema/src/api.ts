@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { MoveDraftSchema } from './analyst.ts';
 import { EvalBarSchema, EvalSchema } from './eval.ts';
 import { FormatSchema } from './format.ts';
+import { GameReviewSchema } from './game-review.ts';
 import {
   AnalysisSchema,
   CharacterSchema,
@@ -159,6 +160,8 @@ export const ProjectEditSchema = z.object({
   title: ProjectTitleSchema.optional(),
   /** Omitted at full size. */
   evalBarScale: EvalBarScaleSchema.optional(),
+  /** Omitted until an accuracy or the summary is typed. */
+  gameReview: GameReviewSchema.optional(),
 });
 export type ProjectEdit = z.infer<typeof ProjectEditSchema>;
 

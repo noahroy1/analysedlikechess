@@ -32,6 +32,8 @@ export interface TimelineProps {
   onSeek: (frame: number) => void;
   onSelectHold: (hold: Hold) => void;
   onSelectBeat: (beat: EvalBeat, outFrame: number) => void;
+  /** The game review's block: shows it, with its panel in the inspector. */
+  onSelectGameReview: (outFrame: number) => void;
   onScrubStart?: () => void;
   onRetimeStart: (momentId: string) => void;
   /** Moves a moment to (about) `rawSec`; returns where it actually landed. */
@@ -215,6 +217,23 @@ export function Timeline(props: TimelineProps) {
               </button>
             );
           })}
+          {timeline.gameReview && (
+            <button
+              type="button"
+              data-testid="game-review-block"
+              data-out-start={timeline.gameReview.outStart}
+              data-frames={timeline.gameReview.frames}
+              onPointerDown={(e) => {
+                e.stopPropagation();
+                if (e.button === 0) props.onSelectGameReview(timeline.gameReview!.outStart);
+              }}
+              title={`Game review · ${(timeline.gameReview.frames / fps).toFixed(1)} s after the last frame`}
+              className="absolute top-3 bottom-1 overflow-hidden rounded-sm border border-neutral-600 bg-neutral-800 px-1 text-left text-[10px] leading-7 text-neutral-300 hover:border-neutral-400"
+              style={{ left: pct(timeline.gameReview.outStart), width: pct(timeline.gameReview.frames) }}
+            >
+              Review
+            </button>
+          )}
         </div>
 
         {/* The evaluation bar: White's share as a step plot. Solid dots are moves, hollow ones beats. */}

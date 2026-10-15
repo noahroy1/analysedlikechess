@@ -12,6 +12,7 @@ import {
   type EvalBeat,
   type EvaluateResult,
   type Format,
+  type GameReview,
   type Moment,
   type Subtitle,
   type Theme,
@@ -22,7 +23,7 @@ import {
 } from '@als/schema';
 import { autoPlaceCard, moveNumbers } from '@als/composition';
 
-/** The part of a project the editor changes: its name, the annotation track, the cast, the look, the format, the evaluation bar and the subtitles. */
+/** The part of a project the editor changes: its name, the annotation track, the cast, the look, the format, the evaluation bar, the subtitles and the game review. */
 export interface Doc {
   /** Absent until the project is renamed. */
   title?: string;
@@ -36,6 +37,8 @@ export interface Doc {
   evalBarScale?: EvalBarScale;
   /** Absent while the subtitles follow the transcript; set by the first edit. */
   subtitles?: Subtitle[];
+  /** Accuracy and summary as typed; absent shows the defaults. */
+  gameReview?: GameReview;
 }
 
 export class EditError extends Error {}
@@ -245,6 +248,31 @@ export function setEvalBarScale(doc: Doc, scale: EvalBarScale | 1): Doc {
   if ((doc.evalBarScale ?? 1) === scale) return doc;
   const { evalBarScale: _, ...rest } = doc;
   return scale === 1 ? rest : { ...rest, evalBarScale: scale };
+}
+
+/** The doc with its game review replaced; nothing left typed drops it. */
+function withGameReview(doc: Doc, review: GameReview): Doc {
+  const { gameReview: _, ...rest } = doc;
+  const accuracy = review.accuracy && Object.keys(review.accuracy).length > 0 ? review.accuracy : undefined;
+  const next: GameReview = { ...(accuracy ? { accuracy } : {}), ...(review.summary ? { summary: review.summary } : {}) };
+  return Object.keys(next).length > 0 ? { ...rest, gameReview: next } : rest;
+}
+
+/** A side's accuracy on the game review, 0-100 to one decimal; undefined goes back to the default. */
+export function setReviewAccuracy(doc: Doc, side: 'white' | 'black', value: number | undefined): Doc {
+  const current = doc.gameReview?.accuracy?.[side];
+  const next = value === undefined ? undefined : Math.round(Math.min(100, Math.max(0, value)) * 10) / 10;
+  if (current === next) return doc;
+  const { [side]: _, ...others } = doc.gameReview?.accuracy ?? {};
+  return withGameReview(doc, { ...doc.gameReview, accuracy: next === undefined ? others : { ...others, [side]: next } });
+}
+
+/** The game review's summary line, kept as typed; blank goes back to the one written from the result. */
+export function setReviewSummary(doc: Doc, text: string): Doc {
+  const summary = text.trim() ? text : undefined;
+  if (doc.gameReview?.summary === summary) return doc;
+  const { summary: _, ...rest } = doc.gameReview ?? {};
+  return withGameReview(doc, summary ? { ...rest, summary } : rest);
 }
 
 /** Renames the project; a blank name goes back to the movie title or the file's name. */

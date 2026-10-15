@@ -1,6 +1,6 @@
 // Entry point the server bundles for rendering. The Player imports <Episode> directly
 // and never loads this file.
-import type { RenderProps } from '@als/schema';
+import { gameReviewSec, type RenderProps } from '@als/schema';
 import { defaultTheme } from '@als/theme';
 import { Composition, registerRoot, type CalculateMetadataFunction } from 'remotion';
 import { Episode } from './Episode.tsx';
@@ -13,10 +13,10 @@ function RenderEpisode({ fps: _fps, width: _width, height: _height, ...episode }
   return <Episode {...episode} />;
 }
 
-// Frame size and rate come from the source; the length is the source plus every hold,
+// Frame size and rate come from the source; the length is the source plus every hold and the review,
 // from the same timeline the Player uses.
 const calculateMetadata: CalculateMetadataFunction<RenderProps> = ({ props }) => ({
-  durationInFrames: buildTimeline(props.moments, props.fps, props.durationSec).outFrames,
+  durationInFrames: buildTimeline(props.moments, props.fps, props.durationSec, gameReviewSec(props.theme)).outFrames,
   fps: props.fps,
   width: props.width,
   height: props.height,

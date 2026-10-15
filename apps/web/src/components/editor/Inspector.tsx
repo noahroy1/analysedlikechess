@@ -8,6 +8,7 @@ import { formatTime } from '../../lib/format.ts';
 import { BarPanel, BeatInspector, EVAL_HINT, EvalInput, Warnings } from './BarPanels.tsx';
 import { ClassificationPicker } from './ClassificationPicker.tsx';
 import { Field, SecondsInput } from './fields.tsx';
+import { GameReviewPanel } from './GameReviewPanel.tsx';
 import { RegeneratePanel } from './RegeneratePanel.tsx';
 
 const ANCHOR_LABELS: Record<Moment['card']['anchor'], string> = {
@@ -18,7 +19,7 @@ const ANCHOR_LABELS: Record<Moment['card']['anchor'], string> = {
   custom: 'Custom (dragged)',
 };
 
-/** Every field of the selected moment or beat; with nothing selected, the evaluation bar. */
+/** Every field of the selected moment or beat; with nothing selected, the evaluation bar and the game review. */
 export function Inspector() {
   const store = useEditorStore();
   const selectedId = useEditor((s) => s.selectedId);
@@ -40,6 +41,7 @@ export function Inspector() {
           Press <Kbd>M</Kbd> to add one at the playhead, <Kbd>B</Kbd> for a beat.
         </p>
         <BarPanel />
+        <GameReviewPanel />
       </div>
     );
   }

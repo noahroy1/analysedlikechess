@@ -140,6 +140,17 @@ export const ThemeSchema = z.object({
       sideColor: z.string(),
     })
     .optional(),
+  /**
+   * chess.com's Game Review screen after the clip's last frame (see
+   * `game-review.ts`), over the frozen frame darkened by `backdropDim`. Absent: none.
+   */
+  gameReview: z
+    .object({
+      /** Seconds it stays up. */
+      holdSec: z.number().positive(),
+      backdropDim: Unit,
+    })
+    .optional(),
   freeze: z.object({
     treatment: z.enum(['none', 'dim', 'push-in']),
     /** Darkening at full strength, for `dim`. */

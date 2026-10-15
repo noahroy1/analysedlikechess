@@ -1,10 +1,11 @@
-import { DEFAULT_START_EVAL, evalKeyframes, subtitleAt, typeOutStartSec, type EpisodeProps, type Moment, type Theme } from '@als/schema';
+import { DEFAULT_START_EVAL, evalKeyframes, gameReviewSec, subtitleAt, typeOutStartSec, type EpisodeProps, type Moment, type Theme } from '@als/schema';
 import { Audio, Video } from '@remotion/media';
 import { useMemo } from 'react';
 import { AbsoluteFill, Freeze, Sequence, useCurrentFrame, useVideoConfig } from 'remotion';
 import { cardMotion, revealAt, type FrameSize } from './card.ts';
 import { EvalBar, barPlayers } from './EvalBar.tsx';
 import { evalBarAt, placeKeyframes } from './eval-bar.ts';
+import { GameReview } from './GameReview.tsx';
 import { evalBarLayout, type BarLayout } from './layout.ts';
 import { MoveCard } from './MoveCard.tsx';
 import { moveNumbers } from './notation.ts';
@@ -14,13 +15,18 @@ import { buildTimeline, timeMapFrame, type Segment } from './timeline.ts';
 
 /**
  * The finished episode: the source clip with a freeze and a move card at every
- * moment. Pure: everything arrives through props, and every frame is derived
- * from the frame number, so the Player and the renderer draw identical frames.
+ * moment, then the game review where the theme has one. Pure: everything arrives
+ * through props, and every frame is derived from the frame number, so the
+ * Player and the renderer draw identical frames.
  */
-export function Episode({ src, durationSec, moments, characters, theme, evalBar, evalBarScale, portraits, sounds, subtitles }: EpisodeProps) {
+export function Episode({ src, durationSec, moments, characters, theme, evalBar, evalBarScale, portraits, sounds, subtitles, gameReview }: EpisodeProps) {
   const { fps, width, height } = useVideoConfig();
   const frame = useCurrentFrame();
-  const timeline = useMemo(() => buildTimeline(moments, fps, durationSec), [moments, fps, durationSec]);
+  const reviewSec = gameReviewSec(theme);
+  const timeline = useMemo(() => buildTimeline(moments, fps, durationSec, reviewSec), [moments, fps, durationSec, reviewSec]);
+  const review = timeline.gameReview;
+  // The review has its own graph, so the bar and the subtitles step aside for it.
+  const reviewing = review !== undefined && frame >= review.outStart;
   const evalTrack = useMemo(
     () => placeKeyframes(evalKeyframes(evalBar, moments, characters), timeline),
     [evalBar, moments, characters, timeline],
@@ -41,7 +47,9 @@ export function Episode({ src, durationSec, moments, characters, theme, evalBar,
     <AbsoluteFill style={{ backgroundColor: 'black', overflow: 'hidden' }}>
       {timeline.segments.map((segment) => {
         const playFrames = segment.sourceEnd - segment.sourceStart;
-        const total = playFrames + (segment.hold?.frames ?? 0);
+        // The last segment stays frozen on the clip's last frame through the review.
+        const endFrames = segment.hold ? 0 : (review?.frames ?? 0);
+        const total = playFrames + (segment.hold?.frames ?? 0) + endFrames;
         if (total <= 0) return null;
         const moment = segment.hold ? moments[segment.hold.index] : undefined;
         return (
@@ -58,6 +66,7 @@ export function Episode({ src, durationSec, moments, characters, theme, evalBar,
             <SegmentView
               src={src}
               segment={segment}
+              endFrames={endFrames}
               moment={moment}
               actorName={moment?.actorId ? names.get(moment.actorId) : undefined}
               moveNumber={moment ? numbers.get(moment.id) : undefined}
@@ -68,8 +77,8 @@ export function Episode({ src, durationSec, moments, characters, theme, evalBar,
           </Sequence>
         );
       })}
-      {theme.subtitles && subtitles && <Subtitle subtitles={subtitles} sourceSec={timeMapFrame(timeline, frame).sourceFrame / fps} style={theme.subtitles} frame={{ width, height }} bar={barLayout} />}
-      {theme.evalBar && (
+      {theme.subtitles && subtitles && !reviewing && <Subtitle subtitles={subtitles} sourceSec={timeMapFrame(timeline, frame).sourceFrame / fps} style={theme.subtitles} frame={{ width, height }} bar={barLayout} />}
+      {theme.evalBar && !reviewing && (
         <EvalBar
           state={evalBarAt(evalBar?.start ?? DEFAULT_START_EVAL, evalTrack, frame, fps)}
           players={players}
@@ -78,6 +87,21 @@ export function Episode({ src, durationSec, moments, characters, theme, evalBar,
           frame={{ width, height }}
           scale={evalBarScale}
         />
+      )}
+      {review && theme.gameReview && (
+        // Premounted so the portraits are loaded before the review cuts in.
+        <Sequence from={review.outStart} durationInFrames={review.frames} premountFor={fps} name="game review">
+          <AbsoluteFill style={{ backgroundColor: `rgba(0, 0, 0, ${theme.gameReview.backdropDim})` }} />
+          <GameReview
+            review={gameReview}
+            moments={moments}
+            characters={characters}
+            evalBar={evalBar}
+            portraits={portraits}
+            theme={theme}
+            frame={{ width, height }}
+          />
+        </Sequence>
       )}
       {cues.map((cue) => (
         // Premounting loads each sound a second ahead, so it starts on its frame.
@@ -105,6 +129,8 @@ function Subtitle({ subtitles, sourceSec, style, frame, bar }: { subtitles: NonN
 interface SegmentViewProps {
   src: string;
   segment: Segment;
+  /** Frames the last segment stays on the clip's last frame after playing (the game review). */
+  endFrames: number;
   moment: Moment | undefined;
   actorName: string | undefined;
   moveNumber: string | undefined;
@@ -113,7 +139,7 @@ interface SegmentViewProps {
   fps: number;
 }
 
-function SegmentView({ src, segment, moment, actorName, moveNumber, theme, frameSize, fps }: SegmentViewProps) {
+function SegmentView({ src, segment, endFrames, moment, actorName, moveNumber, theme, frameSize, fps }: SegmentViewProps) {
   const frame = useCurrentFrame();
   const { hold } = segment;
   const playFrames = segment.sourceEnd - segment.sourceStart;
@@ -125,13 +151,16 @@ function SegmentView({ src, segment, moment, actorName, moveNumber, theme, frame
     holding && moment ? revealAt(moment.explanation, progress * holdSec - typeOutStartSec(theme.timing), holdSec, theme.timing) : undefined;
   const { treatment, dim, pushIn } = theme.freeze;
   const zoom = holding && treatment === 'push-in' ? 1 + (pushIn - 1) * progress : 1;
+  const frozenFrame = hold?.sourceFrame ?? (endFrames > 0 ? segment.sourceEnd - 1 : segment.sourceStart);
+  // A last move on the clip's final frame leaves nothing to play, so the video starts on the frozen frame.
+  const videoStart = Math.min(segment.sourceStart, frozenFrame);
 
   return (
     <AbsoluteFill>
       <AbsoluteFill style={{ transform: zoom === 1 ? undefined : `scale(${zoom})` }}>
         {/* Frame numbers inside the sequence are relative, so the hold shows source frame hold.sourceFrame. */}
-        <Freeze frame={(hold?.sourceFrame ?? segment.sourceStart) - segment.sourceStart} active={(f) => hold !== undefined && f >= playFrames}>
-          <Video src={src} trimBefore={segment.sourceStart} objectFit="contain" style={{ width: '100%', height: '100%' }} />
+        <Freeze frame={frozenFrame - videoStart} active={(f) => (hold !== undefined || endFrames > 0) && f >= playFrames}>
+          <Video src={src} trimBefore={videoStart} objectFit="contain" style={{ width: '100%', height: '100%' }} />
         </Freeze>
       </AbsoluteFill>
 

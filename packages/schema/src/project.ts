@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { ClassificationSchema } from './classification.ts';
 import { EvalBarSchema, EvalSchema } from './eval.ts';
 import { FormatSchema } from './format.ts';
+import { GameReviewSchema } from './game-review.ts';
 import { FrameRegionsSchema } from './regions.ts';
 import { MIN_MOMENT_GAP_SEC } from './rules.ts';
 import { SubtitleSchema } from './subtitles.ts';
@@ -240,6 +241,8 @@ export const ProjectSchema = z
     subtitles: z.array(SubtitleSchema).optional(),
     /** The evaluation bar's size; absent is 100%. */
     evalBarScale: EvalBarScaleSchema.optional(),
+    /** The closing game review's accuracy and summary as edited; absent shows the defaults. */
+    gameReview: GameReviewSchema.optional(),
     ingest: IngestSchema,
     analysis: AnalysisSchema,
   })

@@ -49,6 +49,16 @@ describe('game sounds', () => {
     expect(end.from + end.frames).toBe(out);
   });
 
+  it('ends the game on the clip’s last frame, before the game review', () => {
+    const moments = [moment('a', 5)];
+    const timeline = buildTimeline(moments, fps, 60, 5);
+    const cues = soundCues({ timeline, moments, characters: cast, timing, sounds: full });
+    const end = only(cues, 'game-end');
+    expect(end.from + end.frames).toBe(timeline.gameReview!.outStart);
+    expect(only(cues, 'ten-seconds').from).toBe(timeline.gameReview!.outStart - 10 * fps);
+    expect(cues.every((c) => c.from < timeline.gameReview!.outStart)).toBe(true);
+  });
+
   it('plays game-start on the first frame of a video shorter than its delay', () => {
     expect(only(cuesFor([], full, 0.5), 'game-start').from).toBe(0);
   });

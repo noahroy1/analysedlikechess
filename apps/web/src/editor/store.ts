@@ -102,11 +102,12 @@ const docOf = (project: Project): Doc => ({
   ...(project.evalBar ? { evalBar: project.evalBar } : {}),
   ...(project.evalBarScale ? { evalBarScale: project.evalBarScale } : {}),
   ...(project.subtitles ? { subtitles: project.subtitles } : {}),
+  ...(project.gameReview ? { gameReview: project.gameReview } : {}),
 });
 
 /** The project with the doc's changes applied. */
 const applyDoc = (project: Project, doc: Doc): Project => {
-  const { evalBar: _, subtitles: __, title: ___, evalBarScale: ____, ...rest } = project;
+  const { evalBar: _, subtitles: __, title: ___, evalBarScale: ____, gameReview: _____, ...rest } = project;
   return {
     ...rest,
     ...(doc.title ? { title: doc.title } : {}),
@@ -117,6 +118,7 @@ const applyDoc = (project: Project, doc: Doc): Project => {
     ...(doc.evalBar ? { evalBar: doc.evalBar } : {}),
     ...(doc.evalBarScale ? { evalBarScale: doc.evalBarScale } : {}),
     ...(doc.subtitles ? { subtitles: doc.subtitles } : {}),
+    ...(doc.gameReview ? { gameReview: doc.gameReview } : {}),
   };
 };
 
@@ -291,6 +293,7 @@ export function createEditorStore(initial: Project, deps: EditorDeps): EditorSto
         ...(doc.subtitles ? { subtitles: doc.subtitles } : {}),
         ...(doc.title ? { title: doc.title } : {}),
         ...(doc.evalBarScale ? { evalBarScale: doc.evalBarScale } : {}),
+        ...(doc.gameReview ? { gameReview: doc.gameReview } : {}),
       });
       if (outcome.kind === 'conflict') {
         saveAgain = false;

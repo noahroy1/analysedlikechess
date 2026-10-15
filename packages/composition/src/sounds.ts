@@ -89,13 +89,14 @@ export function soundCues({ timeline, moments, characters, timing, sounds }: Sou
     if (file && frames > 0) cues.push({ key, sound, src: file.src, from, frames, ...extra });
   };
 
-  const end = timeline.outFrames;
+  // The game ends on the clip's last frame; the review (if any) follows in silence.
+  const end = timeline.gameReview?.outStart ?? timeline.outFrames;
   // A video shorter than the delay plays it on its first frame.
   const start = toFrames(GAME_START_SEC);
   add('game-start', 'game-start', Number.isFinite(end) && start >= end ? 0 : start);
   if (Number.isFinite(end)) {
     if (end > toFrames(TEN_SECONDS)) add('ten-seconds', 'game-ten-seconds-remaining', end - toFrames(TEN_SECONDS));
-    // Finishes on the last frame.
+    // Finishes on the clip's last frame, so the review shows once it has played.
     add('game-end', 'game-end', Math.max(0, end - fileFrames('game-end')));
   }
 

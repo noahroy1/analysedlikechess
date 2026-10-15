@@ -163,3 +163,24 @@ describe('round trips', () => {
     }
   });
 });
+
+describe('game review', () => {
+  const tl = buildTimeline([m('a', 2, 1)], FPS, 10, 5);
+
+  it('follows the clip’s last frame and counts in the length', () => {
+    expect(tl.gameReview).toEqual({ outStart: 330, frames: 150, sourceFrame: 299 });
+    expect(tl.outFrames).toBe(480);
+    expect(buildTimeline([m('a', 2, 1)], FPS, 10).gameReview).toBeUndefined();
+  });
+
+  it('holds the last frame for its length', () => {
+    expect(timeMapFrame(tl, 329)).toEqual({ sourceFrame: 299 });
+    expect(timeMapFrame(tl, 330)).toEqual({ sourceFrame: 299, gameReview: { progress: 0 } });
+    expect(timeMapFrame(tl, 405)).toEqual({ sourceFrame: 299, gameReview: { progress: 0.5 } });
+  });
+
+  it('follows a move on the very last frame', () => {
+    const last = buildTimeline([m('a', 10, 1)], FPS, 10, 5);
+    expect(last.gameReview).toEqual({ outStart: 330, frames: 150, sourceFrame: 299 });
+  });
+});

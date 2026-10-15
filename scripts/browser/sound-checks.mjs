@@ -9,6 +9,7 @@
 import { execFileSync } from 'node:child_process';
 import { renameSync } from 'node:fs';
 import { join } from 'node:path';
+import { gameReviewSec } from '../../packages/schema/src/game-review.ts';
 import { buildTimeline } from '../../packages/composition/src/timeline.ts';
 import { soundCues } from '../../packages/composition/src/sounds.ts';
 import { launch, sleep } from './cdp.mjs';
@@ -67,7 +68,7 @@ try {
   const playThrough = async (look) => {
     const state = await editorState();
     const { fps, durationSec } = state.source;
-    const timeline = buildTimeline(state.moments, fps, durationSec);
+    const timeline = buildTimeline(state.moments, fps, durationSec, gameReviewSec(state.theme));
     const cues = soundCues({ timeline, moments: state.moments, characters: state.characters, timing: state.theme.timing, sounds });
 
     // Play the whole episode straight through, as the MP4 will.
@@ -109,13 +110,19 @@ try {
       result(`${look}: each hold: move sound on the badge, typing under the type-out, a silent reread`, ok, rows.join('; '));
     }
 
-    // 4. The game sounds bracket the video.
+    // 4. The game sounds bracket the clip; a game review follows in silence.
     {
       const start = cues.find((c) => c.key === 'game-start');
       const end = cues.find((c) => c.key === 'game-end');
       const ten = cues.find((c) => c.key === 'ten-seconds');
-      const ok = start?.from === Math.round(fps) && end && end.from + end.frames === timeline.outFrames && ten?.from === timeline.outFrames - 10 * fps;
-      result(`${look}: game-start 1 s in, the ten-second warning 10 s out, game-end finishing on the last frame`, !!ok, `start ${start?.from}, ten ${ten?.from}, end ${end?.from}+${end?.frames} of ${timeline.outFrames}`);
+      const last = timeline.gameReview?.outStart ?? timeline.outFrames;
+      const inReview = starts.filter((s) => s.frame > last + SLACK);
+      const ok = start?.from === Math.round(fps) && end && end.from + end.frames === last && ten?.from === last - 10 * fps && inReview.length === 0;
+      result(
+        `${look}: game-start 1 s in, the ten-second warning 10 s out, game-end finishing on the clip's last frame${timeline.gameReview ? ', a silent review after it' : ''}`,
+        !!ok,
+        `start ${start?.from}, ten ${ten?.from}, end ${end?.from}+${end?.frames} of ${last}, video ${timeline.outFrames}${inReview.length ? `, ${inReview.length} in the review` : ''}`,
+      );
     }
   };
 

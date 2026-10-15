@@ -84,6 +84,10 @@ export const creatorTheme: Theme = {
     nameColor: '#ffffff',
     sideColor: '#d9d6d1',
   },
+  // chess.com's Game Review after the last frame (media/game-review-screen-ref.png).
+  // TODO(open-decision): how long it stays up and how dark the frozen frame
+  // behind it goes are unmeasured; the creator's own end screen sets them.
+  gameReview: { holdSec: 5, backdropDim: 0.6 },
   // The dim lands on the first frozen frame; the card cuts away as playback resumes.
   freeze: { treatment: 'dim', dim: 0.1, pushIn: 1.04, dimInSec: 0 },
   timing: {

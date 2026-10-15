@@ -1,4 +1,4 @@
-import { CLASSIFICATIONS, episodeProps, speechSnapTargets, type EpisodeProps, type SoundBank } from '@als/schema';
+import { CLASSIFICATIONS, episodeProps, gameReviewSec, speechSnapTargets, type EpisodeProps, type SoundBank } from '@als/schema';
 import { Episode, buildTimeline, cardSettledFrame, sourceFrameToOut, timeMapFrame, type Hold } from '@als/composition';
 import { Player, type PlayerRef } from '@remotion/player';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
@@ -45,6 +45,7 @@ export function Workspace({ left, right }: WorkspaceProps) {
   const evalBar = useEditor((s) => s.doc.evalBar);
   const editedSubtitles = useEditor((s) => s.doc.subtitles);
   const evalBarScale = useEditor((s) => s.doc.evalBarScale);
+  const gameReview = useEditor((s) => s.doc.gameReview);
   const portraitCrop = useEditor((s) => s.portraitCrop);
   const [cropping, setCropping] = useState(false);
   const player = useRef<PlayerRef>(null);
@@ -63,7 +64,8 @@ export function Workspace({ left, right }: WorkspaceProps) {
     getSoundBank().then(setSounds, (error: unknown) => console.warn('no chess sounds:', error));
   }, []);
 
-  const timeline = useMemo(() => buildTimeline(moments, fps, source.durationSec), [moments, fps, source.durationSec]);
+  const reviewSec = gameReviewSec(theme);
+  const timeline = useMemo(() => buildTimeline(moments, fps, source.durationSec, reviewSec), [moments, fps, source.durationSec, reviewSec]);
   const snapTargets = useMemo(
     () => speechSnapTargets(project.transcript?.words ?? [], shots, fps),
     [project.transcript, shots, fps],
@@ -72,10 +74,10 @@ export function Workspace({ left, right }: WorkspaceProps) {
   const inputProps = useMemo<EpisodeProps>(
     () =>
       episodeProps(
-        { durationSec: source.durationSec, moments, characters, evalBar, evalBarScale, subtitles: editedSubtitles, transcript: project.transcript },
+        { durationSec: source.durationSec, moments, characters, evalBar, evalBarScale, subtitles: editedSubtitles, transcript: project.transcript, gameReview },
         { src: fileUrl(project.id, source.proxy), theme, fileUrl: (file) => fileUrl(project.id, file), sounds },
       ),
-    [project.id, source.proxy, source.durationSec, moments, characters, theme, evalBar, evalBarScale, sounds, editedSubtitles, project.transcript],
+    [project.id, source.proxy, source.durationSec, moments, characters, theme, evalBar, evalBarScale, sounds, editedSubtitles, project.transcript, gameReview],
   );
 
   // Handlers attached once read the latest values here.
@@ -183,6 +185,10 @@ export function Workspace({ left, right }: WorkspaceProps) {
     const at = timeMapFrame(timeline, player.current?.getCurrentFrame() ?? 0);
     if (at.hold) {
       store.getState().notify('There is already a move here.', 'warn');
+      return;
+    }
+    if (at.gameReview) {
+      store.getState().notify('The game review comes after the clip; moves go before it.', 'warn');
       return;
     }
     const { sec } = snapTime(at.sourceFrame / fps, { targets: snapTargets, shots, fps }, true, ADD_SNAP_SEC);
@@ -424,6 +430,11 @@ export function Workspace({ left, right }: WorkspaceProps) {
             onSelectHold={(hold) => {
               store.getState().select(hold.momentId);
               goToHold(hold);
+            }}
+            onSelectGameReview={(outFrame) => {
+              player.current?.pause();
+              store.getState().select(null);
+              seek(outFrame);
             }}
             onScrubStart={() => {
               player.current?.pause();

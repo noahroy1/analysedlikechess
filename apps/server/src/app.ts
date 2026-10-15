@@ -163,6 +163,8 @@ export function createApp({ store, queue, analysis, sounds, renders }: AppDeps) 
       else delete p.title;
       if (edit.evalBarScale) p.evalBarScale = edit.evalBarScale;
       else delete p.evalBarScale;
+      if (edit.gameReview) p.gameReview = edit.gameReview;
+      else delete p.gameReview;
     });
     return c.json({ version: saved.version });
   });
@@ -170,7 +172,7 @@ export function createApp({ store, queue, analysis, sounds, renders }: AppDeps) 
   /** The last saved versions, newest first. */
   app.get('/projects/:id/history', async (c) => c.json(await store.history(c.req.param('id'))));
 
-  /** Bring back an earlier version's moments, characters, theme, format, bar and subtitles as a new version (the name stays). */
+  /** Bring back an earlier version's moments, characters, theme, format, bar, subtitles and game review as a new version (the name stays). */
   app.post('/projects/:id/history/:version/restore', async (c) => {
     const id = c.req.param('id');
     const { version } = ProjectEditSchema.pick({ version: true }).parse(await c.req.json());
@@ -187,6 +189,8 @@ export function createApp({ store, queue, analysis, sounds, renders }: AppDeps) 
       else delete p.subtitles;
       if (old.evalBarScale) p.evalBarScale = old.evalBarScale;
       else delete p.evalBarScale;
+      if (old.gameReview) p.gameReview = old.gameReview;
+      else delete p.gameReview;
     });
     return c.json(saved);
   });

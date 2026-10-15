@@ -252,6 +252,21 @@ describe('doc operations', () => {
     expect(store.getState().doc.title).toBeUndefined();
   });
 
+  it('edits the game review’s accuracy and summary as saved, undoable edits', async () => {
+    const { store, deps } = setup();
+    store.getState().edit((d) => ops.setReviewAccuracy(d, 'white', 71.64));
+    store.getState().edit((d) => ops.setReviewSummary(d, 'Red won '));
+    await vi.advanceTimersByTimeAsync(AUTOSAVE_DELAY_MS);
+    expect(deps.save).toHaveBeenLastCalledWith(expect.objectContaining({ gameReview: { accuracy: { white: 71.6 }, summary: 'Red won ' } }));
+    expect(store.getState().project.gameReview).toEqual({ accuracy: { white: 71.6 }, summary: 'Red won ' });
+    // Clearing both goes back to the defaults, stored as absent.
+    const cleared = ops.setReviewSummary(ops.setReviewAccuracy(store.getState().doc, 'white', undefined), '  ');
+    expect('gameReview' in cleared).toBe(false);
+    expect(ops.setReviewAccuracy(store.getState().doc, 'black', 140).gameReview?.accuracy).toEqual({ white: 71.6, black: 100 });
+    store.getState().undo();
+    expect(store.getState().doc.gameReview).toEqual({ accuracy: { white: 71.6 } });
+  });
+
   it('assigning a speaker label takes it off everyone else', () => {
     const next = ops.assignSpeaker(doc(), 'A', 'c-blue');
     expect(next.characters.map((c) => c.speakerLabels)).toEqual([[], ['B', 'A']]);

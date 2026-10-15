@@ -2,6 +2,7 @@ export * from './classification.ts';
 export * from './project.ts';
 export * from './eval.ts';
 export * from './eval-track.ts';
+export * from './game-review.ts';
 export * from './format.ts';
 export * from './rules.ts';
 export * from './json-schema.ts';
