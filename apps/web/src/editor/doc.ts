@@ -337,6 +337,12 @@ export function evalBefore(doc: Doc, sec: number): Eval {
   return before.at(-1)?.eval ?? barOf(doc).start;
 }
 
+/** What the bar reads just before a move or beat changes it (a move with no eval: what it holds). */
+export function evalBeforeItem(doc: Doc, id: string, sec: number): Eval {
+  const own = evalKeyframes(doc.evalBar, doc.moments, doc.characters).find((k) => k.id === id);
+  return own ? own.before : evalBefore(doc, sec);
+}
+
 /** A new beat holding the bar's current value, so adding one never jumps the bar. */
 export function addBeat(doc: Doc, init: { sourceTime: number; actorId?: string }, durationSec: number): { doc: Doc; id: string } {
   const sourceTime = Math.min(Math.max(init.sourceTime, 0), durationSec);

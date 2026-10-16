@@ -1,6 +1,6 @@
 import { DEFAULT_ACCURACY, gameResult, reviewSummary } from '@als/schema';
 import { barPlayers } from '@als/composition';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useEditor, useEditorStore, usePlayback } from '../../editor/context.tsx';
 import { setReviewAccuracy, setReviewSummary } from '../../editor/doc.ts';
 import { Field } from './fields.tsx';
@@ -70,11 +70,14 @@ export function GameReviewPanel() {
 
 /** 0-100; commits on Enter or blur, and empty goes back to the default. */
 function AccuracyInput({ value, onCommit, testId }: { value: number | undefined; onCommit: (value: number | undefined) => void; testId: string }) {
+  const cancelled = useRef(false);
   const [draft, setDraft] = useState<string | null>(null);
   const parsed = draft === null || draft.trim() === '' ? undefined : Number(draft);
   const invalid = parsed !== undefined && !(Number.isFinite(parsed) && parsed >= 0 && parsed <= 100);
   const commit = () => {
-    if (draft !== null && !invalid) onCommit(parsed);
+    // Esc blurs too, and this closure still holds the draft it cancels.
+    if (!cancelled.current && draft !== null && !invalid) onCommit(parsed);
+    cancelled.current = false;
     setDraft(null);
   };
   return (
@@ -88,7 +91,7 @@ function AccuracyInput({ value, onCommit, testId }: { value: number | undefined;
       onKeyDown={(e) => {
         if (e.key === 'Enter') e.currentTarget.blur();
         if (e.key === 'Escape') {
-          setDraft(null);
+          cancelled.current = true;
           e.currentTarget.blur();
         }
       }}

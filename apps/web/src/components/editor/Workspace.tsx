@@ -1,5 +1,5 @@
 import { CLASSIFICATIONS, episodeProps, gameReviewSec, speechSnapTargets, type EpisodeProps, type SoundBank } from '@als/schema';
-import { Episode, buildTimeline, cardSettledFrame, sourceFrameToOut, timeMapFrame, type Hold } from '@als/composition';
+import { Episode, buildTimeline, cardSettledFrame, sourceFrameToOut, timeMapFrame, type Hold, type Timeline as OutTimeline } from '@als/composition';
 import { Player, type PlayerRef } from '@remotion/player';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { addBeatAt } from '../../editor/bar.ts';
@@ -148,7 +148,19 @@ export function Workspace({ left, right }: WorkspaceProps) {
   );
 
   const currentHold = timeline.holds.find((h) => frame >= h.outStart && frame < h.outStart + h.frames);
-  const editableHold = !playing && !scrubbing ? currentHold : undefined;
+  const pausedHold = !playing && !scrubbing ? currentHold : undefined;
+  // An edit that reshapes the timeline (deleting a word shortens the hold) renders once
+  // before the anchor below moves the playhead after the card. For that render the old
+  // frame can fall outside the hold; the card stays up, or the field being typed in
+  // unmounts and its focus falls to the page, where Backspace deletes the move.
+  const [lastHold, setLastHold] = useState<{ momentId: string; timeline: OutTimeline } | null>(null);
+  const followingHold =
+    !playing && !scrubbing && !pausedHold && lastHold && lastHold.timeline !== timeline
+      ? timeline.holds.find((h) => h.momentId === lastHold.momentId)
+      : undefined;
+  const editableHold = pausedHold ?? followingHold;
+  const nextLastHold = pausedHold ? { momentId: pausedHold.momentId, timeline } : followingHold ? lastHold : null;
+  if (nextLastHold?.momentId !== lastHold?.momentId || nextLastHold?.timeline !== lastHold?.timeline) setLastHold(nextLastHold);
   const editableMoment = editableHold ? moments[editableHold.index] : undefined;
 
   // While paused on a card, keep the playhead on it as edits reshape the timeline
@@ -211,7 +223,22 @@ export function Workspace({ left, right }: WorkspaceProps) {
     }
   }, [store, fps, snapTargets, shots, source.durationSec, goToMoment]);
 
+  // The text field last typed in, until the user clicks or leaves it (Enter, Esc, Tab).
+  // A field that loses focus any other way (it was removed from the page) leaves this set,
+  // and until the next click the keys meant for the text are no shortcuts: a Backspace
+  // never deletes the move.
+  const typedIn = useRef<HTMLElement | null>(null);
   useEffect(() => {
+    const onPointer = () => {
+      typedIn.current = null;
+    };
+    const onFocusOut = (e: FocusEvent) => {
+      const field = e.target as HTMLElement;
+      // Chrome blurs a field it is about to remove; look once the removal is done.
+      queueMicrotask(() => {
+        if (field === typedIn.current && field.isConnected) typedIn.current = null;
+      });
+    };
     const onKey = (e: KeyboardEvent) => {
       const s = store.getState();
       const mod = e.metaKey || e.ctrlKey;
@@ -222,7 +249,17 @@ export function Workspace({ left, right }: WorkspaceProps) {
         else s.undo();
         return;
       }
-      if (isTyping(e.target) || mod || e.altKey) return;
+      if (isTyping(e.target)) {
+        // A key that left the field (Enter, Esc) reaches here after its blur: that ends it.
+        const field = e.target as HTMLElement;
+        typedIn.current = field === document.activeElement || !field.isConnected ? field : null;
+        return;
+      }
+      if (typedIn.current) {
+        if (key === 'backspace' || key === 'delete') e.preventDefault();
+        return;
+      }
+      if (mod || e.altKey) return;
       const p = player.current;
       if (!p) return;
       const current = p.getCurrentFrame();
@@ -296,7 +333,13 @@ export function Workspace({ left, right }: WorkspaceProps) {
       if (handled) e.preventDefault();
     };
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    window.addEventListener('pointerdown', onPointer, true);
+    window.addEventListener('focusout', onFocusOut, true);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('pointerdown', onPointer, true);
+      window.removeEventListener('focusout', onFocusOut, true);
+    };
   }, [store, fps, seek, goToHold, addAtPlayhead]);
 
   const playback: Playback = { player, timeline, fps, frame, playing, seek, pause, goToMoment, editableHold };

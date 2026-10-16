@@ -100,6 +100,37 @@ try {
     result('a mistake that helps its maker is flagged, and the flag clears when fixed', warned && cleared, warned ? '' : text.slice(text.indexOf('Bar after'), text.indexOf('Bar after') + 220));
   }
 
+  // 4b. The eval field reads the bar before the move, and the swing as it is typed; arrows step from it.
+  {
+    const readout = () => page.eval(`document.querySelector('[data-testid=moment-eval-before]')?.textContent ?? ''`);
+    const field = (expr) => page.eval(`document.querySelector('[data-testid=moment-eval]').${expr}`);
+    await select('m1');
+    const shown = await readout();
+    await field('focus()');
+    await page.key('ArrowUp');
+    await page.key('ArrowUp', { shift: true });
+    await sleep(100);
+    const stepped = await field('value');
+    const live = await readout();
+    await page.key('Escape');
+    await sleep(100);
+    const kept = await page.eval(`${E}.getState().doc.moments.find((m) => m.id === 'm1').eval.pawns`);
+    // m2 has no eval: it holds the bar at m1's value, and an arrow starts from there.
+    await select('m2');
+    const placeholder = await field('placeholder');
+    await field('focus()');
+    await page.key('ArrowDown');
+    await sleep(100);
+    const fromHeld = await field('value');
+    await page.key('Escape');
+    await sleep(100);
+    const ok =
+      /^Before: -1\.5 → -3\.0 · Black \+\d+% of the bar$/.test(shown) && stepped === '-1.9' && live.includes('→ -1.9 · Black') && kept === -3 &&
+      placeholder === 'Empty: holds at -3.0' && fromHeld === '-3.1';
+    result('the eval field shows the bar before the move and the swing; ↑ ↓ step from it, Esc keeps the saved value', ok,
+      `"${shown}"; ↑ Shift+↑ → ${stepped} "${live}"; kept ${kept}; m2 "${placeholder}", ↓ → ${fromHeld}`);
+  }
+
   // 5. A beat at the playhead holds the bar's value, moves it during play, and deletes with undo.
   {
     const h = await holds();
@@ -116,6 +147,8 @@ try {
     const shown = await page.eval(`!!document.querySelector('[data-testid=beat-inspector]')`);
     result('B adds a beat at the playhead holding the current value, shown on the bar lane', beat?.eval?.pawns === -3 && dot && shown, `${id} at ${beat?.sourceTime?.toFixed(2)} s, ${JSON.stringify(beat?.eval)}`);
 
+    const beatBefore = await page.eval(`document.querySelector('[data-testid=beat-eval-before]')?.textContent ?? ''`);
+    result('a beat reads the bar before it', beatBefore.startsWith('Before: -3.0'), beatBefore);
     await type('[data-testid=beat-eval]', '-2.6');
     await seek(frame + Math.round(1.5 * fps));
     const after = await bar();

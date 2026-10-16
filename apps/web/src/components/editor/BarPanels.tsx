@@ -1,58 +1,94 @@
-import { evalWarnings, formatEvalSigned, parseEval, type Eval, type EvalBeat } from '@als/schema';
+import { evalFill, evalWarnings, formatEvalSigned, isMate, parseEval, type Eval, type EvalBeat } from '@als/schema';
 import { sourceFrameToOut, timeMapFrame } from '@als/composition';
-import { useState, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { addBeatAt, reevaluateBar } from '../../editor/bar.ts';
 import { useEditor, useEditorStore, usePlayback } from '../../editor/context.tsx';
-import { deleteBeat, setStartEval, updateBeat } from '../../editor/doc.ts';
+import { deleteBeat, evalBeforeItem, setStartEval, updateBeat } from '../../editor/doc.ts';
 import { formatTime } from '../../lib/format.ts';
 import { Field, SecondsInput } from './fields.tsx';
 
 /**
  * An eval as typed: "1.0", "-0.8", "M4" (White mates), "-M6" (Black mates).
  * Commits on Enter or blur; empty commits undefined where `optional`.
+ * With `before` (the bar just before this change), it shows that value and the
+ * swing as you type, and ↑/↓ nudge from it.
  */
 export function EvalInput({
   value,
+  before,
   optional = false,
-  placeholder,
   onCommit,
   testId,
 }: {
   value: Eval | undefined;
+  before?: Eval;
   optional?: boolean;
-  placeholder?: string;
   onCommit: (value: Eval | undefined) => void;
   testId?: string;
 }) {
+  const cancelled = useRef(false);
   const [draft, setDraft] = useState<string | null>(null);
   const shown = draft ?? (value ? formatEvalSigned(value) : '');
   const parsed = draft === null ? value : draft.trim() === '' ? undefined : parseEval(draft);
   const invalid = draft !== null && draft.trim() !== '' && parsed === undefined;
   const commit = () => {
-    if (draft !== null && !invalid && (optional || parsed)) onCommit(parsed);
+    // Esc blurs too, and this closure still holds the draft it cancels.
+    if (!cancelled.current && draft !== null && !invalid && (optional || parsed)) onCommit(parsed);
+    cancelled.current = false;
     setDraft(null);
   };
+  /** Steps a pawn eval (from the bar's value before, if empty); a mate is left alone. */
+  const nudge = (step: number) => {
+    const from = draft === null || !invalid ? (parsed ?? before) : undefined;
+    if (!from || isMate(from)) return;
+    setDraft(formatEvalSigned({ pawns: Math.round((from.pawns + step) * 10) / 10 || 0 }));
+  };
   return (
-    <input
-      value={shown}
-      placeholder={placeholder}
-      inputMode="decimal"
-      data-testid={testId}
-      onChange={(e) => setDraft(e.target.value)}
-      onBlur={commit}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter') e.currentTarget.blur();
-        if (e.key === 'Escape') {
-          setDraft(null);
-          e.currentTarget.blur();
-        }
-      }}
-      className={`input tabular-nums ${invalid ? 'border-red-700 text-red-300' : ''}`}
-    />
+    <>
+      <input
+        value={shown}
+        placeholder={optional ? (before ? `Empty: holds at ${formatEvalSigned(before)}` : 'Empty: the bar holds') : undefined}
+        inputMode="decimal"
+        data-testid={testId}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') e.currentTarget.blur();
+          if (e.key === 'Escape') {
+            cancelled.current = true;
+            e.currentTarget.blur();
+          }
+          if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+            e.preventDefault();
+            nudge((e.key === 'ArrowUp' ? 1 : -1) * (e.shiftKey ? 1 : 0.1));
+          }
+        }}
+        className={`input tabular-nums ${invalid ? 'border-red-700 text-red-300' : ''}`}
+      />
+      {before && (
+        <span className="mt-1 block text-xs text-neutral-400 tabular-nums" data-testid={testId && `${testId}-before`}>
+          Before: <span className="font-medium text-neutral-200">{formatEvalSigned(before)}</span>
+          {parsed && !invalid && <Swing from={before} to={parsed} />}
+        </span>
+      )}
+    </>
   );
 }
 
-export const EVAL_HINT = 'Pawns for White (1.0, -0.8) or a mate: M4 White mates, -M6 Black mates.';
+/** "→ +2.5 · White +12% of the bar". */
+function Swing({ from, to }: { from: Eval; to: Eval }) {
+  const share = Math.round((evalFill(to) - evalFill(from)) * 100);
+  return (
+    <>
+      {' → '}
+      <span className="font-medium text-neutral-200">{formatEvalSigned(to)}</span>
+      {' · '}
+      {share === 0 ? 'no change on the bar' : `${share > 0 ? 'White' : 'Black'} +${Math.abs(share)}% of the bar`}
+    </>
+  );
+}
+
+export const EVAL_HINT = 'Pawns for White (1.0, -0.8) or a mate: M4 White mates, -M6 Black mates. ↑ ↓ step 0.1, with Shift 1.0.';
 
 /** The selected beat: a change of the bar during play, with no card. */
 export function BeatInspector({ beat }: { beat: EvalBeat }) {
@@ -74,7 +110,7 @@ export function BeatInspector({ beat }: { beat: EvalBeat }) {
       </div>
 
       <Field label="Bar after the beat">
-        <EvalInput value={beat.eval} onCommit={(value) => value && set({ eval: value })} testId="beat-eval" />
+        <EvalInput value={beat.eval} before={evalBeforeItem(doc, beat.id, beat.sourceTime)} onCommit={(value) => value && set({ eval: value })} testId="beat-eval" />
         <Hint>{EVAL_HINT}</Hint>
       </Field>
 

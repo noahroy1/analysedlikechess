@@ -174,6 +174,7 @@ export function EditLayer({ moment, width, height, scale }: EditLayerProps) {
                 singleLine={name === 'moveLabel' || name === 'motif'}
                 onChange={(v) => setField(name, v)}
                 focusSignal={focusFor(name)}
+                onFocused={(n) => store.getState().focusTaken(n)}
               />
             ),
             children: (

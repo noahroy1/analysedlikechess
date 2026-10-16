@@ -9,13 +9,15 @@ export interface EditableTextProps {
   field: string;
   /** Focus counter: focuses whenever it changes. */
   focusSignal?: number;
+  /** Called with the signal once it has taken the focus. */
+  onFocused?: (signal: number) => void;
 }
 
 /**
  * Plain-text in-place editing. Uncontrolled while typing (so the caret never
  * jumps); the DOM is re-synced only when the value changes from elsewhere, e.g. undo.
  */
-export function EditableText({ value, placeholder, onChange, singleLine, field, focusSignal }: EditableTextProps) {
+export function EditableText({ value, placeholder, onChange, singleLine, field, focusSignal, onFocused }: EditableTextProps) {
   const ref = useRef<HTMLSpanElement>(null);
 
   useLayoutEffect(() => {
@@ -30,6 +32,9 @@ export function EditableText({ value, placeholder, onChange, singleLine, field, 
     // Never scroll the page to reach the card.
     ref.current.focus({ preventScroll: true });
     placeCaretAtEnd(ref.current);
+    onFocused?.(focusSignal);
+    // Only a new signal focuses, not a new callback.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusSignal]);
 
   const onKeyDown = (e: KeyboardEvent<HTMLSpanElement>) => {

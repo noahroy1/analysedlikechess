@@ -61,18 +61,25 @@ Single-user local web app: upload a movie scene clip, draft chess-style move ann
 8. Where the creator's format is unknown (exact card look, text length, hold timing), leave a `TODO(open-decision)` comment rather than guessing.
 9. Commit after each working step with a message that says what now works.
 
-## Status and handoff (updated Oct 15, 2026)
+## Status and handoff (updated Oct 16, 2026)
 
 Read this first in a new session. It says where the work stands, what to do next, what is waiting on the user, and what was learned the hard way.
 
 ### Where things stand
 
 - **Branch:** work now happens on `main` (the user asked for this on Oct 12; commit and push to `main`). `main` was fast-forwarded to the tip of `format-iterations`, and all phase branches (`phase-0-scaffold` … `phase-4-analysis`, `format-iterations`) are pushed to GitHub as history; do not add new per-phase branches. `apps/server/.env.example` shows as deleted in the working tree from before Oct 12; it is not ours, so leave it out of commits (`git add -A -- . ':!apps/server/.env.example'`).
-- **Done:** Phases 0-5 (Phase 4 has two owed items, below), the creator's review iterations, all seven format iterations (log below), and the game review screen (Oct 15, below).
+- **Done:** Phases 0-5 (Phase 4 has two owed items, below), the creator's review iterations, all seven format iterations (log below), the game review screen (Oct 15, below), and the eval-field and Backspace fixes (Oct 16, below).
 - **Not started:** Phase 6 (pitch build).
-- **Checks at the tip:** `pnpm check` passes (309 tests, including the render test). The browser checks pass: `phase2-checks`, `phase3-checks`, `typeout-checks` (`m1`), `format-checks`, `evalbar-checks`, `sound-checks`, `subtitle-checks`, `render-checks` (on the creator-look sample and on a copy of BB1, holds and the game review), `placement-checks` and `review-checks`.
+- **Checks at the tip:** `pnpm check` passes (310 tests, including the render test). The browser checks pass: `phase2-checks`, `phase3-checks`, `typeout-checks` (`m1`), `format-checks`, `evalbar-checks`, `sound-checks`, `subtitle-checks`, `render-checks` (on the creator-look sample and on a copy of BB1, holds and the game review), `placement-checks` and `review-checks`.
 
 ### Next action: the user's review of short- and long-form, then Phase 5 (and iterations 5-7), then Phase 6
+
+**Eval field and Backspace (Oct 16, the user's report).**
+- **Eval field:** "Bar after this move" and "Bar after the beat" now read the bar just before the change (`evalBeforeItem()` in `editor/doc.ts`) and, as you type, the new value and the swing as a share of the bar ("Before: +0.3 → +2.3 · White +17% of the bar"). An empty move eval shows "Empty: holds at +0.3". ↑/↓ step a pawn eval by 0.1 (Shift: 1.0), starting from the value before when empty; a mate is left alone. Esc now cancels: before, the blur it triggers committed the draft anyway (the Game review's accuracy fields had the same bug).
+- **Backspace deleting the move (root cause):** with the playhead late in a hold, deleting a word shortened the hold, and for one render the old frame fell outside it before the anchor moved the playhead. The edit layer unmounted, focus fell to the page, and the next Backspace was the "delete selected move" shortcut. `Workspace` now keeps the card up for that render (`followingHold`).
+- **Focus jumping to the label:** `focusRequest` (set by M and the transcript's add) was never cleared, so any later mount of that move's card focused its label again. `focusTaken()` clears it once used.
+- **Backstop:** while a text field that was typed in loses focus without a click or a deliberate blur (Enter, Esc, Tab), keys are not shortcuts: Backspace deletes nothing until the next click.
+- **Checks:** `phase3-checks` 5-7 (40 Backspaces late in a hold keep the field; a vanished field's Backspace deletes nothing, a click restores Delete; M focuses the label once) and `evalbar-checks` 4b and the beat's "Before" line.
 
 **Game review screen (built Oct 15).** Reference: `media/game-review-screen-ref.png` (chess.com, 483×837). After `game-end` the creator look shows the review for 5 s: the result in a speech bubble, the bar's travel as a graph with a dot per move in its rating's colour, each side's player (cast portrait and name; the winner's framed green), accuracy, and each side's moves per rating in chess.com's row order (Book between Great and Best).
 - **Measured:** every position, colour and radius comes from the screenshot (`GameReview.tsx`); the screenshot crops the header, so ours is 11 px taller with the title centred. Arial sets wider than chess.com's font, so labels are 14 px and counts 17 px, matched by width. Side by side at 483 px wide, BB1's review lines up with the reference row for row.
@@ -309,4 +316,5 @@ To measure more, use `scripts/ref/hold-phases.mjs <clip> <crop>` for timing, PIL
 - A server restart under `pnpm dev` could leave a page's `/api/events` stream silent for good behind Vite's proxy, so the Render menu sat at "Rendering 0%" while renders ran and finished (Oct 13, the Private Property project). Now the server pings on connect and every 5 s, the client reopens a stream that is silent for 12 s or closed after a 502 (and the Render menu and project list refetch on reconnect), and the Vite proxy closes the browser's side when the server's side closes. A render's progress is never written to `renders.json`, so a cancelled render always reads 0% there.
 - The editor is now taller than a 1150-1300 px window, so the page can show a scrollbar. Measure a container and its children in the same pass. Selecting a move changes the inspector's height and can move the stage, so `render-checks` measures the stage after each seek.
 - The game review is premounted a second early (so portraits load), so it is in the DOM before it shows; checks test `checkVisibility()`, not presence.
+- Chrome fires `focusout` on a focused element it is about to remove, while it is still connected; check `isConnected` in a microtask. A window `keydown` listener sees Enter/Esc after the field's own handler has blurred it. A script's `element.click()` fires no `pointerdown`; use `page.click(x, y)` where a check depends on one.
 - zsh does not split an unquoted `$args` into words: a loop that runs checks with `node check.mjs $args` passes one argument and the page opens `/projects/undefined`. Use an array (`extra=(30 1143)`).

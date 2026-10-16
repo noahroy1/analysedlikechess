@@ -79,6 +79,8 @@ export interface EditorActions {
   select: (id: string | null) => void;
   notify: (text: string, tone?: Toast['tone']) => void;
   requestFocus: (id: string, field: 'moveLabel' | 'explanation' | 'bestMove') => void;
+  /** The field took the focus: a card mounted later must not take it again. */
+  focusTaken: (n: number) => void;
   setProposal: (proposal: Proposal | null) => void;
   setPortraitCrop: (characterId: string | null) => void;
   dismissToast: () => void;
@@ -222,6 +224,9 @@ export function createEditorStore(initial: Project, deps: EditorDeps): EditorSto
       setProposal: (proposal) => set({ proposal }),
       setPortraitCrop: (portraitCrop) => set({ portraitCrop }),
       requestFocus: (id, field) => set((s) => ({ focusRequest: { id, field, n: (s.focusRequest?.n ?? 0) + 1 } })),
+      focusTaken: (n) => {
+        if (get().focusRequest?.n === n) set({ focusRequest: null });
+      },
 
       flush: async () => {
         if (saveTimer) {

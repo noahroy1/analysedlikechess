@@ -1,7 +1,7 @@
 import { CARD_ANCHORS, NO_BEST_MOVE, autoHoldSec, textCaps, evalWarnings, momentWarnings, placedByHand, regionsFresh, type Card, type Moment } from '@als/schema';
 import { sourceFrameToOut } from '@als/composition';
 import { useState, type ReactNode } from 'react';
-import { deleteMoment, retime, setCardByHand, setMomentEval, updateMoment } from '../../editor/doc.ts';
+import { deleteMoment, evalBeforeItem, retime, setCardByHand, setMomentEval, updateMoment } from '../../editor/doc.ts';
 import { reevaluatePlacement } from '../../editor/placement.ts';
 import { useEditor, useEditorStore, usePlayback } from '../../editor/context.tsx';
 import { formatTime } from '../../lib/format.ts';
@@ -121,8 +121,8 @@ export function Inspector() {
       <Field label="Bar after this move">
         <EvalInput
           value={moment.eval}
+          before={evalBeforeItem(doc, moment.id, moment.sourceTime)}
           optional
-          placeholder="Empty: the bar holds"
           onCommit={(value) => store.getState().edit((d) => setMomentEval(d, moment.id, value))}
           testId="moment-eval"
         />

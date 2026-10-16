@@ -17,10 +17,29 @@ const open = async () => {
   await sleep(1200);
 };
 const pauseOn = async (id) => {
-  await page.eval(`document.querySelector('[data-testid=moment-item][data-moment-id=${id}]').click()`);
+  await page.eval(`document.querySelector('[data-testid=moment-item][data-moment-id="${id}"]').click()`);
   await page.waitFor(`!!document.querySelector('[data-testid=edit-layer] [data-field=moveLabel]')`);
   await sleep(300);
 };
+const holdBlock = async (id) =>
+  JSON.parse(await page.eval(`(() => { const b = document.querySelector('[data-testid=hold-block][data-moment-id="${id}"]'); return JSON.stringify({ start: Number(b.dataset.outStart), frames: Number(b.dataset.frames) }); })()`));
+/** Focuses a card field on the edit layer with the caret at the end. */
+const focusEnd = (field) =>
+  page.eval(`(() => {
+    const f = document.querySelector('[data-testid=edit-layer] [data-field=${field}]');
+    f.focus();
+    const r = document.createRange(); r.selectNodeContents(f); r.collapse(false);
+    getSelection().removeAllRanges(); getSelection().addRange(r);
+  })()`);
+const backspace = async () => {
+  const key = { key: 'Backspace', code: 'Backspace', windowsVirtualKeyCode: 8 };
+  await page.send('Input.dispatchKeyEvent', { type: 'rawKeyDown', ...key });
+  await page.send('Input.dispatchKeyEvent', { type: 'keyUp', ...key });
+  await sleep(120);
+};
+const focusState = async () =>
+  JSON.parse(await page.eval(`(() => { const a = document.activeElement; const s = ${E}.getState();
+    return JSON.stringify({ focus: a?.dataset?.field ?? a?.tagName, moments: s.doc.moments.length, selected: s.selectedId, frame: ${P}.getCurrentFrame() }); })()`));
 const waitSaved = () => page.waitFor(`document.querySelector('[data-testid=save-status]').dataset.status === 'saved'`, 10000);
 
 try {
@@ -129,6 +148,61 @@ try {
     const server = await page.eval(`(async () => (await (await fetch('/api/projects/${projectId}')).json()).moments[0].moveLabel)()`);
     result('a stale save gets a 409 and reloads', other === 200 && m3 === 'Changed in another tab' && m1 !== 'Stale local edit' && server !== 'Stale local edit',
       `base v${base}; other tab saved (${other}); editor now shows "${m3}"; server kept m1 "${server}"`);
+  }
+
+  // 5. Backspace in the card never loses its field, even as the shrinking text shortens the hold under a late playhead.
+  {
+    await open();
+    await pauseOn('m1');
+    const h = await holdBlock('m1');
+    await page.eval(`${P}.seekTo(${h.start + h.frames - 3})`);
+    await sleep(400);
+    await focusEnd('explanation');
+    const steps = [];
+    for (let i = 0; i < 40; i++) {
+      await backspace();
+      steps.push(await focusState());
+    }
+    const lost = steps.findIndex((s) => s.focus !== 'explanation');
+    const end = steps.at(-1);
+    result('Backspace in the breakdown keeps its field as the hold shortens; the move stays', lost === -1 && end.moments === 3 && end.frame < h.start + h.frames - 3,
+      lost === -1 ? `40 keys, playhead ${h.start + h.frames - 3} → ${end.frame}` : `focus went to ${steps[lost].focus} after ${lost + 1} keys`);
+  }
+
+  // 6. A field that vanishes while typed in takes the keys with it: Backspace deletes no move until a click.
+  {
+    await focusEnd('explanation');
+    await backspace();
+    await page.eval(`${P}.seekTo(5)`); // off the hold: the edit layer goes, and its field with it
+    await sleep(300);
+    await backspace();
+    await backspace();
+    const kept = await focusState();
+    const r = JSON.parse(await page.eval(`JSON.stringify(document.querySelector('[data-testid=moment-item][data-moment-id=m2]').getBoundingClientRect())`));
+    await page.click(r.x + r.width / 2, r.y + r.height / 2);
+    await sleep(400);
+    await page.eval(`document.activeElement.blur()`);
+    await backspace();
+    const deleted = await focusState();
+    await page.eval(`${E}.getState().undo()`);
+    await sleep(200);
+    result('Backspace after the field vanished deletes nothing; after a click it deletes the selected move', kept.moments === 3 && deleted.moments === 2,
+      `${kept.moments} moves after the lost keys, ${deleted.moments} after a click and Backspace`);
+  }
+
+  // 7. A move added with M focuses its label once; showing its hold later does not take the focus again.
+  {
+    await page.eval(`${P}.pause(); ${P}.seekTo(20)`);
+    await sleep(300);
+    await page.key('m');
+    await sleep(800);
+    const added = await focusState();
+    await page.eval(`document.activeElement.blur(); ${P}.seekTo(5)`);
+    await sleep(300);
+    await pauseOn(added.selected);
+    const back = await focusState();
+    await page.eval(`${E}.getState().undo()`);
+    result('M focuses the new label once, not again when its hold comes back', added.focus === 'moveLabel' && back.focus !== 'moveLabel', `${added.focus}, then ${back.focus}`);
   }
 } finally {
   const errs = page.logs.filter((l) => /error|exception/i.test(l) && !/409/.test(l));

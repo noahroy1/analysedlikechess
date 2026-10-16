@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Moment } from '@als/schema';
-import { addBeat, applyEvaluation, deleteBeat, deleteCharacter, evalBefore, hasItem, setMomentEval, updateBeat, type Doc } from './doc.ts';
+import { addBeat, applyEvaluation, deleteBeat, deleteCharacter, evalBefore, evalBeforeItem, hasItem, setMomentEval, updateBeat, type Doc } from './doc.ts';
 
 const moment = (id: string, sourceTime: number, extra: Partial<Moment> = {}): Moment => ({
   id,
@@ -29,6 +29,15 @@ describe('the bar in the editor', () => {
     expect(evalBefore(doc, 1)).toEqual({ pawns: 0.2 });
     expect(evalBefore(doc, 12)).toEqual({ pawns: 1.4 });
     expect(evalBefore(doc, 25)).toEqual({ mate: 3 });
+  });
+
+  it('reads the bar before a move or beat, not after it', () => {
+    expect(evalBeforeItem(doc, 'm1', 5)).toEqual({ pawns: 0.2 });
+    expect(evalBeforeItem(doc, 'k1', 10)).toEqual({ pawns: 1 });
+    expect(evalBeforeItem(doc, 'm2', 20)).toEqual({ pawns: 1.4 });
+    // A move with no eval holds the bar where it is.
+    const held = setMomentEval(doc, 'm2', undefined);
+    expect(evalBeforeItem(held, 'm2', 20)).toEqual({ pawns: 1.4 });
   });
 
   it('adds a beat holding the current value, so the bar does not jump', () => {
