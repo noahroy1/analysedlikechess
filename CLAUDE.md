@@ -61,7 +61,7 @@ Single-user local web app: upload a movie scene clip, draft chess-style move ann
 8. Where the creator's format is unknown (exact card look, text length, hold timing), leave a `TODO(open-decision)` comment rather than guessing.
 9. Commit after each working step with a message that says what now works.
 
-## Status and handoff (updated Oct 16, 2026)
+## Status and handoff (updated Nov 3, 2026)
 
 Read this first in a new session. It says where the work stands, what to do next, what is waiting on the user, and what was learned the hard way.
 
@@ -70,6 +70,7 @@ Read this first in a new session. It says where the work stands, what to do next
 - **Branch:** work now happens on `main` (the user asked for this on Oct 12; commit and push to `main`). `main` was fast-forwarded to the tip of `format-iterations`, and all phase branches (`phase-0-scaffold` … `phase-4-analysis`, `format-iterations`) are pushed to GitHub as history; do not add new per-phase branches. `apps/server/.env.example` shows as deleted in the working tree from before Oct 12; it is not ours, so leave it out of commits (`git add -A -- . ':!apps/server/.env.example'`).
 - **Done:** Phases 0-5 (Phase 4 has two owed items, below), the creator's review iterations, all seven format iterations (log below), the game review screen (Oct 15, below), and the eval-field and Backspace fixes (Oct 16, below).
 - **Not started:** Phase 6 (pitch build).
+- **Planned, not started:** the cloud backend and mobile app, phases C0-C5 in `PLAN-CLOUD.md` (written Nov 3). The user's decisions: several users from the start; Supabase for data, auth and live events wherever no relevant metric suffers (Cloudflare keeps compute, Workflows, Containers and R2 media); Capacitor for mobile; the listed Cloudflare and Capacitor dependencies approved. Waiting on the user: the order against Phase 6, approval of the Supabase dependencies (`@supabase/supabase-js`, a Postgres driver, the Supabase CLI), the sound bank's licence for other users, and the default spend cap.
 - **Checks at the tip:** `pnpm check` passes (310 tests, including the render test). The browser checks pass: `phase2-checks`, `phase3-checks`, `typeout-checks` (`m1`), `format-checks`, `evalbar-checks`, `sound-checks`, `subtitle-checks`, `render-checks` (on the creator-look sample and on a copy of BB1, holds and the game review), `placement-checks` and `review-checks`.
 
 ### Next action: the user's review of short- and long-form, then Phase 5 (and iterations 5-7), then Phase 6

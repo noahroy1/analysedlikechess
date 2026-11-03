@@ -427,6 +427,10 @@ Build the style corpus, the `creator` theme and two demo episodes (see Pitch str
 - [ ] Both demos render in the creator's look
 - [ ] Upload to render takes under 30 minutes including review, timed end to end
 
+**After v1: cloud backend and mobile**
+
+The plan for moving the backend to Cloudflare (Workers, Workflows, Containers, R2) with Supabase for data, auth and live events, for several users, and adding a Capacitor mobile app beside the desktop editor, is in [PLAN-CLOUD.md](PLAN-CLOUD.md) (phases C0-C5). Its order relative to Phase 6 is still open.
+
 ## Pitch strategy, open decisions and risks
 
 The pitch should show the tool doing the creator's job in their voice, not tell them about AI. Bring two demos: one that proves it understands their format, and one finished video they could post.
