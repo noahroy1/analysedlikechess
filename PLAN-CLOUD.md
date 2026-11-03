@@ -23,7 +23,9 @@ This plan moves the backend off the local Node server onto Cloudflare, with Supa
 5. **Order (Nov 3):** this comes before Phase 6 and any further feature iterations. The backend counterpart of the current logic (C0-C4) comes first, then the mobile app (C5), because the app depends on it.
 6. **Assets (Nov 3):** build with the sounds and icons we have, and replace the improvised ones later.
 
-**Still open:** the per-user spend cap's default.
+7. **Spend (Nov 3):** build the cap logic as the frame for later work: per-user monthly caps, checked before every paid call, with the value in one place. Start at $2 a month. The user expects to tighten it well below that once spend becomes the bottleneck.
+8. **Sign-in (Nov 3):** OAuth (Google and Apple) is built at the same time as the app's own sign-in method, not added later. So C3 builds email codes and OAuth together, and C5 adds the native mobile flows for both.
+9. **Region (Nov 3):** the user is in Sydney, so latency is measured from there.
 
 ## Why Supabase for the data
 
@@ -154,6 +156,58 @@ These rules hold for every route, so a client written once keeps working.
 - **Replay** fixtures are bundled into the Worker as JSON. `ANALYSIS_RECORD_DIR` becomes an R2 prefix in dev.
 - **Browser checks** take an `--origin` and a dev user's token, and otherwise run as today.
 
+## C0 findings (Nov 3)
+
+Sources are the Cloudflare and Supabase docs pages named below, read Nov 3, 2026.
+
+- **Workers Paid is required** (developers.cloudflare.com: containers/pricing, workflows/reference/limits, workers/platform/limits):
+  - Containers list no Free allowance ("N/A").
+  - On Free, a Workflow step gets 10 ms of CPU, and a Worker request gets 10 ms of CPU and 50 subrequests.
+  - On Paid, a request gets 30 s of CPU by default (up to 5 min) and 10,000 subrequests.
+  - Memory is 128 MB per isolate on both plans.
+- **Containers** (instance types: vCPU / memory / disk):
+
+  | Type | vCPU | Memory | Disk |
+  | --- | --- | --- | --- |
+  | lite | 1/16 | 256 MiB | 2 GB |
+  | basic | 1/4 | 1 GiB | 4 GB |
+  | standard-1 | 1/2 | 4 GiB | 8 GB |
+  | standard-2 | 1 | 6 GiB | 12 GB |
+  | standard-3 | 2 | 8 GiB | 16 GB |
+  | standard-4 | 4 | 12 GiB | 20 GB |
+
+  - **Paid rates:** $0.000020 per vCPU-second (375 vCPU-minutes a month included), $0.0000025 per GiB-second (25 GiB-hours included) and $0.00000007 per GB-second of disk (200 GB-hours included).
+  - **Estimate, to be measured:** a BB1 render on standard-4 at today's 2 minutes would be 480 vCPU-s plus 1440 GiB-s, about $0.013. The included minutes would cover about 45 such renders a month.
+  - **Source size:** the largest disk is 20 GB, which caps source size.
+- **Workflows on Paid:**
+  - 10,000 steps (up to 25,000).
+  - A step returns at most 1 MiB, or a stream that counts toward state.
+  - 30 s of CPU per step (up to 5 min), with unlimited wall time.
+  - Sleeps of up to 365 days.
+  - 1 GB of state per instance.
+  - Completed instances are kept 30 days.
+  - Sleeping instances don't count toward concurrency.
+
+  So stage outputs over 1 MiB go to R2, and OpenAI polling is a sleep step per poll.
+- **Hyperdrive** (hyperdrive/platform/pricing, the Supabase guide, supported-databases-and-features):
+  - It is on both plans (Free: 100,000 queries a day).
+  - Use Supabase's direct connection, not its pooler, with `pg` 8.16.3 or later (Postgres.js also works). Avoid supabase-js in the Worker.
+  - Unsupported: per-session state, `LISTEN`/`NOTIFY` and SQL-level `PREPARE`.
+  - Transaction-local `set_config(…, true)` for RLS claims isn't named either way. Test it in the latency spike.
+- **The first Supabase project is in Frankfurt** (its database's IPv6 address is in AWS `eu-central-1`). A TCP connect from Sydney took 349-379 ms, against 18-32 ms to AWS Sydney. One round trip already fails the 150 ms gate, so the project is recreated in Sydney (`ap-southeast-2`). Its auth already signs with ES256 (JWKS at `/auth/v1/.well-known/jwks.json`). Supabase's edge caches the key set for 10 minutes and clients for up to 10 more, so the Worker caches keys for 10 minutes and refetches on an unknown `kid`.
+- **Realtime Broadcast** (supabase.com/docs/guides/realtime/broadcast):
+  - **Sending:** the server sends with `POST /realtime/v1/api/broadcast/<topic>/events/<event>?private=true` (with an `apikey` header), or in batches with `POST /realtime/v1/api/broadcast` and a `messages` array.
+  - **Authorization:** private channels are authorised by RLS on `realtime.messages`. Ours: `realtime.topic() = 'user:' || auth.uid()`.
+  - **Clients:** they call `supabase.realtime.setAuth()` and subscribe with `{ config: { private: true } }`.
+- **Frames and portraits stay in the container.** The alternatives didn't fit:
+  - Media Transformations (stream/transform-videos) needs a Cloudflare zone, meaning our own domain, with transformations enabled. It needs a source URL that answers HEAD and Range, input under 100 MB and 10 minutes, and takes times as strings like `5s`. Frame-exact grabs aren't documented.
+  - The Images binding takes up to 20 MB of input and documents no crop on its binding page.
+
+  So regions and portraits call the container. The paid spike measures the container's cold start, which competes with Gemini's 2 s.
+- **Workflow spike (passed):** 30 polls ran, each followed by a 30 s `step.sleep`, with a redeploy 5 minutes in. Every sleep lasted 30.0 s, and the run completed.
+  - **A run keeps the code it started on:** every poll after the redeploy, and the result, reported the old build.
+  - **Effect on analysis:** a prompt or code change reaches only new runs, so a run in flight never mixes two prompts. Fixing a stuck run means terminating and restarting it, so the stage cache matters.
+
 ## Phases
 
 **Phase C0: Docs and spikes**
@@ -166,7 +220,7 @@ Confirm every "(confirm in C0)" in this file. Record limits and prices in this f
 
 - [ ] BB1 renders in a Container. Time and cost are recorded, and the MP4 matches the Node render (`render-checks`' PSNR method, at least 27 dB).
 - [ ] Autosave (one transaction with RLS claims set) through Hyperdrive to Supabase measures under 150 ms p95 from the user's location.
-- [ ] A Workflow survives a 15-minute `step.sleep` poll loop and resumes after a deploy.
+- [x] A Workflow survives a 15-minute `step.sleep` poll loop and resumes after a deploy. Passed Nov 3 on Workers Free: 30 polls, 30 s sleeps, with a redeploy at 5 min.
 - [ ] A frame and a 256 px portrait crop come out of the proxy without a container, or the warm-container fallback is costed.
 - [ ] The Gemini file upload works from an R2 stream on Workers (else its REST upload is called with `fetch`).
 
