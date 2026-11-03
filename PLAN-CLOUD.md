@@ -20,10 +20,10 @@ This plan moves the backend off the local Node server onto Cloudflare, with Supa
 3. **Capacitor** for the mobile shell, for the most reuse of the DOM-only Remotion Player and `<MoveCard>`.
 4. **Dependencies approved** (working rule 7): `wrangler`, `@cloudflare/workers-types`, `@cloudflare/containers`, the Workers Vitest pool, Docker for the container image, and Capacitor. The Supabase pieces this plan adds (`@supabase/supabase-js` in the clients, a Postgres driver in the Worker, and the Supabase CLI for local dev) were not on that list. Confirm them before C1 uses them.
 
-**Still open:**
-- the order against Phase 6 (pitch build)
-- the sound bank's licence for other users (see Risks)
-- the per-user spend cap's default
+5. **Order (Nov 3):** this comes before Phase 6 and any further feature iterations. The backend counterpart of the current logic (C0-C4) comes first, then the mobile app (C5), because the app depends on it.
+6. **Assets (Nov 3):** build with the sounds and icons we have, and replace the improvised ones later.
+
+**Still open:** the per-user spend cap's default.
 
 ## Why Supabase for the data
 
@@ -228,6 +228,6 @@ Move ffmpeg and Remotion into `apps/media` behind its HTTP API, and package its 
 - **Large sources** may exceed a container's ephemeral disk. Cap uploads by duration (the 10-minute assumption) and size.
 - **Interactive latency** for regions and portraits, if Media Transformations can't extract frames from our proxies.
 - **Copyrighted clips.** For the first time, users' footage (and `media/` demo footage, at migration) is stored by us. R2 stays private and URLs are signed, but other users need terms of use and a way to take content down.
-- **The sound bank** is one set of files served to every user. Check its licence before anyone other than the creator uses it.
+- **The sound bank and icons** are the current files, served to every user (the user's call, Nov 3). Replace them before a public release.
 - **Spend.** The app pays the providers, so a runaway user or a retry loop costs real money. Spend caps and idempotency keys are the guard, and C1 tests both.
 - **Mobile uploads** from a WebView stop when iOS suspends the app. Resumable parts limit the loss. A native background-upload plugin would need its own approval.

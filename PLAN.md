@@ -429,7 +429,7 @@ Build the style corpus, the `creator` theme and two demo episodes (see Pitch str
 
 **After v1: cloud backend and mobile**
 
-The plan for moving the backend to Cloudflare (Workers, Workflows, Containers, R2) with Supabase for data, auth and live events, for several users, and adding a Capacitor mobile app beside the desktop editor, is in [PLAN-CLOUD.md](PLAN-CLOUD.md) (phases C0-C5). Its order relative to Phase 6 is still open.
+The plan for moving the backend to Cloudflare (Workers, Workflows, Containers, R2) with Supabase for data, auth and live events, for several users, and adding a Capacitor mobile app beside the desktop editor, is in [PLAN-CLOUD.md](PLAN-CLOUD.md) (phases C0-C5). It comes before Phase 6 and any further feature iterations (the user's call, Nov 3): the backend first, then the mobile app.
 
 ## Pitch strategy, open decisions and risks
 
