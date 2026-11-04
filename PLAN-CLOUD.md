@@ -208,6 +208,33 @@ Sources are the Cloudflare and Supabase docs pages named below, read Nov 3, 2026
   - **A run keeps the code it started on:** every poll after the redeploy, and the result, reported the old build.
   - **Effect on analysis:** a prompt or code change reaches only new runs, so a run in flight never mixes two prompts. Fixing a stuck run means terminating and restarting it, so the stage cache matters.
 
+- **Container render spike (Nov 4, BB1 v87 with the creator look: 5350 frames, 3:43 out):**
+  - **Setup:**
+    - The container program fetched the clip, portraits and sounds from R2 through a Worker, served them on localhost with Range support, rendered with `renders.ts`' exact settings, and uploaded the MP4 back.
+    - The image is `node:24-bookworm-slim` with Remotion's Chrome libraries and the browser baked in, and the Remotion bundle built on the Mac.
+  - **Speed on standard-4 (4 vCPU, 12 GiB):**
+    - Rendering took 339-356 s (333 s with `concurrency: 4`), against 117.5 s on the M4 Mac (10 cores). The cloud is about 3× slower.
+    - Fetching inputs took 2-3 s (191 MB) and uploading took 2.4-2.9 s (77 MB).
+  - **Cost:** about $0.039 a render, from 346 s × (4 vCPU + 12 GiB + 20 GB). Workers Paid's included usage covers about 16 such renders a month, limited by vCPU.
+    - Idle instances bill until `sleepAfter` runs out, so the real service stops the container when a job ends.
+  - **Faster renders are possible:** if 6 minutes is too slow, render frame ranges on several instances and join them, as Remotion Lambda does. The total cost stays about the same. This is a C2 decision.
+  - **Match:**
+    - Without fonts, every frame differed (median 22.6 dB), all of it in text. The image has no Arial, so subtitles, names and cards used a wider fallback font. The picture itself was within about 1 level.
+    - With `fonts-liberation` (Liberation Sans has Arial's metrics, and Debian's fontconfig maps Arial to it), the median is 32.2 dB and the minimum 27.8 dB on every one of the 5350 frames. Layout and line breaks are identical, and only the letter shapes differ slightly.
+    - `TODO(open-decision)`: ship one font file with the composition (for example Arimo, Arial-metric) so the Player and the render draw the same glyphs. The creator's cards were measured in Arial.
+  - **Cold start:**
+    - The first start after a deploy took 26 s, and a new instance on a cached image took 21.8 s. A warm request takes 10-40 ms.
+    - So a frame grab or portrait crop after idle would wait about 20 s. The API wakes the media container when the editor opens a project, keeps it warm with `sleepAfter` of about 10 minutes while the editor is open, and uses a small instance type for frame work.
+  - **Deploy notes:**
+    - `max_instances: 1` makes a second instance fail with 500 while the first is awake.
+    - A config-only redeploy reported `APPLICATION_NOT_FOUND` during rollout, though instances kept serving.
+    - Wrangler builds the linux/amd64 image with Docker and pushes it, and needs `docker` on the PATH (`/Applications/Docker.app/Contents/Resources/bin`).
+- **Gemini upload spike (Nov 4):**
+  - **One request:** a Worker streamed BB1's 16.5 MB proxy from R2 to Gemini's resumable upload in one request. It went up in 4.6 s, was ACTIVE after 7.4 s, and was deleted.
+  - **Large files:** the 191 MB original failed that way ("Network connection lost"). Uploaded in 8 MiB chunks the way the SDK does it (`upload` with `X-Goog-Upload-Offset`, checking `x-goog-upload-status: active`, with `upload, finalize` last), each chunk read from R2 as a byte range, it went up in 39.6 s and was ACTIVE after 25.8 s. The proxy took 6.4 s and 7.3 s.
+  - **Effect:** the Worker never holds more than one chunk, so the real describer uses `fetch` and chunks, not the SDK.
+- **Secrets from `.env`:** `GEMINI_API_KEY`'s line carries an inline `# comment`. Node's env-file parser drops it, so copying values into `wrangler secret` takes the first word only.
+
 ## Phases
 
 **Phase C0: Docs and spikes**
@@ -218,11 +245,11 @@ Read the current docs for:
 
 Confirm every "(confirm in C0)" in this file. Record limits and prices in this file with their sources.
 
-- [ ] BB1 renders in a Container. Time and cost are recorded, and the MP4 matches the Node render (`render-checks`' PSNR method, at least 27 dB).
-- [ ] Autosave (one transaction with RLS claims set) through Hyperdrive to Supabase measures under 150 ms p95 from the user's location.
+- [x] BB1 renders in a Container. Time and cost are recorded, and the MP4 matches the Node render (`render-checks`' PSNR method, at least 27 dB). Passed Nov 4: every frame is at least 27.8 dB from the Mac render, with Liberation fonts in the image (details in the findings).
+- [ ] Autosave (one transaction with RLS claims set) through Hyperdrive to Supabase measures under 150 ms p95 from the user's location. Blocked Nov 4: the Sydney project's password in `.env` is refused (`28P01`); the test Worker is written (`spike-db`, session scratchpad).
 - [x] A Workflow survives a 15-minute `step.sleep` poll loop and resumes after a deploy. Passed Nov 3 on Workers Free: 30 polls, 30 s sleeps, with a redeploy at 5 min.
-- [ ] A frame and a 256 px portrait crop come out of the proxy without a container, or the warm-container fallback is costed.
-- [ ] The Gemini file upload works from an R2 stream on Workers (else its REST upload is called with `fetch`).
+- [x] A frame and a 256 px portrait crop come out of the proxy without a container, or the warm-container fallback is costed. Settled Nov 4: Media Transformations doesn't fit, so the container does it (cold start and warm-up below).
+- [x] The Gemini file upload works from an R2 stream on Workers (else its REST upload is called with `fetch`). Passed Nov 4 with `fetch` and 8 MiB chunks.
 
 **Phase C1: Interfaces and contract, still on Node**
 
