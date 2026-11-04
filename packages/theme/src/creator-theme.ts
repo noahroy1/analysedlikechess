@@ -1,5 +1,10 @@
 import { DEFAULT_TYPE_OUT, type Theme } from '@als/schema';
 
+// Arimo (Arial's metrics) is shipped with the composition (SHIPPED_FONTS in
+// packages/composition/src/fonts.ts), so the Player and the render containers
+// draw the same glyphs; Arial follows in case it has not loaded.
+const CREATOR_FONT = 'Arimo, Arial, "Helvetica Neue", Helvetica, sans-serif';
+
 /**
  * The creator's look, measured on their videos (`media/creator-ref/`, Oct 12, 2026):
  * a round badge beside the card, "<Move> is <phrase>" in the rating colour, a grey
@@ -25,7 +30,7 @@ export const creatorTheme: Theme = {
   },
   card: {
     layout: 'headline',
-    fontFamily: 'Arial, "Helvetica Neue", Helvetica, sans-serif',
+    fontFamily: CREATOR_FONT,
     labelSize: 22,
     titleSize: 34,
     bodySize: 30,
@@ -53,7 +58,7 @@ export const creatorTheme: Theme = {
   // frame of ours: Arial Bold 50 px, white with a 5 px black outline outside the
   // letters, centred, baseline 65 px above the bottom.
   subtitles: {
-    fontFamily: 'Arial, "Helvetica Neue", Helvetica, sans-serif',
+    fontFamily: CREATOR_FONT,
     fontSize: 50,
     fontWeight: 700,
     color: '#ffffff',

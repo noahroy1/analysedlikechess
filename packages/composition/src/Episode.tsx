@@ -4,6 +4,7 @@ import { useMemo } from 'react';
 import { AbsoluteFill, Freeze, Sequence, useCurrentFrame, useVideoConfig } from 'remotion';
 import { cardMotion, revealAt, type FrameSize } from './card.ts';
 import { EvalBar, barPlayers } from './EvalBar.tsx';
+import { useShippedFonts } from './fonts.ts';
 import { evalBarAt, placeKeyframes } from './eval-bar.ts';
 import { GameReview } from './GameReview.tsx';
 import { evalBarLayout, type BarLayout } from './layout.ts';
@@ -20,6 +21,7 @@ import { buildTimeline, timeMapFrame, type Segment } from './timeline.ts';
  * Player and the renderer draw identical frames.
  */
 export function Episode({ src, durationSec, moments, characters, theme, evalBar, evalBarScale, portraits, sounds, subtitles, gameReview }: EpisodeProps) {
+  useShippedFonts();
   const { fps, width, height } = useVideoConfig();
   const frame = useCurrentFrame();
   const reviewSec = gameReviewSec(theme);

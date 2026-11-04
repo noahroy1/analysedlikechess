@@ -221,7 +221,8 @@ Sources are the Cloudflare and Supabase docs pages named below, read Nov 3, 2026
   - **Match:**
     - Without fonts, every frame differed (median 22.6 dB), all of it in text. The image has no Arial, so subtitles, names and cards used a wider fallback font. The picture itself was within about 1 level.
     - With `fonts-liberation` (Liberation Sans has Arial's metrics, and Debian's fontconfig maps Arial to it), the median is 32.2 dB and the minimum 27.8 dB on every one of the 5350 frames. Layout and line breaks are identical, and only the letter shapes differ slightly.
-    - `TODO(open-decision)`: ship one font file with the composition (for example Arimo, Arial-metric) so the Player and the render draw the same glyphs. The creator's cards were measured in Arial.
+    - **Shipped font (the user's call, Nov 4):** the composition now ships Arimo (`packages/composition/src/fonts/`, SIL OFL), and the creator look asks for it before Arial. Rendered with it, the Mac and a local Linux container (same image) match at a median of 34.9 dB and a minimum of 30.4 dB over all 5350 frames (Liberation alone gave 32.2 and 27.8). The cards show the same letters in the same places; what remains is how macOS and Linux smooth text edges. The image keeps `fonts-liberation` as the fallback.
+    - **The default look still uses the system font stack** (San Francisco on a Mac, a Linux sans in a container), so its renders will differ from the Player until it ships a font too. `TODO(open-decision)`.
   - **Cold start:**
     - The first start after a deploy took 26 s, and a new instance on a cached image took 21.8 s. A warm request takes 10-40 ms.
     - So a frame grab or portrait crop after idle would wait about 20 s. The API wakes the media container when the editor opens a project, keeps it warm with `sleepAfter` of about 10 minutes while the editor is open, and uses a small instance type for frame work.
