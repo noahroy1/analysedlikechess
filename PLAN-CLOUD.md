@@ -320,6 +320,12 @@ Move ffmpeg and Remotion into `apps/media` behind its HTTP API, and package its 
 **Phase C5: Mobile**
 
 - **Spike first:** the Remotion Player in iOS WKWebView and Android WebView. Check inline playback, frame-exact holds and Web Audio after a user gesture.
+- **iPhone trial (offered Nov 5; the user decides whether and when, any time before C5):**
+  - **What:** a throwaway Capacitor 8 shell (`spikes/capacitor-trial/`, not linted or tested) that bundles the rights-free sample project (`fixtures/sample`) and the local sound files and plays `<Episode>` in the Player, with no backend, sign-in or network. It shows a report on screen: frames where each hold froze against the frame expected, when each sound started against `soundCues()`, and dropped frames.
+  - **On this Mac (checked Nov 5):** Xcode 26.6 (Capacitor 8 needs 26.0 or later), Node 24.12 (needs 22 or later), iOS 26 simulators, and 35 GiB free. Swift Package Manager is Capacitor 8's default, so CocoaPods (not installed) is not needed. Capacitor is an approved dependency; pin `@capacitor/core`, `@capacitor/cli` and `@capacitor/ios` exactly.
+  - **First pass, without the user:** the iOS Simulator, to catch layout, inline playback and the frame report. It runs macOS's WebKit and audio, not the phone's, so it can't settle sound after a tap or real-device performance.
+  - **Second pass, about 15 minutes of the user's time:** an iPhone with its cable (model and iOS version to note in the report). The user signs in to Xcode with their Apple ID (a free Personal Team is enough: its signing lasts 7 days, then the app stops launching until it's run from Xcode again; the $99-a-year program is needed only for TestFlight and the App Store in C5). On the phone: turn on Developer Mode (Settings → Privacy & Security; it restarts the phone), trust the developer after the first install (Settings → General → VPN & Device Management), then watch the holds, listen for the sounds after tapping play, and screenshot the report.
+  - **Android** is not part of this trial; C5's spike still needs it.
 - **Then build** `apps/mobile` to the scope above. Sign-in is Supabase PKCE with deep links.
 
 - [ ] On an iPhone and an Android phone: sign in, upload a clip from the camera roll, watch the drafts with holds and sounds, approve and edit one card, render, and share the MP4.
