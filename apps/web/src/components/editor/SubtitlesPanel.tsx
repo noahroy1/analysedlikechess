@@ -1,6 +1,6 @@
 import { sourceFrameToOut, timeMapFrame } from '@als/composition';
 import { useMemo } from 'react';
-import { deleteSubtitle, followTranscript, retimeSubtitle, setSubtitleText, subtitlesOf } from '../../editor/doc.ts';
+import { deleteSubtitle, followTranscript, retimeSubtitle, setSubtitleText, subtitlesOf } from '@als/editor-core';
 import { useEditor, useEditorStore, usePlayback } from '../../editor/context.tsx';
 import { formatTime } from '../../lib/format.ts';
 import { SecondsInput } from './fields.tsx';

@@ -1,7 +1,7 @@
 import { freezeAfterSpeech } from '@als/schema';
 import { sourceFrameToOut, timeMapFrame } from '@als/composition';
 import { useCallback, useState } from 'react';
-import { EditError, addMoment } from '../../editor/doc.ts';
+import { EditError, addMoment } from '@als/editor-core';
 import { useEditor, useEditorStore, usePlayback } from '../../editor/context.tsx';
 import { draftNewMove } from '../../editor/regenerate.ts';
 import { formatTime } from '../../lib/format.ts';

@@ -1,6 +1,6 @@
 import { Badge } from '@als/theme';
 import { useState } from 'react';
-import { setStatus } from '../../editor/doc.ts';
+import { setStatus } from '@als/editor-core';
 import { useEditor, useEditorStore, usePlayback } from '../../editor/context.tsx';
 import { formatTime } from '../../lib/format.ts';
 

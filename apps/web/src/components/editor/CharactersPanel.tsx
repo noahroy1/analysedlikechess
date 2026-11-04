@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { SIDES } from '@als/schema';
-import { addCharacter, assignSpeaker, deleteCharacter, mergeCharacters, renameCharacter, setPortrait, setSide } from '../../editor/doc.ts';
+import { addCharacter, assignSpeaker, deleteCharacter, mergeCharacters, renameCharacter, setPortrait, setSide } from '@als/editor-core';
 import { useEditor, useEditorStore } from '../../editor/context.tsx';
 import { fileUrl } from '../../lib/api.ts';
 

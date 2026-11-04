@@ -1,7 +1,7 @@
 import { CARD_ANCHORS, NO_BEST_MOVE, textCaps, type Card, type Moment } from '@als/schema';
 import { MoveCard, cardRect, moveNumbers, type CardField } from '@als/composition';
 import { useLayoutEffect, useMemo, useRef, useState, type PointerEvent } from 'react';
-import { setCardByHand, updateMoment } from '../../editor/doc.ts';
+import { setCardByHand, updateMoment } from '@als/editor-core';
 import { useEditor, useEditorStore } from '../../editor/context.tsx';
 import { ClassificationPicker } from './ClassificationPicker.tsx';
 import { EditableText } from './EditableText.tsx';

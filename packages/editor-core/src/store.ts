@@ -1,5 +1,5 @@
 import { ProjectSchema, projectFormat, type MoveDraft, type Project, type ProjectEdit, type Theme } from '@als/schema';
-import { getTheme } from '@als/theme';
+import { getTheme } from '@als/theme/themes';
 import { createStore, type StoreApi } from 'zustand/vanilla';
 import { hasItem, normalize, type Doc } from './doc.ts';
 

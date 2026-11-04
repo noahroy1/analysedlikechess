@@ -58,8 +58,8 @@ export interface GeminiOptions {
 export function geminiDescriber({ apiKey, model, fps, record }: GeminiOptions): SceneDescriber {
   const ai = new GoogleGenAI({ apiKey });
   return {
-    async describe(videoPath, { durationSec, context }) {
-      let file = await ai.files.upload({ file: videoPath, config: { mimeType: 'video/mp4' } });
+    async describe(video, { durationSec, context }) {
+      let file = await ai.files.upload({ file: video, config: { mimeType: 'video/mp4' } });
       const started = Date.now();
       try {
         while (file.state === FileState.PROCESSING) {
@@ -161,7 +161,7 @@ export function geminiRegions({ apiKey, model, record }: Omit<GeminiOptions, 'fp
     async find(jpeg, context) {
       const response = await ai.models.generateContent({
         model,
-        contents: [{ role: 'user', parts: [{ inlineData: { mimeType: 'image/jpeg', data: jpeg.toString('base64') } }, { text: regionsPrompt(context) }] }],
+        contents: [{ role: 'user', parts: [{ inlineData: { mimeType: 'image/jpeg', data: Buffer.from(jpeg).toString('base64') } }, { text: regionsPrompt(context) }] }],
         config: {
           responseMimeType: 'application/json',
           responseJsonSchema: z.toJSONSchema(GeminiRegionsSchema),

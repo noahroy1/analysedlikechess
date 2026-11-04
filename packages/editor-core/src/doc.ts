@@ -21,7 +21,8 @@ import {
   type FrameRegions,
   subtitlesFromTranscript,
 } from '@als/schema';
-import { autoPlaceCard, moveNumbers } from '@als/composition';
+import { moveNumbers } from '@als/composition/notation';
+import { autoPlaceCard } from '@als/composition/placement';
 
 /** The part of a project the editor changes: its name, the annotation track, the cast, the look, the format, the evaluation bar, the subtitles and the game review. */
 export interface Doc {

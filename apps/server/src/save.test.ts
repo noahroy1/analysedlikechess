@@ -3,29 +3,25 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { HistoryEntrySchema, ProjectSchema, type Project } from '@als/schema';
-import { HISTORY_LIMIT } from './projects/store.ts';
+import { HISTORY_LIMIT } from './node/fs-repo.ts';
 import { makeTestApp } from './test-helpers.ts';
 
 const FIXTURE = new URL('../../../fixtures/sample/project.json', import.meta.url);
 
 const root = await mkdtemp(join(tmpdir(), 'als-save-'));
-const { store, app } = await makeTestApp(root);
+const { store, call } = await makeTestApp(root);
 let project: Project;
 
 afterAll(() => rm(root, { recursive: true, force: true }));
 
 beforeEach(async () => {
   const fixture = ProjectSchema.parse(JSON.parse(await readFile(FIXTURE, 'utf8')));
-  const id = await store.createDir('save');
+  const id = await store.newId('save');
   project = await store.create({ ...fixture, id, version: 1 });
 });
 
 const put = (body: unknown) =>
-  app.request(`/api/projects/${project.id}`, {
-    method: 'PUT',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(body),
-  });
+  call(`/projects/${project.id}`, { method: 'PUT', json: body });
 
 const edit = (version: number, label: string) => ({
   version,
@@ -47,7 +43,7 @@ describe('autosave', () => {
   it('saves the name and the bar size, and the list shows the name', async () => {
     await put({ ...edit(1, 'x'), title: 'Grandpa’s pond', evalBarScale: 0.9 });
     expect(await store.read(project.id)).toMatchObject({ title: 'Grandpa’s pond', evalBarScale: 0.9 });
-    const list = (await (await app.request('/api/projects')).json()) as { id: string; name: string }[];
+    const list = (await (await call('/projects')).json()) as { id: string; name: string }[];
     expect(list.find((p) => p.id === project.id)?.name).toBe('Grandpa’s pond');
     // Leaving them out goes back to the default name and a full-size bar.
     await put(edit(2, 'y'));
@@ -82,7 +78,7 @@ describe('autosave', () => {
 describe('history', () => {
   it(`keeps the last ${HISTORY_LIMIT} saved versions`, async () => {
     for (let v = 1; v <= HISTORY_LIMIT + 5; v++) expect((await put(edit(v, `v${v}`))).status).toBe(200);
-    const history = HistoryEntrySchema.array().parse(await (await app.request(`/api/projects/${project.id}/history`)).json());
+    const history = HistoryEntrySchema.array().parse(await (await call(`/projects/${project.id}/history`)).json());
     expect(history).toHaveLength(HISTORY_LIMIT);
     expect(history[0]!.version).toBe(HISTORY_LIMIT + 5);
     expect(history.at(-1)!.version).toBe(6);
@@ -91,11 +87,7 @@ describe('history', () => {
   it('restores an earlier version as a new version', async () => {
     await put(edit(1, 'Good edit'));
     await put(edit(2, 'Bad edit'));
-    const res = await app.request(`/api/projects/${project.id}/history/2/restore`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ version: 3 }),
-    });
+    const res = await call(`/projects/${project.id}/history/2/restore`, { json: { version: 3 } });
     expect(res.status).toBe(200);
     const restored = await store.read(project.id);
     expect(restored.version).toBe(4);
@@ -103,11 +95,7 @@ describe('history', () => {
   });
 
   it('404s for a version that is not kept', async () => {
-    const res = await app.request(`/api/projects/${project.id}/history/99/restore`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ version: 1 }),
-    });
+    const res = await call(`/projects/${project.id}/history/99/restore`, { json: { version: 1 } });
     expect(res.status).toBe(404);
   });
 });

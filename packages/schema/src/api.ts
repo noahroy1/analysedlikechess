@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { MoveDraftSchema } from './analyst.ts';
+import { MediaGrantSchema } from './contract.ts';
 import { EvalBarSchema, EvalSchema } from './eval.ts';
 import { FormatSchema } from './format.ts';
 import { GameReviewSchema } from './game-review.ts';
@@ -15,9 +16,6 @@ import {
 } from './project.ts';
 import { FrameRegionsSchema } from './regions.ts';
 import { SubtitleSchema } from './subtitles.ts';
-
-/** Containers the upload accepts. The proxy makes any of them browser-safe. */
-export const UPLOAD_EXTENSIONS = ['mp4', 'mov', 'mkv'] as const;
 
 /** Folder-relative path of a shot's filmstrip thumbnail. */
 export const shotThumbnailFile = (shotIndex: number): string =>
@@ -57,6 +55,8 @@ export const ProjectSummarySchema = z.object({
   momentCount: z.int().nonnegative(),
   /** Folder-relative thumbnail for list views, once shots exist. */
   poster: z.string().optional(),
+  /** Signed access to the project's files, for the poster (v1 API). */
+  media: MediaGrantSchema.optional(),
 });
 export type ProjectSummary = z.infer<typeof ProjectSummarySchema>;
 

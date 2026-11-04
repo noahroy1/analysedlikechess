@@ -1,7 +1,7 @@
 import { RENDER_PRESETS, presetSize, type RenderJob, type RenderPreset } from '@als/schema';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useEditor, useEditorStore } from '../../editor/context.tsx';
-import { cancelRender, deleteRender, fileUrl, listRenders, revealRender, startRender } from '../../lib/api.ts';
+import { cancelRender, deleteRender, downloadUrl, fileUrl, listRenders, startRender } from '../../lib/api.ts';
 import { formatDate, formatTime } from '../../lib/format.ts';
 import { useProjectEvents } from '../../lib/useProjectEvents.ts';
 import { HeaderButton } from './HeaderButton.tsx';
@@ -169,8 +169,15 @@ function RenderRow({ job, projectId, act }: { job: RenderJob; projectId: string;
               <a href={fileUrl(projectId, job.file)} target="_blank" rel="noreferrer" className="text-sky-400 hover:underline">
                 Play
               </a>
-              <button type="button" onClick={act(() => revealRender(projectId, job.id))} className="text-sky-400 hover:underline">
-                Show in Finder
+              <button
+                type="button"
+                onClick={act(async () => {
+                  // A signed link that answers with the MP4 as an attachment, so the page stays put.
+                  window.location.assign(await downloadUrl(projectId, job.id));
+                })}
+                className="text-sky-400 hover:underline"
+              >
+                Download
               </button>
             </>
           ) : (

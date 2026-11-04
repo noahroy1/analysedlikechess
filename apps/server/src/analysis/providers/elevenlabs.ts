@@ -1,5 +1,3 @@
-import { readFile } from 'node:fs/promises';
-import { basename } from 'node:path';
 import { z } from 'zod';
 import type { AudioEvent, Utterance, Word } from '@als/schema';
 import { SCRIBE_KEYTERM_SURCHARGE, costUsd } from '../prices.ts';
@@ -78,10 +76,10 @@ export interface ScribeOptions {
 /** ElevenLabs Scribe: word timestamps, diarization and sound-event tags in one synchronous call. */
 export function scribeTranscriber({ apiKey, model, record }: ScribeOptions): Transcriber {
   return {
-    async transcribe(audioPath, { keyterms, durationSec }) {
+    async transcribe(audio, { keyterms, durationSec }) {
       const form = new FormData();
       form.append('model_id', model);
-      form.append('file', new Blob([await readFile(audioPath)], { type: 'audio/wav' }), basename(audioPath));
+      form.append('file', audio.type ? audio : audio.slice(0, audio.size, 'audio/wav'), 'audio.wav');
       form.append('diarize', 'true');
       form.append('timestamps_granularity', 'word');
       form.append('tag_audio_events', 'true');

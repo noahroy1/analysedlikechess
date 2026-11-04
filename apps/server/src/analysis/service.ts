@@ -1,104 +1,104 @@
-import { readFile } from 'node:fs/promises';
 import {
-  StyleCorpusSchema,
   projectFormat,
-  type Analysis,
   type AnalyzeRequest,
   type EvaluateRequest,
   type EvaluateResult,
   type Format,
+  type JobOf,
   type Moment,
   type RegenerateResult,
   type RegionsResult,
   type StyleCorpus,
 } from '@als/schema';
-import { JobQueue, stageSignature } from '../jobs.ts';
-import type { ProjectStore } from '../projects/store.ts';
+import { NotReadyError, type BlobStore, type JobRunner, type MediaRunner, type ProjectRepo, type UsageLog } from '../ports.ts';
+import type { Spend } from '../spend.ts';
 import { missingKeys, type AnalysisConfig } from './config.ts';
-import { pendingAnalysis, runAnalysis, type AnalysisOptions } from './pipeline.ts';
+import { pendingAnalysis, runAnalysis, type AnalysisDeps, type AnalysisOptions } from './pipeline.ts';
 import type { Providers } from './providers/index.ts';
 import { reevaluate } from './reevaluate.ts';
 import { findRegions } from './regions.ts';
-import { logUsage, readUsage, regenerateMoment, type EditorUsage } from './regenerate.ts';
+import { regenerateMoment } from './regenerate.ts';
 
-export class AnalysisBusyError extends Error {}
+export interface AnalysisServiceDeps {
+  repo: ProjectRepo;
+  blobs: BlobStore;
+  media: MediaRunner;
+  jobs: JobRunner;
+  usage: UsageLog;
+  spend: Spend;
+  providers: Providers;
+  config: AnalysisConfig;
+  style: StyleCorpus;
+}
 
-/** The analysis job queue plus Regenerate, sharing one set of providers. */
+/** Analysis jobs plus the editor's own AI calls (Regenerate, Re-evaluate, regions), sharing one set of providers. */
 export class AnalysisService {
-  readonly queue: JobQueue<Analysis>;
   readonly config: AnalysisConfig;
-  private readonly store: ProjectStore;
-  private readonly providers: Providers;
-  private readonly style: StyleCorpus;
-  private readonly options = new Map<string, AnalysisOptions>();
+  private readonly deps: AnalysisServiceDeps;
 
-  constructor(deps: { store: ProjectStore; providers: Providers; config: AnalysisConfig; style: StyleCorpus }) {
-    this.store = deps.store;
-    this.providers = deps.providers;
+  constructor(deps: AnalysisServiceDeps) {
+    this.deps = deps;
     this.config = deps.config;
-    this.style = deps.style;
-    this.queue = new JobQueue<Analysis>(
-      (id, onUpdate) =>
-        runAnalysis(deps, id, this.options.get(id) ?? {}, onUpdate).finally(() => this.options.delete(id)),
-      stageSignature,
-    );
-  }
-
-  static async load(store: ProjectStore, providers: Providers, config: AnalysisConfig): Promise<AnalysisService> {
-    const style = StyleCorpusSchema.parse(JSON.parse(await readFile(config.styleCorpusPath, 'utf8')));
-    return new AnalysisService({ store, providers, config, style });
+    const pipeline: AnalysisDeps = deps;
+    deps.jobs.register('analysis', async ({ job, userId, request, report }) => {
+      await runAnalysis(pipeline, job.projectId, (request ?? {}) as AnalysisOptions, { userId, check: () => deps.spend.check(userId) }, report);
+    });
   }
 
   missingKeys(): string[] {
     return missingKeys(this.config);
   }
 
-  /** Queues an analysis run. */
-  async start(id: string, request: AnalyzeRequest = {}): Promise<void> {
-    if (this.queue.has(id)) throw new AnalysisBusyError('analysis is already running');
-    const project = await this.store.read(id);
-    if (project.ingest.status !== 'done') throw new AnalysisBusyError('wait for ingest to finish');
-    await this.store.update(id, (p) => {
+  /** Starts an analysis run, or returns the one already pending or running (`created: false`). */
+  async start(userId: string, id: string, request: AnalyzeRequest = {}): Promise<{ job: JobOf<'analysis'>; created: boolean }> {
+    const { repo, jobs, spend } = this.deps;
+    const running = jobs.find('analysis', id);
+    if (running) return { job: running, created: false };
+    const project = await repo.read(id);
+    if (project.ingest.status !== 'done') throw new NotReadyError('Wait for ingest to finish.');
+    await spend.check(userId);
+    const pending = await repo.update(id, (p) => {
       p.analysis = pendingAnalysis(p.analysis);
       if (request.secondsPerMove) p.analysis.secondsPerMove = request.secondsPerMove;
       else if (request.secondsPerMove === null) delete p.analysis.secondsPerMove;
     });
-    this.options.set(id, { ...(request.rerun ? { rerun: request.rerun } : {}) });
-    this.queue.enqueue(id);
+    const options: AnalysisOptions = request.rerun ? { rerun: request.rerun } : {};
+    return jobs.start('analysis', id, { userId, state: pending.analysis, request: options });
   }
 
   /** After ingest: analyse new clips on their own when the keys are there. */
-  async autoStart(id: string): Promise<void> {
+  async autoStart(userId: string, id: string): Promise<void> {
     if (!this.config.autoAnalyze || this.missingKeys().length) return;
-    const project = await this.store.read(id).catch(() => undefined);
-    if (project?.analysis.status === 'idle') await this.start(id).catch(() => undefined);
+    const project = await this.deps.repo.read(id).catch(() => undefined);
+    if (project?.analysis.status === 'idle') await this.start(userId, id).catch(() => undefined);
   }
 
-  async regenerate(id: string, moment: Moment, instruction?: string, format?: Format): Promise<RegenerateResult> {
-    const project = await this.store.read(id);
-    const deps = { store: this.store, providers: this.providers, config: this.config, style: this.style };
-    return regenerateMoment(deps, project, moment, instruction, format ?? projectFormat(project));
-  }
-
-  async evaluate(id: string, request: EvaluateRequest): Promise<EvaluateResult> {
-    const project = await this.store.read(id);
-    return reevaluate({ store: this.store, providers: this.providers, config: this.config, style: this.style }, project, request);
-  }
-
-  /** Faces and subject on a move's frozen frame, for the editor to place its card. Saves nothing. */
-  async regions(id: string, moment: Moment): Promise<RegionsResult> {
-    const project = await this.store.read(id);
-    const result = await findRegions({ store: this.store, providers: this.providers, config: this.config }, project, moment);
-    if (result.costUsd > 0) await logUsage(this.store, id, 'regions', result.costUsd);
+  async regenerate(userId: string, id: string, moment: Moment, instruction?: string, format?: Format): Promise<RegenerateResult> {
+    const { repo, spend, usage } = this.deps;
+    const project = await repo.read(id);
+    await spend.check(userId);
+    const result = await regenerateMoment(this.deps, project, moment, instruction, format ?? projectFormat(project));
+    await usage.record({ userId, projectId: id, call: 'regenerate', model: result.model, usage: result.usage, costUsd: result.costUsd });
     return result;
   }
 
-  async usage(id: string): Promise<Record<'regenerate' | 'evaluate' | 'regions', EditorUsage>> {
-    const [regenerate, evaluate, regions] = await Promise.all([
-      readUsage(this.store, id, 'regenerate'),
-      readUsage(this.store, id, 'evaluate'),
-      readUsage(this.store, id, 'regions'),
-    ]);
-    return { regenerate, evaluate, regions };
+  async evaluate(userId: string, id: string, request: EvaluateRequest): Promise<EvaluateResult> {
+    const { repo, spend, usage } = this.deps;
+    const project = await repo.read(id);
+    await spend.check(userId);
+    const result = await reevaluate(this.deps, project, request);
+    await usage.record({ userId, projectId: id, call: 'evaluate', model: result.model, usage: result.usage, costUsd: result.costUsd });
+    return result;
+  }
+
+  /** Faces and subject on a move's frozen frame, for the editor to place its card. Saves nothing. A cached frame is free and never refused. */
+  async regions(userId: string, id: string, moment: Moment): Promise<RegionsResult> {
+    const { repo, spend, usage } = this.deps;
+    const project = await repo.read(id);
+    const result = await findRegions({ ...this.deps, check: () => spend.check(userId) }, project, moment);
+    if (result.costUsd > 0) {
+      await usage.record({ userId, projectId: id, call: 'regions', model: result.model, usage: result.usage, costUsd: result.costUsd });
+    }
+    return result;
   }
 }

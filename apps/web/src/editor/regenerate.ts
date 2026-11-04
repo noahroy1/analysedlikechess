@@ -1,7 +1,7 @@
 import { NO_BEST_MOVE, type MoveDraft } from '@als/schema';
 import { regenerateMoment } from '../lib/api.ts';
-import { updateMoment } from './doc.ts';
-import type { EditorStore } from './store.ts';
+import { updateMoment } from '@als/editor-core';
+import type { EditorStore } from '@als/editor-core';
 
 /** Asks the server for a new version of one moment's card. The result waits as a proposal. */
 export async function requestRegeneration(store: EditorStore, momentId: string, instruction?: string): Promise<void> {

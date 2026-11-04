@@ -2,8 +2,8 @@ import { EVAL_BAR_SCALES, FORMATS, FORMAT_RULES, guessFormat, projectName, type 
 import { useEffect, useRef, useState } from 'react';
 import { THEMES, getTheme } from '@als/theme';
 import { EditorProvider, useEditor, useEditorStore } from '../../editor/context.tsx';
-import { replaceAutoCards, setEvalBarScale, setFormat, setTheme, setTitle } from '../../editor/doc.ts';
-import { createEditorStore, type EditorStore, type SaveStatus } from '../../editor/store.ts';
+import { replaceAutoCards, setEvalBarScale, setFormat, setTheme, setTitle } from '@als/editor-core';
+import { createEditorStore, type EditorStore, type SaveStatus } from '@als/editor-core';
 import { getProject, listHistory, restoreVersion, saveProject } from '../../lib/api.ts';
 import { formatFps, formatTime } from '../../lib/format.ts';
 import { projectsHref } from '../../lib/router.ts';

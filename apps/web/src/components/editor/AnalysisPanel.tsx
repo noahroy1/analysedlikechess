@@ -1,7 +1,7 @@
 import { FORMAT_RULES, type Analysis } from '@als/schema';
 import { sourceFrameToOut } from '@als/composition';
 import { useEffect, useState } from 'react';
-import { assignSpeaker } from '../../editor/doc.ts';
+import { assignSpeaker } from '@als/editor-core';
 import { useEditor, useEditorStore, usePlayback } from '../../editor/context.tsx';
 import { getAnalysisConfig, getUsage, startAnalysis, type AnalysisConfigInfo } from '../../lib/api.ts';
 import { formatUsd } from '../../lib/format.ts';

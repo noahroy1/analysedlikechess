@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { Source } from '@als/schema';
+import { NotAVideoError, type ProbeResult } from '../ports.ts';
 import { run } from './run.ts';
 
 // The subset of ffprobe's JSON output we read.
@@ -19,9 +19,7 @@ const ProbeOutput = z.object({
   format: z.looseObject({ duration: z.string().optional() }),
 });
 
-export type ProbeResult = Pick<Source, 'fps' | 'durationSec' | 'width' | 'height' | 'hasAudio'>;
-
-export class NotAVideoError extends Error {}
+export { NotAVideoError };
 
 /** "24000/1001" -> 23.976... */
 export function parseRate(rate: string | undefined): number {

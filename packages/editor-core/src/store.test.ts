@@ -1,13 +1,13 @@
 import { readFileSync } from 'node:fs';
 import { ProjectSchema, type Project } from '@als/schema';
-import { defaultTheme } from '@als/theme';
+import { defaultTheme } from '@als/theme/themes';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as ops from './doc.ts';
 import { AUTOSAVE_DELAY_MS, COALESCE_MS, createEditorStore, type EditorDeps } from './store.ts';
 
 const fixture = (): Project =>
   ProjectSchema.parse(
-    JSON.parse(readFileSync(new URL('../../../../fixtures/sample/project.json', import.meta.url), 'utf8')),
+    JSON.parse(readFileSync(new URL('../../../fixtures/sample/project.json', import.meta.url), 'utf8')),
   );
 
 function setup(overrides: Partial<EditorDeps> = {}) {

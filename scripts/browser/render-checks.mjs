@@ -65,10 +65,10 @@ try {
     await clickText('Render');
   }
 
-  const renders = await page.eval(`fetch('/api/projects/${projectId}/renders').then((r) => r.json())`);
+  const renders = await page.eval(`fetch('/api/v1/projects/${projectId}/renders').then((r) => r.json())`);
   const job = renders.find((r) => r.status === 'done');
   const mp4 = join(projectsDir, projectId, job.file);
-  const project = await page.eval(`fetch('/api/projects/${projectId}').then((r) => r.json())`);
+  const project = await page.eval(`fetch('/api/v1/projects/${projectId}').then((r) => r.json())`);
   result('the render is of the saved version', job.projectVersion === project.version, `v${job.projectVersion}, project at v${project.version}`);
   const probe = JSON.parse(execFileSync('ffprobe', ['-v', 'error', '-select_streams', 'v:0', '-count_packets', '-show_entries', 'stream=nb_read_packets,width,height', '-of', 'json', mp4], { encoding: 'utf8' })).streams[0];
   result('the MP4 has every output frame', Number(probe.nb_read_packets) === job.frames, `${probe.nb_read_packets} frames, expected ${job.frames}`);

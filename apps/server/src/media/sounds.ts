@@ -6,9 +6,6 @@ import { run } from './run.ts';
 /** Sound files the browser and the renderer can both decode. */
 export const SOUND_FILE = /^([a-z0-9-]+)\.(wav|mp3|ogg|m4a|aac|flac)$/;
 
-/** URL a sound file is served at. */
-export const soundUrl = (file: string) => `/api/sounds/${file}`;
-
 /**
  * The chess sounds in a folder (`<id>.<ext>`, see SOUND_IDS), with their
  * lengths. Probed lengths are cached by file size and time, so dropping a new
@@ -23,7 +20,8 @@ export class SoundLibrary {
     this.dir = dir;
   }
 
-  async bank(): Promise<SoundBank> {
+  /** The bank, with each file's URL from `src` (signed by the caller). */
+  async bank(src: (file: string) => string): Promise<SoundBank> {
     const files = await readdir(this.dir).catch(() => [] as string[]);
     const bank: SoundBank = {};
     for (const file of files.sort()) {
@@ -31,15 +29,14 @@ export class SoundLibrary {
       const id = SoundIdSchema.safeParse(match?.[1]);
       if (!id.success || bank[id.data]) continue;
       const durationSec = await this.duration(file).catch(() => 0);
-      if (durationSec > 0) bank[id.data] = { src: soundUrl(file), durationSec };
+      if (durationSec > 0) bank[id.data] = { src: src(file), durationSec };
     }
     return bank;
   }
 
-  /** Path of a servable file, or undefined. */
-  path(file: string): string | undefined {
-    const id = SoundIdSchema.safeParse(SOUND_FILE.exec(file)?.[1]);
-    return id.success ? join(this.dir, file) : undefined;
+  /** Whether a file name is one the bank serves. */
+  static servable(file: string): boolean {
+    return SoundIdSchema.safeParse(SOUND_FILE.exec(file)?.[1]).success;
   }
 
   private async duration(file: string): Promise<number> {

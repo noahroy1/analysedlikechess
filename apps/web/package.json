@@ -9,7 +9,9 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@als/client": "workspace:*",
     "@als/composition": "workspace:*",
+    "@als/editor-core": "workspace:*",
     "@als/schema": "workspace:*",
     "@als/theme": "workspace:*",
     "@remotion/player": "4.0.534",

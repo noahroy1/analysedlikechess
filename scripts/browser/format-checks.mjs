@@ -74,7 +74,7 @@ try {
     await sleep(150);
     const chip = await page.eval(`document.querySelector('[data-testid=edit-layer] [data-part=motif]')?.textContent ?? ''`);
     await waitSaved();
-    const saved = await page.eval(`fetch('/api/projects/${projectId}').then((r) => r.json()).then((p) => p.moments.find((m) => m.id === 'm1').motif)`);
+    const saved = await page.eval(`fetch('/api/v1/projects/${projectId}').then((r) => r.json()).then((p) => p.moments.find((m) => m.id === 'm1').motif)`);
     result('a motif typed in the inspector shows in the chip and saves', chip === 'Gambit' && saved === 'Gambit', `chip "${chip}", saved "${saved}"`);
     await page.eval(`document.activeElement.blur()`);
   }

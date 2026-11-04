@@ -18,10 +18,10 @@ import {
 } from '@als/schema';
 import { autoPlaceCard } from '@als/composition/placement';
 import { defaultTheme, getTheme } from '@als/theme/themes';
-import { makeTestApp, DIALOGUE_RECORDING } from '../test-helpers.ts';
-import { AnalysisService } from './service.ts';
-import { makeProviders } from './providers/index.ts';
-import { handoffAnalyst } from './providers/replay.ts';
+import { makeTestApp, uploadFile, DIALOGUE_RECORDING } from '../test-helpers.ts';
+import { makeProviders } from '../node/providers.ts';
+import { handoffAnalyst } from '../node/replay-providers.ts';
+import { LOCAL_USER } from '../node/server.ts';
 import { ProviderError } from './providers/types.ts';
 import { parseScribe } from './providers/elevenlabs.ts';
 import { parseNotes, parseRegions } from './providers/gemini.ts';
@@ -274,17 +274,17 @@ describe('analysis pipeline', () => {
   beforeAll(async () => {
     root = await mkdtemp(join(tmpdir(), 'als-analysis-'));
     env = await makeTestApp(root, { autoAnalyze: true });
-    const res = await env.app.request('/api/projects?name=dialogue.mp4', { method: 'POST', body: await readFile(DIALOGUE) });
+    const res = await uploadFile(env, 'dialogue.mp4', await readFile(DIALOGUE));
     expect(res.status).toBe(201);
     const { id } = ProjectSchema.parse(await res.json());
-    await env.queue.whenIdle();
+    await env.jobs.whenIdle();
     await new Promise((r) => setTimeout(r, 50));
-    await env.analysis.queue.whenIdle();
+    await env.jobs.whenIdle();
     project = await env.store.read(id);
   }, 120_000);
 
   afterAll(async () => {
-    await env.analysis.queue.whenIdle();
+    await env.jobs.whenIdle();
     await rm(root, { recursive: true, force: true });
   });
 
@@ -385,16 +385,13 @@ describe('analysis pipeline', () => {
   });
 
   it('keeps the track it replaced in history', async () => {
-    expect((await readdir(env.store.file(project.id, 'history'))).length).toBeGreaterThan(0);
+    expect((await readdir(join(env.dir(project.id), 'history'))).length).toBeGreaterThan(0);
   });
 
   it('re-running the Analyst skips Stages 1 and 2 and keeps approved moves and their evals', async () => {
     // Approve one move through the editor's save path, with an eval set by hand.
     const approved = project.moments[1]!;
-    const save = await env.app.request(`/api/projects/${project.id}`, {
-      method: 'PUT',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
+    const save = await env.call(`/projects/${project.id}`, { method: 'PUT', json: {
         version: project.version,
         moments: project.moments.map((m) =>
           m.id === approved.id ? { ...m, status: 'approved', moveLabel: 'Approved edit', eval: { pawns: 2 } } : m,
@@ -402,17 +399,12 @@ describe('analysis pipeline', () => {
         characters: project.context.characters,
         themeId: project.themeId,
         evalBar: project.evalBar,
-      }),
-    });
+      } });
     expect(save.status).toBe(200);
 
-    const res = await env.app.request(`/api/projects/${project.id}/analyze`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ rerun: 'analyst' }),
-    });
+    const res = await env.call(`/projects/${project.id}/analyze`, { json: { rerun: 'analyst' } });
     expect(res.status).toBe(202);
-    await env.analysis.queue.whenIdle();
+    await env.jobs.whenIdle();
     const rerun = await env.store.read(project.id);
     expect(rerun.analysis.stages.map((s) => [s.name, s.status])).toEqual([
       ['transcribe', 'cached'],
@@ -434,34 +426,26 @@ describe('analysis pipeline', () => {
 
   it('regenerates one moment as a proposal, without saving the project', async () => {
     const before = await env.store.read(project.id);
-    const res = await env.app.request(`/api/projects/${project.id}/regenerate`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ moment: before.moments[0], instruction: 'funnier' }),
-    });
+    const res = await env.call(`/projects/${project.id}/regenerate`, { json: { moment: before.moments[0], instruction: 'funnier' } });
     expect(res.status).toBe(200);
     const result = RegenerateResultSchema.parse(await res.json());
     expect(result.draft.moveLabel).toBeTruthy();
     expect(result.costUsd).toBeGreaterThan(0);
     expect((await env.store.read(project.id)).version).toBe(before.version);
-    const usage = await (await env.app.request(`/api/projects/${project.id}/usage`)).json();
+    const usage = await (await env.call(`/projects/${project.id}/usage`)).json();
     expect(usage).toEqual({ regenerate: { count: 1, costUsd: result.costUsd }, evaluate: { count: 0, costUsd: 0 }, regions: { count: 0, costUsd: 0 } });
   });
 
   it('re-evaluates the bar as a proposal, placing beats for a track that has none', async () => {
     const before = await env.store.read(project.id);
     const moments = before.moments.map(({ eval: _, ...m }) => m);
-    const res = await env.app.request(`/api/projects/${project.id}/evaluate`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ moments, characters: before.context.characters }),
-    });
+    const res = await env.call(`/projects/${project.id}/evaluate`, { json: { moments, characters: before.context.characters } });
     expect(res.status).toBe(200);
     const result = EvaluateResultSchema.parse(await res.json());
     expect(result.evalBar.beats.map((b) => b.id)).toEqual(['beat-c2', 'beat-c3', 'beat-c5']);
     expect(result.evals).toEqual({ 'ai-c1-1': { pawns: 0.9 }, 'ai-c4-2': { pawns: 2.8 }, 'ai-c6-3': { mate: 3 } });
     expect((await env.store.read(project.id)).version).toBe(before.version);
-    const usage = (await (await env.app.request(`/api/projects/${project.id}/usage`)).json()) as { evaluate: unknown };
+    const usage = (await (await env.call(`/projects/${project.id}/usage`)).json()) as { evaluate: unknown };
     expect(usage.evaluate).toEqual({ count: 1, costUsd: result.costUsd });
   });
 
@@ -469,11 +453,7 @@ describe('analysis pipeline', () => {
     const before = await env.store.read(project.id);
     const moment = before.moments[0]!;
     const ask = async (m: typeof moment) => {
-      const res = await env.app.request(`/api/projects/${project.id}/regions`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ moment: m }),
-      });
+      const res = await env.call(`/projects/${project.id}/regions`, { json: { moment: m } });
       expect(res.status).toBe(200);
       return RegionsResultSchema.parse(await res.json());
     };
@@ -485,16 +465,16 @@ describe('analysis pipeline', () => {
     expect(retimed.costUsd).toBeGreaterThan(0);
     expect(retimed.regions.sourceTime).toBe(moment.sourceTime + 0.5);
     expect((await env.store.read(project.id)).version).toBe(before.version);
-    const usage = (await (await env.app.request(`/api/projects/${project.id}/usage`)).json()) as { regions: { count: number; costUsd: number } };
+    const usage = (await (await env.call(`/projects/${project.id}/usage`)).json()) as { regions: { count: number; costUsd: number } };
     expect(usage.regions.count).toBe(1);
     expect(usage.regions.costUsd).toBeCloseTo(retimed.costUsd, 6);
   });
 
   it('refuses to analyse without API keys and says which', async () => {
     const bare = await makeTestApp(root, { replayDir: undefined, keys: {} });
-    const res = await bare.app.request(`/api/projects/${project.id}/analyze`, { method: 'POST' });
+    const res = await bare.call(`/projects/${project.id}/analyze`, { method: 'POST' });
     expect(res.status).toBe(400);
-    expect(await res.json()).toEqual({ error: expect.stringMatching(/ELEVENLABS_API_KEY.*GEMINI_API_KEY.*OPENAI_API_KEY/) });
+    expect(await res.json()).toEqual({ code: 'missing_keys', error: expect.stringMatching(/ELEVENLABS_API_KEY.*GEMINI_API_KEY.*OPENAI_API_KEY/) });
   });
 });
 
@@ -503,15 +483,15 @@ describe('a failing vendor', () => {
     const root = await mkdtemp(join(tmpdir(), 'als-analysis-fail-'));
     try {
       const env = await makeTestApp(root);
-      const res = await env.app.request('/api/projects?name=dialogue.mp4', { method: 'POST', body: await readFile(DIALOGUE) });
+      const res = await uploadFile(env, 'dialogue.mp4', await readFile(DIALOGUE));
       const { id } = ProjectSchema.parse(await res.json());
-      await env.queue.whenIdle();
+      await env.jobs.whenIdle();
 
       const replay = makeProviders(env.analysis.config);
       const broke: typeof replay = { ...replay, describer: { describe: () => Promise.reject(new ProviderError('credits depleted')) } };
-      const failing = await AnalysisService.load(env.store, broke, env.analysis.config);
-      await failing.start(id);
-      await failing.queue.whenIdle();
+      const failing = await makeTestApp(root, {}, undefined, undefined, { providers: broke });
+      await failing.analysis.start(LOCAL_USER, id);
+      await failing.jobs.whenIdle();
 
       const failed = await env.store.read(id);
       const stage = (name: string) => failed.analysis.stages.find((s) => s.name === name);
@@ -520,8 +500,8 @@ describe('a failing vendor', () => {
       expect(stage('describe')?.status).toBe('error');
 
       // The retry, with the vendor fixed, does not pay for transcription again.
-      await env.analysis.start(id);
-      await env.analysis.queue.whenIdle();
+      await env.analysis.start(LOCAL_USER, id);
+      await env.jobs.whenIdle();
       const retried = await env.store.read(id);
       expect(retried.analysis.status).toBe('done');
       expect(retried.analysis.stages.find((s) => s.name === 'transcribe')?.status).toBe('cached');

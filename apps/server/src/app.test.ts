@@ -2,34 +2,38 @@ import { mkdtemp, readFile, readdir, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { ProjectSchema, ProjectSummarySchema, type Project } from '@als/schema';
-import type { createApp } from './app.ts';
-import type { IngestQueue } from './ingest/queue.ts';
+import { MediaGrantSchema, ProjectSchema, ProjectSummarySchema, grantUrl, type MediaGrant, type Project } from '@als/schema';
 import { run } from './media/run.ts';
-import type { ProjectStore } from './projects/store.ts';
-import { makeTestApp } from './test-helpers.ts';
+import { makeTestApp, uploadFile, type TestApp } from './test-helpers.ts';
 
 // End to end against real ffmpeg (local, no cloud calls) on the 10 s fixture clip,
 // which has hard cuts at 3.5 s and 7 s.
 const FIXTURE = new URL('../../../fixtures/sample/source.mp4', import.meta.url);
 
 let root: string;
-let store: ProjectStore;
-let queue: IngestQueue;
-let app: ReturnType<typeof createApp>;
+let env: TestApp;
+let store: TestApp['store'];
+let call: TestApp['call'];
 
 beforeAll(async () => {
   root = await mkdtemp(join(tmpdir(), 'als-test-'));
-  ({ store, queue, app } = await makeTestApp(root));
+  env = await makeTestApp(root);
+  ({ store, call } = env);
 });
 
 afterAll(async () => {
-  await queue.whenIdle();
+  await env.jobs.whenIdle();
   await rm(root, { recursive: true, force: true });
 });
 
-const upload = async (name: string, body: RequestInit['body'], query = '') =>
-  app.request(`/api/projects?name=${encodeURIComponent(name)}${query}`, { method: 'POST', body });
+const upload = (name: string, body: string | Uint8Array, context: Record<string, unknown> = {}) =>
+  uploadFile(env, name, typeof body === 'string' ? new TextEncoder().encode(body) : body, context);
+
+/** A project file's URL under a fresh grant. */
+const signed = async (id: string, file: string) => {
+  const grant: MediaGrant = MediaGrantSchema.parse(await (await call(`/projects/${id}/media`)).json());
+  return grantUrl(grant, file);
+};
 
 const mtimes = async (dir: string) => {
   const files = [
@@ -41,7 +45,7 @@ const mtimes = async (dir: string) => {
 
 describe('health', () => {
   it('answers', async () => {
-    const res = await app.request('/api/health');
+    const res = await call('/health');
     expect(await res.json()).toEqual({ ok: true });
   });
 });
@@ -50,12 +54,13 @@ describe('upload validation', () => {
   it('rejects unsupported extensions', async () => {
     const res = await upload('notes.txt', 'hello');
     expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({ code: 'invalid_request', error: expect.stringMatching(/MP4, MOV, MKV/) });
   });
 
   it('rejects a file that is not a video and leaves nothing behind', async () => {
     const res = await upload('fake.mp4', 'definitely not a video');
     expect(res.status).toBe(400);
-    expect(await res.json()).toEqual({ error: expect.stringMatching(/not a playable video/) });
+    expect(await res.json()).toEqual({ code: 'not_a_video', error: expect.stringMatching(/not a playable video/) });
     expect(await readdir(root)).toEqual([]);
   });
 });
@@ -65,11 +70,11 @@ describe('ingest', () => {
   let dir: string;
 
   beforeAll(async () => {
-    const res = await upload('Sample Clip.MP4', await readFile(FIXTURE), '&movieTitle=Synthetic');
+    const res = await upload('Sample Clip.MP4', await readFile(FIXTURE), { movieTitle: 'Synthetic' });
     expect(res.status).toBe(201);
     project = ProjectSchema.parse(await res.json());
-    dir = store.dir(project.id);
-    await queue.whenIdle();
+    dir = env.dir(project.id);
+    await env.jobs.whenIdle();
     project = await store.read(project.id);
   }, 60_000);
 
@@ -138,45 +143,47 @@ describe('ingest', () => {
   });
 
   it('lists the project with a poster', async () => {
-    const list = ProjectSummarySchema.array().parse(await (await app.request('/api/projects')).json());
+    const list = ProjectSummarySchema.array().parse(await (await call('/projects')).json());
     expect(list).toHaveLength(1);
     expect(list[0]).toMatchObject({ id: project.id, name: 'Synthetic', shotCount: 3, poster: 'frames/shot-0001.jpg' });
   });
 
   it('serves the proxy with byte ranges so the browser can seek', async () => {
-    const res = await app.request(`/api/projects/${project.id}/files/proxy.mp4`, { headers: { Range: 'bytes=0-99' } });
+    const res = await env.app.request(await signed(project.id, 'proxy.mp4'), { headers: { Range: 'bytes=0-99' } });
     expect(res.status).toBe(206);
+    expect(res.headers.get('content-range')).toMatch(/^bytes 0-99\/\d+$/);
+    expect(res.headers.get('content-type')).toBe('video/mp4');
     expect((await res.arrayBuffer()).byteLength).toBe(100);
+    const tail = await env.app.request(await signed(project.id, 'proxy.mp4'), { headers: { Range: 'bytes=-10' } });
+    expect((await tail.arrayBuffer()).byteLength).toBe(10);
+    const past = await env.app.request(await signed(project.id, 'proxy.mp4'), { headers: { Range: 'bytes=999999999-' } });
+    expect(past.status).toBe(416);
   });
 
   it('crops a square portrait from one frame, serves it, and leaves the project unsaved', async () => {
     const before = (await store.read(project.id)).version;
-    const res = await app.request(`/api/projects/${project.id}/portraits`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ characterId: 'c-red', sourceTime: 1, x: 0.3, y: 0.2, size: 0.5 }),
-    });
+    const res = await call(`/projects/${project.id}/portraits`, { json: { characterId: 'c-red', sourceTime: 1, x: 0.3, y: 0.2, size: 0.5 } });
     expect(res.status).toBe(200);
     const { file } = (await res.json()) as { file: string };
     expect(file).toMatch(/^portraits\/c-red-[0-9a-f]{8}\.jpg$/);
     const size = await run('ffprobe', ['-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=width,height', '-of', 'csv=p=0', join(dir, file)]);
     expect(size.trim()).toBe('256,256');
-    expect((await app.request(`/api/projects/${project.id}/files/${file}`)).status).toBe(200);
+    expect((await env.app.request(await signed(project.id, file))).status).toBe(200);
     expect((await store.read(project.id)).version).toBe(before);
   });
 
   it('refuses to serve files outside the allowlist', async () => {
     for (const name of ['project.json', 'ingest.json', '..%2F..%2Fetc%2Fpasswd', 'audio.wav']) {
-      const res = await app.request(`/api/projects/${project.id}/files/${name}`);
+      const res = await env.app.request(await signed(project.id, name));
       expect(res.status).toBe(404);
     }
   });
 
   it('is a no-op when re-run on the same file', async () => {
     const before = await mtimes(dir);
-    const res = await app.request(`/api/projects/${project.id}/ingest`, { method: 'POST' });
+    const res = await call(`/projects/${project.id}/ingest`, { method: 'POST' });
     expect(res.status).toBe(202);
-    await queue.whenIdle();
+    await env.jobs.whenIdle();
     const rerun = await store.read(project.id);
 
     expect(rerun.ingest.status).toBe('done');
@@ -191,8 +198,8 @@ describe('ingest', () => {
 
   it('rebuilds only what is missing', async () => {
     await rm(join(dir, 'frames', 'shot-0001.jpg'));
-    await app.request(`/api/projects/${project.id}/ingest`, { method: 'POST' });
-    await queue.whenIdle();
+    await call(`/projects/${project.id}/ingest`, { method: 'POST' });
+    await env.jobs.whenIdle();
     const rerun = await store.read(project.id);
     expect(rerun.ingest.stages.map((s) => [s.name, s.status])).toEqual([
       ['hash', 'cached'],
@@ -205,8 +212,8 @@ describe('ingest', () => {
   });
 
   it('deletes the project', async () => {
-    const res = await app.request(`/api/projects/${project.id}`, { method: 'DELETE' });
+    const res = await call(`/projects/${project.id}`, { method: 'DELETE' });
     expect(res.status).toBe(204);
-    expect((await app.request(`/api/projects/${project.id}`)).status).toBe(404);
+    expect((await call(`/projects/${project.id}`)).status).toBe(404);
   });
 });

@@ -1,33 +1,27 @@
-import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
-import { promisify } from 'node:util';
 import { z } from 'zod';
 import { BoxSchema, FaceRegionSchema, regionsFresh, type FrameRegions, type Moment, type Project, type RegionsResult, type Theme } from '@als/schema';
 import { moveNumbers } from '@als/composition/notation';
 import { autoPlaceCard } from '@als/composition/placement';
-import type { ProjectStore } from '../projects/store.ts';
+import { sourceHash as readSourceHash } from '../ingest/ingest.ts';
+import type { MediaRunner, ProjectRepo } from '../ports.ts';
 import type { AnalysisConfig } from './config.ts';
 import { REGIONS_PROMPT_VERSION, regionsPrompt } from './providers/gemini.ts';
 import type { Providers, RegionContext } from './providers/index.ts';
 
 // Faces and the move's subject on each frozen frame, so cards can be placed
-// clear of them. Answers are cached per frame and prompt beside the project,
+// clear of them. Answers are cached per frame and prompt with the project,
 // so re-runs, undo and a retime back to the same frame cost nothing.
 
-const CACHE = 'analysis/regions-cache.json';
-const CacheSchema = z.record(
-  z.string(),
-  z.object({ faces: z.array(FaceRegionSchema), subject: BoxSchema.optional(), model: z.string() }),
-);
-
-/** Writes to a project's cache one at a time. */
-const cacheLocks = new Map<string, Promise<unknown>>();
+const CachedSchema = z.object({ faces: z.array(FaceRegionSchema), subject: BoxSchema.optional(), model: z.string() });
 
 export interface RegionsDeps {
-  store: ProjectStore;
+  repo: ProjectRepo;
+  media: MediaRunner;
   providers: Providers;
   config: AnalysisConfig;
+  /** Runs before a paid call (a frame not looked at yet); throws to refuse it. */
+  check: () => Promise<void>;
 }
 
 /** The source frame a move freezes on, as the timeline counts it. */
@@ -36,14 +30,14 @@ export const freezeFrame = (project: Project, sourceTime: number) =>
 
 /** Faces and subject on a move's frozen frame: from the cache, or one call. */
 export async function findRegions(deps: RegionsDeps, project: Project, moment: Moment): Promise<RegionsResult> {
-  const { store, providers, config } = deps;
+  const { repo, media, providers, config } = deps;
   const frame = freezeFrame(project, moment.sourceTime);
   const context: RegionContext = {
     moveLabel: moment.moveLabel,
     explanation: moment.explanation,
     actorName: project.context.characters.find((c) => c.id === moment.actorId)?.name,
   };
-  const sourceHash = await readFile(store.file(project.id, 'ingest.json'), 'utf8').then((t) => JSON.parse(t).sourceHash as string);
+  const sourceHash = await readSourceHash(repo, project.id);
   const key = createHash('sha256')
     .update(JSON.stringify([REGIONS_PROMPT_VERSION, config.models.regions, sourceHash, frame, regionsPrompt(context)]))
     .digest('hex');
@@ -53,14 +47,13 @@ export async function findRegions(deps: RegionsDeps, project: Project, moment: M
     ...(found.subject ? { subject: found.subject } : {}),
   });
 
-  const cached = (await readCache(store, project.id))[key];
-  if (cached) return { regions: stamp(cached), model: cached.model, usage: {}, costUsd: 0 };
+  const cached = CachedSchema.safeParse((await repo.getStage(project.id, 'regions', key))?.output);
+  if (cached.success) return { regions: stamp(cached.data), model: cached.data.model, usage: {}, costUsd: 0 };
 
-  const jpeg = await grabFrame(store.file(project.id, project.source.proxy), frame, project.source.fps);
+  await deps.check();
+  const jpeg = await media.frame({ projectId: project.id, file: project.source.proxy, frame, fps: project.source.fps });
   const found = await providers.regions.find(jpeg, context);
-  await editCache(store, project.id, (cache) => {
-    cache[key] = { faces: found.faces, ...(found.subject ? { subject: found.subject } : {}), model: found.model };
-  });
+  await repo.putStage(project.id, 'regions', key, key, { faces: found.faces, ...(found.subject ? { subject: found.subject } : {}), model: found.model });
   return { regions: stamp(found), model: found.model, usage: found.usage, costUsd: found.costUsd };
 }
 
@@ -105,39 +98,3 @@ export async function placeCards(
     calls: spent.filter((r) => r.costUsd > 0).length,
   };
 }
-
-/** One frame of the proxy (same frame numbers as the source) as a JPEG. */
-async function grabFrame(proxyPath: string, frame: number, fps: number): Promise<Buffer> {
-  // Just under the frame's time, so rounding never lands on the next one.
-  const at = Math.max(0, (frame - 0.25) / fps);
-  const { stdout } = await promisify(execFile)(
-    'ffmpeg',
-    ['-hide_banner', '-loglevel', 'error', '-ss', at.toFixed(4), '-i', proxyPath, '-frames:v', '1', '-q:v', '3', '-f', 'mjpeg', '-'],
-    { encoding: 'buffer', maxBuffer: 32 * 1024 * 1024 },
-  );
-  if (!stdout.length) throw new Error(`no frame at ${at.toFixed(3)} s`);
-  return stdout;
-}
-
-async function readCache(store: ProjectStore, id: string): Promise<z.infer<typeof CacheSchema>> {
-  return readFile(store.file(id, CACHE), 'utf8').then(
-    (t) => CacheSchema.parse(JSON.parse(t)),
-    () => ({}),
-  );
-}
-
-function editCache(store: ProjectStore, id: string, change: (cache: z.infer<typeof CacheSchema>) => void): Promise<void> {
-  const next = (cacheLocks.get(id) ?? Promise.resolve())
-    .catch(() => undefined)
-    .then(async () => {
-      const cache = await readCache(store, id);
-      change(cache);
-      const path = store.file(id, CACHE);
-      await mkdir(store.file(id, 'analysis'), { recursive: true });
-      await writeFile(`${path}.tmp`, JSON.stringify(cache));
-      await rename(`${path}.tmp`, path);
-    });
-  cacheLocks.set(id, next);
-  return next;
-}
-

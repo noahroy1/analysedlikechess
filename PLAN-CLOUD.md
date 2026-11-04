@@ -278,8 +278,16 @@ Confirm every "(confirm in C0)" in this file. Record limits and prices in this f
   - signed media URLs
   - Download in place of reveal
 
-- [ ] `pnpm check` and every browser check pass, with no change in behaviour.
-- [ ] A test repeats every mutating call with the same key and gets the same response with one effect.
+- [x] `pnpm check` and every browser check pass, with no change in behaviour. Done Nov 4: 329 tests; every browser check, with render-checks on the default and creator-look samples and a copy of BB1 at the same PSNR as before C1. The only visible change is Download in place of Show in Finder, as planned.
+- [x] A test repeats every mutating call with the same key and gets the same response with one effect. Done Nov 4: `apps/server/src/contract.test.ts`.
+
+**C1 notes (Nov 4):**
+- **Upload:** `POST /projects` returns `{ projectId, upload: { uploadId, partSize, partCount } }`, not the project: a project needs the probed source, so the document is created at complete. Parts are 8 MiB; each part's size is checked; parts answers with the parts already stored (`uploaded`), so a resumed upload skips them (C3: S3 ListParts on R2, or a table). An upload that fails to probe is deleted; one with missing parts keeps what was stored.
+- **Media grants** sign a project's file prefix (`projects/<id>/`) rather than one path, so one grant serves the Player, thumbnails and portraits; the serve path needs no database lookup. Sounds have their own grant; upload parts sign one part each.
+- **Renders:** the same version and size while one runs returns it (200); another size is 409 `job_running` with the running job.
+- **Errors:** `over_cap` is 402; `not_ready` (analysis before ingest) and `job_running` are 409; `missing_keys` 400; `media_url_invalid` 403; `idempotency_key_reused` 422.
+- **Spend:** checked before every paid call, including mid-analysis before each paid stage; logged per call with model, usage and cost; UTC months. Renders log container seconds at $0 until C4 prices them.
+- **Live updates:** one `job` event shape (the `Job` schema) for SSE now and Realtime later; clients read `GET /jobs` on every (re)connect instead of the server sending a snapshot.
 
 **Phase C2: Media service**
 

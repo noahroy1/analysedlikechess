@@ -1,0 +1,16 @@
+{
+  "name": "@als/client",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@als/schema": "workspace:*",
+    "zod": "4.6.5"
+  }
+}

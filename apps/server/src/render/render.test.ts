@@ -74,13 +74,14 @@ describe('render', { timeout: 300_000 }, () => {
     process.chdir(fileURLToPath(new URL('../..', import.meta.url)));
     root = await mkdtemp(join(tmpdir(), 'als-render-'));
     const port = await freePort();
-    const { store, renders, app } = await makeTestApp(root, {}, join(root, 'sounds'), `http://127.0.0.1:${port}`);
-    server = serve({ fetch: app.fetch, port, hostname: '127.0.0.1' });
+    const env = await makeTestApp(root, {}, join(root, 'sounds'), `http://127.0.0.1:${port}`);
+    const { store, jobs, call } = env;
+    server = serve({ fetch: env.app.fetch, port, hostname: '127.0.0.1' });
 
     // The sample fixture with its first two moments.
     const sample = ProjectSchema.parse(JSON.parse(await readFile(fixture('project.json'), 'utf8')));
-    const id = await store.createDir('render');
-    await copyFile(fixture('source.mp4'), store.file(id, 'source.mp4'));
+    const id = await store.newId('render');
+    await copyFile(fixture('source.mp4'), join(env.dir(id), 'source.mp4'));
     project = await store.create({
       ...sample,
       id,
@@ -92,16 +93,12 @@ describe('render', { timeout: 300_000 }, () => {
       ingest: pendingIngest(),
     });
 
-    const started = await app.request(`/api/projects/${id}/renders`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ version: project.version }),
-    });
+    const started = await call(`/projects/${id}/renders`, { json: { version: project.version } });
     expect(started.status).toBe(202);
-    await renders.queue.whenIdle();
-    const list = RenderJobSchema.array().parse(await (await app.request(`/api/projects/${id}/renders`)).json());
+    await jobs.whenIdle();
+    const list = RenderJobSchema.array().parse(await (await call(`/projects/${id}/renders`)).json());
     job = list[0]!;
-    output = store.file(id, job.file);
+    output = join(env.dir(id), job.file);
   }, 300_000);
 
   afterAll(async () => {

@@ -6,10 +6,16 @@ import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
 import { CharacterSchema, MomentSchema, ProjectSchema } from '@als/schema';
 import { pendingIngest, runIngest } from './ingest/ingest.ts';
-import { ProjectStore } from './projects/store.ts';
+import { projectKey } from './ports.ts';
+import { LocalMediaRunner } from './media/local-runner.ts';
+import { FsBlobStore } from './node/fs-blobs.ts';
+import { FsProjectRepo } from './node/fs-repo.ts';
 
 const repo = (path: string) => fileURLToPath(new URL(`../../../${path}`, import.meta.url));
-const store = new ProjectStore(process.env.PROJECTS_DIR ?? repo('projects'));
+const projectsDir = process.env.PROJECTS_DIR ?? repo('projects');
+const store = new FsProjectRepo(projectsDir);
+const blobs = new FsBlobStore({ projectsDir, soundsDir: repo('media/sounds') });
+const media = new LocalMediaRunner(blobs);
 
 const MomentsFileSchema = z.object({
   characters: z.array(CharacterSchema),
@@ -18,8 +24,8 @@ const MomentsFileSchema = z.object({
 
 async function seedSample() {
   const fixture = ProjectSchema.parse(JSON.parse(await readFile(repo('fixtures/sample/project.json'), 'utf8')));
-  const id = await store.createDir('sample');
-  await copyFile(repo('fixtures/sample/source.mp4'), store.file(id, 'source.mp4'));
+  const id = await store.newId('sample');
+  await copyFile(repo('fixtures/sample/source.mp4'), blobs.path(projectKey(id, 'source.mp4')));
   await store.create({
     ...fixture,
     id,
@@ -29,7 +35,7 @@ async function seedSample() {
     shots: undefined,
     ingest: pendingIngest(),
   });
-  const ingest = await runIngest(store, id, () => {});
+  const ingest = await runIngest({ repo: store, blobs, media }, id, () => {});
   console.log(`created ${id} (ingest ${ingest.status})`);
 }
 

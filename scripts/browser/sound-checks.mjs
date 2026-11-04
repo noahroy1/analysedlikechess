@@ -55,7 +55,7 @@ try {
   await page.goto(`http://localhost:5173/#/projects/${projectId}`);
   await page.waitFor(`!!${P} && !!${E}`);
   await sleep(1000);
-  const sounds = await (await fetch('http://localhost:5173/api/sounds')).json();
+  const sounds = await (await fetch('http://localhost:5173/api/v1/sounds')).json();
 
   // 1. The server lists the sounds and serves them.
   {

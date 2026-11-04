@@ -3,8 +3,8 @@ import { useEffect, useRef } from 'react';
 import { findRegions } from '../lib/api.ts';
 import { formatUsd } from '../lib/format.ts';
 import { useEditor, useEditorStore } from './context.tsx';
-import { applyFoundRegions, placeCard } from './doc.ts';
-import type { EditorStore } from './store.ts';
+import { applyFoundRegions, placeCard } from '@als/editor-core';
+import type { EditorStore } from '@als/editor-core';
 
 /** Quiet time after the last change before a moved frame is looked at, so a drag asks once. */
 const SETTLE_MS = 600;

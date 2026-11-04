@@ -2,10 +2,10 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { z } from 'zod';
 import { UsageSchema } from '@als/schema';
-import { costUsd } from '../prices.ts';
-import { GeminiNotesSchema, GeminiRegionsSchema, parseNotes, parseRegions } from './gemini.ts';
-import { parseScribe } from './elevenlabs.ts';
-import { ProviderError, type Analyst, type Providers } from './types.ts';
+import { costUsd } from '../analysis/prices.ts';
+import { GeminiNotesSchema, GeminiRegionsSchema, parseNotes, parseRegions } from '../analysis/providers/gemini.ts';
+import { parseScribe } from '../analysis/providers/elevenlabs.ts';
+import { ProviderError, type Analyst, type Providers } from '../analysis/providers/types.ts';
 
 // Tests never call cloud APIs: they replay one real response per provider,
 // recorded with ANALYSIS_RECORD_DIR. The same replay lets the app run without keys.

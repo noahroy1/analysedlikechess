@@ -3,7 +3,7 @@ import { DEFAULT_START_EVAL, evalFill, evalKeyframes, formatEvalSigned, shotThum
 import { placeKeyframes, sourceFrameToOut, type Hold, type Timeline as TimelineModel } from '@als/composition';
 import { Badge } from '@als/theme';
 import { useEffect, useMemo, useRef, useState, type PointerEvent } from 'react';
-import type { SnapKind } from '../editor/snapping.ts';
+import type { SnapKind } from '@als/editor-core';
 import { fileUrl } from '../lib/api.ts';
 import { formatTime } from '../lib/format.ts';
 import { speakerColor } from './editor/speakers.ts';

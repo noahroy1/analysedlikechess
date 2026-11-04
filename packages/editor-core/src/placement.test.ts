@@ -1,12 +1,12 @@
 import { readFileSync } from 'node:fs';
 import { ProjectSchema, placedByHand, type FrameRegions, type Project } from '@als/schema';
-import { creatorTheme, defaultTheme } from '@als/theme';
+import { creatorTheme, defaultTheme } from '@als/theme/themes';
 import { describe, expect, it, vi } from 'vitest';
 import * as ops from './doc.ts';
 import { createEditorStore } from './store.ts';
 
 const fixture = (): Project =>
-  ProjectSchema.parse(JSON.parse(readFileSync(new URL('../../../../fixtures/sample/project.json', import.meta.url), 'utf8')));
+  ProjectSchema.parse(JSON.parse(readFileSync(new URL('../../../fixtures/sample/project.json', import.meta.url), 'utf8')));
 
 const frame = { width: 1280, height: 720 };
 /** One face top-right, its eyes and mouth in view. */

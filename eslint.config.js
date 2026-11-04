@@ -18,7 +18,7 @@ export default defineConfig(
     languageOptions: { globals: globals.node },
   },
   {
-    files: ['apps/web/**/*.{ts,tsx}', 'packages/composition/**/*.{ts,tsx}', 'packages/theme/**/*.{ts,tsx}'],
+    files: ['apps/web/**/*.{ts,tsx}', 'packages/composition/**/*.{ts,tsx}', 'packages/theme/**/*.{ts,tsx}', 'packages/client/**/*.ts', 'packages/editor-core/**/*.ts'],
     extends: [reactHooks.configs.flat.recommended],
     languageOptions: { globals: globals.browser },
   },

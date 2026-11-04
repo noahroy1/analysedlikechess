@@ -1,7 +1,7 @@
 import { CARD_ANCHORS, NO_BEST_MOVE, autoHoldSec, textCaps, evalWarnings, momentWarnings, placedByHand, regionsFresh, type Card, type Moment } from '@als/schema';
 import { sourceFrameToOut } from '@als/composition';
 import { useState, type ReactNode } from 'react';
-import { deleteMoment, evalBeforeItem, retime, setCardByHand, setMomentEval, updateMoment } from '../../editor/doc.ts';
+import { deleteMoment, evalBeforeItem, retime, setCardByHand, setMomentEval, updateMoment } from '@als/editor-core';
 import { reevaluatePlacement } from '../../editor/placement.ts';
 import { useEditor, useEditorStore, usePlayback } from '../../editor/context.tsx';
 import { formatTime } from '../../lib/format.ts';

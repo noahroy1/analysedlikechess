@@ -2,7 +2,7 @@ import type { Hold, Timeline } from '@als/composition';
 import type { PlayerRef } from '@remotion/player';
 import { createContext, useContext, type ReactNode, type RefObject } from 'react';
 import { useStore } from 'zustand';
-import type { EditorActions, EditorState, EditorStore } from './store.ts';
+import type { EditorActions, EditorState, EditorStore } from '@als/editor-core';
 
 const StoreContext = createContext<EditorStore | null>(null);
 

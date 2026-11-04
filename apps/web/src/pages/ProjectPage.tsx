@@ -2,7 +2,7 @@ import { projectName, type Analysis, type Ingest, type Project } from '@als/sche
 import { useCallback, useEffect, useState } from 'react';
 import { EditorRoot } from '../components/editor/EditorRoot.tsx';
 import { StageList, StatusBadge } from '../components/StageList.tsx';
-import { deleteProject, getProject, rerunIngest } from '../lib/api.ts';
+import { deleteProject, getProject, loadMedia, mediaExpiresAt, rerunIngest } from '../lib/api.ts';
 import { formatFps, formatTime } from '../lib/format.ts';
 import { projectsHref } from '../lib/router.ts';
 import { useProjectEvents } from '../lib/useProjectEvents.ts';
@@ -17,11 +17,14 @@ export function ProjectPage({ id }: { id: string }) {
   const [ingest, setIngest] = useState<Ingest | null>(null);
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /** When the media URLs in use expire; a new value re-renders everything that builds them. */
+  const [mediaUntil, setMediaUntil] = useState<string | undefined>();
 
   const load = useCallback(
     () =>
-      getProject(id)
-        .then((p) => {
+      Promise.all([getProject(id), loadMedia(id)])
+        .then(([p]) => {
+          setMediaUntil(mediaExpiresAt(id));
           setProject(p);
           setIngest(p.ingest);
           setAnalysis(p.analysis);
@@ -33,6 +36,16 @@ export function ProjectPage({ id }: { id: string }) {
   useEffect(() => {
     void load();
   }, [load]);
+
+  // Signed media URLs last 6 h: fetch new ones an hour before, which re-renders the Player's sources.
+  useEffect(() => {
+    if (!mediaUntil) return;
+    const refreshIn = Math.max(60_000, Date.parse(mediaUntil) - Date.now() - 60 * 60 * 1000);
+    const timer = setTimeout(() => {
+      void loadMedia(id).then(() => setMediaUntil(mediaExpiresAt(id)), () => undefined);
+    }, refreshIn);
+    return () => clearTimeout(timer);
+  }, [id, mediaUntil]);
 
   useProjectEvents({
     ingest: (event) => {

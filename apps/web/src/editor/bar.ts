@@ -1,6 +1,6 @@
 import { evaluateTrack } from '../lib/api.ts';
-import { addBeat, applyEvaluation } from './doc.ts';
-import type { EditorStore } from './store.ts';
+import { addBeat, applyEvaluation } from '@als/editor-core';
+import type { EditorStore } from '@als/editor-core';
 
 /** Adds a beat at a source time, holding the bar's current value, and selects it. */
 export function addBeatAt(store: EditorStore, sourceSec: number) {

@@ -3,7 +3,7 @@ import { sourceFrameToOut, timeMapFrame } from '@als/composition';
 import { useRef, useState, type ReactNode } from 'react';
 import { addBeatAt, reevaluateBar } from '../../editor/bar.ts';
 import { useEditor, useEditorStore, usePlayback } from '../../editor/context.tsx';
-import { deleteBeat, evalBeforeItem, setStartEval, updateBeat } from '../../editor/doc.ts';
+import { deleteBeat, evalBeforeItem, setStartEval, updateBeat } from '@als/editor-core';
 import { formatTime } from '../../lib/format.ts';
 import { Field, SecondsInput } from './fields.tsx';
 

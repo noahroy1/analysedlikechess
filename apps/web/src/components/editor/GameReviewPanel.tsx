@@ -2,7 +2,7 @@ import { DEFAULT_ACCURACY, gameResult, reviewSummary } from '@als/schema';
 import { barPlayers } from '@als/composition';
 import { useRef, useState } from 'react';
 import { useEditor, useEditorStore, usePlayback } from '../../editor/context.tsx';
-import { setReviewAccuracy, setReviewSummary } from '../../editor/doc.ts';
+import { setReviewAccuracy, setReviewSummary } from '@als/editor-core';
 import { Field } from './fields.tsx';
 
 const SUMMARY_CAP = 160;

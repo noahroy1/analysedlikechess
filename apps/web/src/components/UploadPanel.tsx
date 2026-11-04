@@ -21,7 +21,11 @@ export function UploadPanel() {
     try {
       const project = await uploadClip(
         file,
-        { movieTitle: movieTitle.trim(), sceneNote: sceneNote.trim(), characters: characters.trim() },
+        {
+          ...(movieTitle.trim() ? { movieTitle: movieTitle.trim() } : {}),
+          ...(sceneNote.trim() ? { sceneNote: sceneNote.trim() } : {}),
+          characters: [...new Set(characters.split(',').map((n) => n.trim()).filter(Boolean))],
+        },
         setProgress,
       );
       window.location.hash = projectHref(project.id);

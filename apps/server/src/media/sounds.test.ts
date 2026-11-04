@@ -27,24 +27,29 @@ afterAll(() => rm(root, { recursive: true, force: true }));
 
 describe('SoundLibrary', () => {
   it('lists the known sounds with their lengths, and nothing else', async () => {
-    const bank = await new SoundLibrary(dir).bank();
+    const bank = await new SoundLibrary(dir).bank((file) => `/s/${file}`);
     expect(Object.keys(bank).sort()).toEqual(['move-self', 'typing-end']);
-    expect(bank['typing-end']).toEqual({ src: '/api/sounds/typing-end.wav', durationSec: expect.closeTo(1.5, 1) });
+    expect(bank['typing-end']).toEqual({ src: '/s/typing-end.wav', durationSec: expect.closeTo(1.5, 1) });
     expect(bank['move-self']!.durationSec).toBeGreaterThan(0.1);
   });
 
   it('is empty without a folder', async () => {
-    expect(await new SoundLibrary(join(root, 'missing')).bank()).toEqual({});
+    expect(await new SoundLibrary(join(root, 'missing')).bank(String)).toEqual({});
   });
 
-  it('serves only sound files', async () => {
-    const { app } = await makeTestApp(root, {}, dir);
-    const bank = SoundBankSchema.parse(await (await app.request('/api/sounds')).json());
-    expect(bank['move-self']?.src).toBe('/api/sounds/move-self.mp3');
-    const file = await app.request('/api/sounds/move-self.mp3');
+  it('serves only sound files, at signed URLs', async () => {
+    const { app, call } = await makeTestApp(root, {}, dir);
+    const bank = SoundBankSchema.parse(await (await call('/sounds')).json());
+    const src = bank['move-self']!.src;
+    expect(src).toMatch(/^\/api\/v1\/sounds\/move-self\.mp3\?u=local&exp=\d+&sig=/);
+    const file = await app.request(src);
     expect(file.status).toBe(200);
+    expect(file.headers.get('content-type')).toBe('audio/mpeg');
     expect((await file.arrayBuffer()).byteLength).toBeGreaterThan(0);
-    expect((await app.request('/api/sounds/not-a-sound.wav')).status).toBe(404);
-    expect((await app.request('/api/sounds/..%2Fsounds%2Fmove-self.mp3')).status).toBe(404);
+    const query = src.slice(src.indexOf('?'));
+    expect((await app.request('/api/v1/sounds/move-self.mp3')).status).toBe(403);
+    expect((await app.request(`/api/v1/sounds/typing-end.wav${query.replace(/sig=[^&]+/, 'sig=forged')}`)).status).toBe(403);
+    expect((await app.request(`/api/v1/sounds/not-a-sound.wav${query}`)).status).toBe(404);
+    expect((await app.request(`/api/v1/sounds/..%2Fsounds%2Fmove-self.mp3${query}`)).status).toBe(404);
   });
 });

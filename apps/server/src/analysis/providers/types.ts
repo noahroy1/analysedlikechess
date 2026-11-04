@@ -12,7 +12,8 @@ export interface TranscribeResult {
 }
 
 export interface Transcriber {
-  transcribe(audioPath: string, options: { keyterms: string[]; durationSec: number }): Promise<TranscribeResult>;
+  /** `audio` is the clip's mono 16 kHz WAV. */
+  transcribe(audio: Blob, options: { keyterms: string[]; durationSec: number }): Promise<TranscribeResult>;
 }
 
 export interface SceneContext {
@@ -29,7 +30,8 @@ export interface DescribeResult {
 }
 
 export interface SceneDescriber {
-  describe(videoPath: string, options: { durationSec: number; context: SceneContext }): Promise<DescribeResult>;
+  /** `video` is the proxy MP4. */
+  describe(video: Blob, options: { durationSec: number; context: SceneContext }): Promise<DescribeResult>;
 }
 
 /** The move a frozen frame belongs to, so the finder knows what its subject is. */
@@ -49,7 +51,7 @@ export interface FindRegionsResult {
 
 /** Faces and the move's subject on one still frame (a JPEG), for placing its card. */
 export interface RegionFinder {
-  find(jpeg: Buffer, context: RegionContext): Promise<FindRegionsResult>;
+  find(jpeg: Uint8Array, context: RegionContext): Promise<FindRegionsResult>;
 }
 
 /** Which call this is, so recorded responses can be replayed per call. */

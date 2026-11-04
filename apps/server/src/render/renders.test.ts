@@ -10,27 +10,23 @@ import { renderId } from './renders.ts';
 const FIXTURE = new URL('../../../../fixtures/sample/project.json', import.meta.url);
 
 const root = await mkdtemp(join(tmpdir(), 'als-renders-'));
-const { store, app } = await makeTestApp(root);
+const { store, call } = await makeTestApp(root);
 let project: Project;
 
 afterAll(() => rm(root, { recursive: true, force: true }));
 
 beforeEach(async () => {
   const fixture = ProjectSchema.parse(JSON.parse(await readFile(FIXTURE, 'utf8')));
-  const id = await store.createDir('renders');
+  const id = await store.newId('renders');
   project = await store.create({ ...fixture, id, version: 3 });
 });
 
 const post = (body: unknown) =>
-  app.request(`/api/projects/${project.id}/renders`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(body),
-  });
+  call(`/projects/${project.id}/renders`, { json: body });
 
 describe('render requests', () => {
   it('lists no renders for a new project', async () => {
-    const res = await app.request(`/api/projects/${project.id}/renders`);
+    const res = await call(`/projects/${project.id}/renders`);
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual([]);
   });
@@ -38,7 +34,7 @@ describe('render requests', () => {
   it('renders only the current saved version', async () => {
     const res = await post({ version: 2 });
     expect(res.status).toBe(409);
-    expect(await res.json()).toMatchObject({ current: 3 });
+    expect(await res.json()).toMatchObject({ code: 'version_conflict', current: 3 });
   });
 
   it('refuses a size the clip does not scale to evenly', async () => {
@@ -47,12 +43,12 @@ describe('render requests', () => {
     });
     const res = await post({ version: 4, preset: '1080p' });
     expect(res.status).toBe(400);
-    expect(await res.json()).toMatchObject({ error: expect.stringMatching(/1080p/) });
+    expect(await res.json()).toMatchObject({ code: 'render_preset', error: expect.stringMatching(/1080p/) });
   });
 
   it('404s an unknown render or project', async () => {
-    expect((await app.request(`/api/projects/${project.id}/renders/v1-20260101-000000/cancel`, { method: 'POST' })).status).toBe(404);
-    expect((await app.request('/api/projects/nope/renders')).status).toBe(404);
+    expect((await call(`/projects/${project.id}/renders/v1-20260101-000000/cancel`, { method: 'POST' })).status).toBe(404);
+    expect((await call('/projects/nope/renders')).status).toBe(404);
   });
 });
 

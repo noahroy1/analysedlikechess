@@ -3,11 +3,11 @@ import { Episode, buildTimeline, cardSettledFrame, sourceFrameToOut, timeMapFram
 import { Player, type PlayerRef } from '@remotion/player';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { addBeatAt } from '../../editor/bar.ts';
-import { EditError, addMoment, deleteBeat, deleteMoment, retime, setClassification, setPortrait, setStatus } from '../../editor/doc.ts';
+import { EditError, addMoment, deleteBeat, deleteMoment, retime, setClassification, setPortrait, setStatus } from '@als/editor-core';
 import { PlaybackProvider, useEditor, useEditorStore, type Playback } from '../../editor/context.tsx';
 import { useAutoPlacement } from '../../editor/placement.ts';
-import { snapTime } from '../../editor/snapping.ts';
-import { createPortrait, fileUrl, getSoundBank } from '../../lib/api.ts';
+import { snapTime } from '@als/editor-core';
+import { createPortrait, fileUrl, getSoundBank, mediaExpiresAt } from '../../lib/api.ts';
 import { formatTime } from '../../lib/format.ts';
 import { adjacentHold, holdStopFrame, reviewStop, type PlaybackMode } from '../../lib/playback.ts';
 import { ShotStrip } from '../ShotStrip.tsx';
@@ -71,13 +71,16 @@ export function Workspace({ left, right }: WorkspaceProps) {
     [project.transcript, shots, fps],
   );
 
+  // New signed URLs (every few hours) are a new source for the Player.
+  const mediaUntil = mediaExpiresAt(project.id);
   const inputProps = useMemo<EpisodeProps>(
     () =>
       episodeProps(
         { durationSec: source.durationSec, moments, characters, evalBar, evalBarScale, subtitles: editedSubtitles, transcript: project.transcript, gameReview },
         { src: fileUrl(project.id, source.proxy), theme, fileUrl: (file) => fileUrl(project.id, file), sounds },
       ),
-    [project.id, source.proxy, source.durationSec, moments, characters, theme, evalBar, evalBarScale, sounds, editedSubtitles, project.transcript, gameReview],
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mediaUntil changes what fileUrl returns
+    [project.id, mediaUntil, source.proxy, source.durationSec, moments, characters, theme, evalBar, evalBarScale, sounds, editedSubtitles, project.transcript, gameReview],
   );
 
   // Handlers attached once read the latest values here.

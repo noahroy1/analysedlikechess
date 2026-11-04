@@ -1,6 +1,4 @@
 import { createHash } from 'node:crypto';
-import { mkdir, readFile, rename, stat, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
 import { z } from 'zod';
 import {
   DEFAULT_START_EVAL,
@@ -22,7 +20,8 @@ import {
   type Usage,
 } from '@als/schema';
 import { getTheme } from '@als/theme/themes';
-import type { ProjectStore } from '../projects/store.ts';
+import { AUDIO_FILE, sourceHash as readSourceHash } from '../ingest/ingest.ts';
+import { HINTS_STAGE, projectKey, type BlobStore, type MediaRunner, type ProjectRepo, type UsageLog } from '../ports.ts';
 import type { AnalysisConfig } from './config.ts';
 import { applyEvaluation, evaluationItems, placeBeats } from './evaluate.ts';
 import { annotationTask, decisionPointsTask, evaluationTask, speakerNamingTask, systemPrompt, targetMoveCount } from './prompts.ts';
@@ -49,10 +48,20 @@ const NAMING_SYSTEM =
   'You identify who is speaking in film scenes from transcripts and scene notes. Answer only with the requested JSON.';
 
 export interface AnalysisDeps {
-  store: ProjectStore;
+  repo: ProjectRepo;
+  blobs: BlobStore;
+  media: MediaRunner;
   providers: Providers;
   config: AnalysisConfig;
   style: StyleCorpus;
+  usage: UsageLog;
+}
+
+/** Who a run spends for, and the check that runs before each paid call. */
+export interface Payer {
+  userId: string;
+  /** Throws (e.g. OverCapError) when the call must not be made. */
+  check: () => Promise<void>;
 }
 
 export interface AnalysisOptions {
@@ -67,15 +76,6 @@ export const pendingAnalysis = (previous: Analysis): Analysis => ({
   ...(previous.secondsPerMove ? { secondsPerMove: previous.secondsPerMove } : {}),
 });
 
-const ManifestSchema = z.object({
-  keys: z.partialRecord(z.enum(ANALYSIS_STAGES), z.string()),
-  /**
-   * Character names given to perception as spelling and identity hints, captured
-   * on its first run. Speaker naming adds names later; reusing the captured hints
-   * keeps re-runs of the Analyst from redoing transcription and scene notes.
-   */
-  perceptionHints: z.array(z.string()).optional(),
-});
 const cacheKey = (...parts: unknown[]) => createHash('sha256').update(JSON.stringify(parts)).digest('hex');
 
 interface StepResult<T> {
@@ -94,17 +94,11 @@ export async function runAnalysis(
   deps: AnalysisDeps,
   id: string,
   options: AnalysisOptions,
+  payer: Payer,
   onUpdate: (analysis: Analysis) => void,
 ): Promise<Analysis> {
-  const { store, providers, config, style } = deps;
-  const dir = store.file(id, 'analysis');
-  await mkdir(dir, { recursive: true });
-  const manifestPath = join(dir, 'manifest.json');
-  const manifest = await readFile(manifestPath, 'utf8')
-    .then((t) => ManifestSchema.parse(JSON.parse(t)))
-    .catch(() => ({ keys: {} }) as z.infer<typeof ManifestSchema>);
-
-  let project = await store.read(id);
+  const { repo, blobs, providers, config, style, usage } = deps;
+  let project = await repo.read(id);
   const analysis: Analysis = { ...pendingAnalysis(project.analysis), status: 'running', models: {} };
   const stageOf = (name: StageName) => analysis.stages.find((s) => s.name === name)!;
   const emit = () => {
@@ -114,7 +108,7 @@ export async function runAnalysis(
   // Persisted only at checkpoints; live progress goes over SSE, so an editor
   // that is open meanwhile is not forced to reload at every stage.
   const persist = async (change?: (p: Project) => void, snapshot = false) => {
-    project = await store.update(
+    project = await repo.update(
       id,
       (p) => {
         change?.(p);
@@ -129,12 +123,12 @@ export async function runAnalysis(
   const force = (name: StageName) =>
     options.rerun === 'all' || (options.rerun === 'analyst' && (name === 'decisions' || name === 'annotate' || name === 'evaluate'));
 
-  /** Runs one step unless its key matches the last run and its output is on disk. */
+  /** Runs one (paid) step unless its key matches the last run and its output is stored. */
   async function step<T>(name: StageName, key: string, schema: z.ZodType<T>, work: () => Promise<StepResult<T>>): Promise<T> {
     const stage: Stage = stageOf(name);
-    const file = join(dir, `${name}.json`);
-    if (!force(name) && manifest.keys[name] === key) {
-      const cached = await readFile(file, 'utf8').then((t) => schema.safeParse(JSON.parse(t)), () => undefined);
+    if (!force(name)) {
+      const stored = await repo.getStage(id, 'analysis', name);
+      const cached = stored?.key === key ? schema.safeParse(stored.output) : undefined;
       if (cached?.success) {
         stage.status = 'cached';
         emit();
@@ -143,12 +137,13 @@ export async function runAnalysis(
     }
     stage.status = 'running';
     emit();
+    await payer.check();
     const started = performance.now();
     const result = await work();
-    await writeFile(`${file}.tmp`, `${JSON.stringify(result.value, null, 2)}\n`);
-    await rename(`${file}.tmp`, file);
-    manifest.keys[name] = key;
-    await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+    await repo.putStage(id, 'analysis', name, key, result.value);
+    if (result.costUsd !== undefined) {
+      await usage.record({ userId: payer.userId, projectId: id, call: `analysis.${name}`, model: result.model, usage: result.usage, costUsd: result.costUsd });
+    }
     Object.assign(stage, {
       status: 'done',
       durationMs: Math.round(performance.now() - started),
@@ -168,23 +163,29 @@ export async function runAnalysis(
 
   try {
     if (project.ingest.status !== 'done') throw new Error('Ingest has not finished');
-    const sourceHash = await readFile(store.file(id, 'ingest.json'), 'utf8').then((t) => JSON.parse(t).sourceHash as string);
+    const sourceHash = await readSourceHash(repo, id);
     const { durationSec, hasAudio } = project.source;
     const typedNames = project.context.characters.map((c) => c.name).filter(Boolean);
-    if (options.rerun === 'all' || !manifest.perceptionHints) manifest.perceptionHints = typedNames;
-    const hints = manifest.perceptionHints;
-    const audioPath = store.file(id, 'audio.wav');
+    // Character names given to perception as spelling and identity hints, captured on its first run.
+    // Speaker naming adds names later; reusing the captured hints keeps re-runs of the Analyst from
+    // redoing transcription and scene notes.
+    const storedHints = z.array(z.string()).safeParse((await repo.getStage(id, 'analysis', HINTS_STAGE))?.output);
+    const hints = options.rerun === 'all' || !storedHints.success ? typedNames : storedHints.data;
+    if (!storedHints.success || options.rerun === 'all') await repo.putStage(id, 'analysis', HINTS_STAGE, '', hints);
+    const audioKey = projectKey(id, AUDIO_FILE);
 
     // Stage 2: perception, in parallel.
     // Both run to completion even if one fails, so the other's paid result is cached for the retry.
     const transcribing =
-      hasAudio && (await exists(audioPath))
+      hasAudio && (await blobs.head(audioKey))
         ? step(
             'transcribe',
             cacheKey('transcribe', STEP_VERSION.transcribe, sourceHash, config.models.transcriber, hints),
             TranscriptSchema,
             async () => {
-              const r = await providers.transcriber.transcribe(audioPath, { keyterms: hints, durationSec });
+              const audio = await blobs.blob(audioKey, 'audio/wav');
+              if (!audio) throw new Error('The clip has no extracted audio; re-run ingest');
+              const r = await providers.transcriber.transcribe(audio, { keyterms: hints, durationSec });
               return { value: r.transcript, model: r.model, usage: r.usage, costUsd: r.costUsd };
             },
           )
@@ -194,7 +195,9 @@ export async function runAnalysis(
         cacheKey('describe', STEP_VERSION.describe, sourceHash, config.models.scene, config.sceneFps, project.context.movieTitle, project.context.sceneNote, hints),
         z.array(SceneNoteSchema),
         async () => {
-          const r = await providers.describer.describe(store.file(id, project.source.proxy), {
+          const video = await blobs.blob(projectKey(id, project.source.proxy), 'video/mp4');
+          if (!video) throw new Error('The clip has no proxy; re-run ingest');
+          const r = await providers.describer.describe(video, {
             durationSec,
             context: { movieTitle: project.context.movieTitle, sceneNote: project.context.sceneNote, characterNames: hints },
           });
@@ -314,7 +317,10 @@ export async function runAnalysis(
     emit();
     try {
       const started = performance.now();
-      const placed = await placeCards({ store, providers, config }, project, getTheme(project.themeId));
+      const placed = await placeCards({ repo, media: deps.media, providers, config, check: payer.check }, project, getTheme(project.themeId));
+      if (placed.costUsd > 0) {
+        await usage.record({ userId: payer.userId, projectId: id, call: 'analysis.place', model: placed.model, usage: placed.usage, costUsd: placed.costUsd });
+      }
       Object.assign(placeStage, {
         status: 'done',
         durationMs: Math.round(performance.now() - started),
@@ -398,12 +404,6 @@ function totalCost(analysis: Analysis): number {
 }
 
 const round6 = (n: number) => Math.round(n * 1e6) / 1e6;
-
-const exists = (path: string) =>
-  stat(path).then(
-    () => true,
-    () => false,
-  );
 
 /** Gives each unassigned label to the named character, creating characters as needed. */
 export function assignSpeakers(

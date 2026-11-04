@@ -1,4 +1,3 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import {
   NO_BEST_MOVE,
   MoveDraftSchema,
@@ -9,7 +8,6 @@ import {
   type Project,
   type RegenerateResult,
 } from '@als/schema';
-import type { ProjectStore } from '../projects/store.ts';
 import type { AnalysisConfig } from './config.ts';
 import { regenerateTask, systemPrompt } from './prompts.ts';
 import type { Providers } from './providers/index.ts';
@@ -19,10 +17,10 @@ import { speakerName, timelineText } from './timeline-text.ts';
 /**
  * Pass B for one moment, on the faster model: Regenerate, and drafting text
  * for "Make this a move". Returns a proposal; nothing is saved to the project,
- * so an open editor is never forced to reload. Spend is logged beside it.
+ * so an open editor is never forced to reload. The caller logs the spend.
  */
 export async function regenerateMoment(
-  deps: { store: ProjectStore; providers: Providers; config: AnalysisConfig; style: StyleCorpus },
+  deps: { providers: Providers; config: AnalysisConfig; style: StyleCorpus },
   project: Project,
   moment: Moment,
   instruction?: string,
@@ -47,31 +45,5 @@ export async function regenerateMoment(
   });
   const classification = relabelLateBook(result.output.classification, moment.sourceTime, format);
   const draft = { ...result.output, classification, bestMove: NO_BEST_MOVE.has(classification) ? null : result.output.bestMove };
-  await logUsage(deps.store, project.id, 'regenerate', result.costUsd);
   return { draft, model: result.model, usage: result.usage, costUsd: result.costUsd };
-}
-
-/** Spend of the editor's own AI calls, which never write project.json: one log per kind beside the project. */
-export interface EditorUsage {
-  count: number;
-  costUsd: number;
-}
-
-export type EditorCall = 'regenerate' | 'evaluate' | 'regions';
-
-const usageFile = (store: ProjectStore, id: string, kind: EditorCall) => store.file(id, `analysis/${kind}-usage.json`);
-
-export async function readUsage(store: ProjectStore, id: string, kind: EditorCall): Promise<EditorUsage> {
-  return readFile(usageFile(store, id, kind), 'utf8')
-    .then((t) => JSON.parse(t) as EditorUsage)
-    .catch(() => ({ count: 0, costUsd: 0 }));
-}
-
-export async function logUsage(store: ProjectStore, id: string, kind: EditorCall, costUsd: number) {
-  const usage = await readUsage(store, id, kind);
-  await mkdir(store.file(id, 'analysis'), { recursive: true });
-  await writeFile(
-    usageFile(store, id, kind),
-    JSON.stringify({ count: usage.count + 1, costUsd: Math.round((usage.costUsd + costUsd) * 1e6) / 1e6 }),
-  );
 }
