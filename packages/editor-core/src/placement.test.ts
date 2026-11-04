@@ -60,6 +60,18 @@ describe('card placement in the document', () => {
   });
 });
 
+describe('the project look', () => {
+  it('moves a project on the default look onto the creator look, its automatic card refitted', () => {
+    const doc = placedDoc();
+    expect(doc.themeId).toBe('default');
+    const adopted = ops.adoptProjectLook(doc, frame);
+    expect(adopted.themeId).toBe(creatorTheme.id);
+    expect(m1(adopted).card).toEqual(m1(ops.placeCard(ops.setTheme(doc, creatorTheme.id), 'm1', regionsAt(m1(doc).sourceTime), creatorTheme, frame)).card);
+    // Already on it: nothing changes.
+    expect(ops.adoptProjectLook(adopted, frame)).toBe(adopted);
+  });
+});
+
 describe('amend', () => {
   it('folds a placement into the retime that caused it: one undo takes back both', () => {
     const project = { ...fixture(), moments: placedDoc().moments };

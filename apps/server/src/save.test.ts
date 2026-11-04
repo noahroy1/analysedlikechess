@@ -94,6 +94,15 @@ describe('history', () => {
     expect(restored.moments[0]!.moveLabel).toBe('Good edit');
   });
 
+  it('keeps the current look when restoring a version saved on another', async () => {
+    await put({ ...edit(1, 'Old look'), themeId: 'default' });
+    await put({ ...edit(2, 'New look'), themeId: 'creator' });
+    expect((await call(`/projects/${project.id}/history/2/restore`, { json: { version: 3 } })).status).toBe(200);
+    const restored = await store.read(project.id);
+    expect(restored.moments[0]!.moveLabel).toBe('Old look');
+    expect(restored.themeId).toBe('creator');
+  });
+
   it('404s for a version that is not kept', async () => {
     const res = await call(`/projects/${project.id}/history/99/restore`, { json: { version: 1 } });
     expect(res.status).toBe(404);

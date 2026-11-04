@@ -289,7 +289,7 @@ Confirm every "(confirm in C0)" in this file. Record limits and prices in this f
 - **Spend:** checked before every paid call, including mid-analysis before each paid stage; logged per call with model, usage and cost; UTC months. Renders log container seconds at $0 until C4 prices them.
 - **Live updates:** one `job` event shape (the `Job` schema) for SSE now and Realtime later; clients read `GET /jobs` on every (re)connect instead of the server sending a snapshot.
 
-**Phase C2: Media service**
+**Phase C2: Media service** (next; the starting state and open choices are in `CLAUDE.md`, "Next action")
 
 Move ffmpeg and Remotion into `apps/media` behind its HTTP API, and package its Container image. The Node server calls it through `MediaRunner`.
 

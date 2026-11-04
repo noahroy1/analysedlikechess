@@ -110,12 +110,9 @@ try {
 
   // 5. A new look moves only automatic cards.
   const others = await state(`s.doc.moments.filter((m) => m.id !== '${id}').map((m) => m.card)`);
-  await page.eval(`(() => {
-    const select = document.querySelector('[data-testid=theme-picker]');
-    Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(select, 'creator');
-    select.dispatchEvent(new Event('change', { bubbles: true }));
-  })()`);
-  await page.waitFor(`${E}.getState().doc.themeId === 'creator'`);
+  // Projects open on the creator look, so the switch is to the internal default look (dev hook).
+  await page.eval(`window.__alsSetLook('default')`);
+  await page.waitFor(`${E}.getState().doc.themeId === 'default'`);
   const themed = await card();
   const othersAfter = await state(`s.doc.moments.filter((m) => m.id !== '${id}').map((m) => m.card)`);
   result(
@@ -127,11 +124,7 @@ try {
   // 6. The size estimate against the drawn card, for every move, in both looks.
   const rows = [];
   for (const look of ['creator', 'default']) {
-    await page.eval(`(() => {
-      const select = document.querySelector('[data-testid=theme-picker]');
-      Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(select, '${look}');
-      select.dispatchEvent(new Event('change', { bubbles: true }));
-    })()`);
+    await page.eval(`window.__alsSetLook('${look}')`);
     await sleep(400);
     const theme = getTheme(look);
     const doc = await state(`({ moments: s.doc.moments, characters: s.doc.characters, width: s.project.source.width, height: s.project.source.height })`);

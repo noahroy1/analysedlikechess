@@ -23,6 +23,7 @@ import {
 } from '@als/schema';
 import { moveNumbers } from '@als/composition/notation';
 import { autoPlaceCard } from '@als/composition/placement';
+import { PROJECT_THEME_ID, getTheme } from '@als/theme/themes';
 
 /** The part of a project the editor changes: its name, the annotation track, the cast, the look, the format, the evaluation bar, the subtitles and the game review. */
 export interface Doc {
@@ -234,9 +235,20 @@ export function replaceAutoCards(doc: Doc, theme: Theme, frame: FrameSize): Doc 
   );
 }
 
-/** Switches the project's look; unlocked holds follow the new theme's timing. */
+/** Switches the project's look; unlocked holds follow the new theme's timing. Internal: users get one look (see adoptProjectLook). */
 export function setTheme(doc: Doc, themeId: string): Doc {
   return doc.themeId === themeId ? doc : { ...doc, themeId };
+}
+
+/** A look with its automatic cards moved to fit its card and badge. */
+export function switchLook(doc: Doc, themeId: string, frame: FrameSize): Doc {
+  if (doc.themeId === themeId) return doc;
+  return replaceAutoCards(setTheme(doc, themeId), getTheme(themeId), frame);
+}
+
+/** Moves a project on another look (older projects were made on `default`) onto the one look projects use. */
+export function adoptProjectLook(doc: Doc, frame: FrameSize): Doc {
+  return switchLook(doc, PROJECT_THEME_ID, frame);
 }
 
 /** Switches between short- and long-form; unlocked holds follow the new format's reread. */

@@ -1,8 +1,8 @@
 import { EVAL_BAR_SCALES, FORMATS, FORMAT_RULES, guessFormat, projectName, type Analysis, type EvalBarScale, type Format, type HistoryEntry, type Ingest, type Project } from '@als/schema';
 import { useEffect, useRef, useState } from 'react';
-import { THEMES, getTheme } from '@als/theme';
+import { PROJECT_THEME_ID, getTheme } from '@als/theme';
 import { EditorProvider, useEditor, useEditorStore } from '../../editor/context.tsx';
-import { replaceAutoCards, setEvalBarScale, setFormat, setTheme, setTitle } from '@als/editor-core';
+import { adoptProjectLook, replaceAutoCards, setEvalBarScale, setFormat, setTitle, switchLook } from '@als/editor-core';
 import { createEditorStore, type EditorStore, type SaveStatus } from '@als/editor-core';
 import { getProject, listHistory, restoreVersion, saveProject } from '../../lib/api.ts';
 import { formatFps, formatTime } from '../../lib/format.ts';
@@ -40,6 +40,16 @@ export function EditorRoot({ project, ingest, analysis, onAnalysisChange, onReru
   // Save anything pending when leaving; warn if the tab closes mid-save.
   useEffect(() => {
     store.getState().activate();
+    const { width, height } = store.getState().project.source;
+    const frame = { width, height };
+    // Projects use one look. One made on another (older projects used `default`) moves onto it once,
+    // as a plain save rather than an undo step, so undo can't bring the old look back.
+    if (store.getState().doc.themeId !== PROJECT_THEME_ID) {
+      store.getState().amend((d) => adoptProjectLook(d, frame));
+      store.getState().notify(`This project now uses the ${getTheme(PROJECT_THEME_ID).name} look.`);
+    }
+    // Dev only: the other looks stay reachable for the browser checks, never from the UI.
+    if (import.meta.env.DEV) Object.assign(window, { __alsSetLook: (id: string) => store.getState().edit((d) => switchLook(d, id, frame)) });
     const onBeforeUnload = (e: BeforeUnloadEvent) => {
       const status = store.getState().saveStatus;
       if (status === 'pending' || status === 'saving') {
@@ -140,7 +150,6 @@ function Header({ ingest, analysis, onRerunIngest, onDelete }: Omit<EditorRootPr
             Redo
           </HeaderButton>
         </div>
-        <ThemePicker />
         <FormatPicker />
         <BarSizePicker />
         <HistoryMenu />
@@ -183,31 +192,6 @@ function SaveIndicator() {
 }
 
 /** The last 20 saved versions; restoring one saves it as the newest. */
-/** The project's look: cards, badges, timing and holds all follow it. Undoable like any edit. */
-function ThemePicker() {
-  const store = useEditorStore();
-  const themeId = useEditor((s) => s.doc.themeId);
-  const { width, height } = useEditor((s) => s.project.source);
-  return (
-    <label className="flex items-center gap-1.5 text-xs text-neutral-400" title="Card look (holds follow its timing)">
-      Look
-      <select
-        value={themeId}
-        data-testid="theme-picker"
-        // Cards placed automatically move to fit the new look's card and badge.
-        onChange={(e) => store.getState().edit((d) => replaceAutoCards(setTheme(d, e.target.value), getTheme(e.target.value), { width, height }))}
-        className="rounded-md border border-neutral-700 bg-neutral-900 px-2 py-1 text-xs text-neutral-200"
-      >
-        {THEMES.map((t) => (
-          <option key={t.id} value={t.id}>
-            {t.name}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
-}
-
 /**
  * Short- or long-form: cadence, text length and hold times for analysis, and
  * the reread of every unlocked hold. Starts from the clip's shape. Undoable.

@@ -127,12 +127,11 @@ try {
   };
 
   // 2-4 under the default look (badge in the card), then the creator's (badge pops at 0.3 s).
+  // Projects open on the creator look; the internal default look is reached through the dev hook.
+  await page.eval(`window.__alsSetLook('default')`);
+  await sleep(500);
   await playThrough('default');
-  await page.eval(`(() => {
-    const sel = document.querySelector('[data-testid=theme-picker]');
-    Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(sel, 'creator');
-    sel.dispatchEvent(new Event('change', { bubbles: true }));
-  })()`);
+  await page.eval(`window.__alsSetLook('creator')`);
   await sleep(500);
   await playThrough('creator');
 

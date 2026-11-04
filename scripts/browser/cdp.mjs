@@ -90,7 +90,11 @@ export async function launch({ port = 9333, profile, width = 1500, height = 1300
       const r = await send('Page.captureScreenshot', { format: 'png', ...(clip ? { clip: { ...clip, scale: 1 } } : {}) });
       writeFileSync(path, Buffer.from(r.data, 'base64'));
     },
-    close() {
+    async close() {
+      // Close the tab too: when a browser from an earlier run is still up on this port, the tab would
+      // otherwise stay open, holding its event stream and media connections to the dev server
+      // (Chrome allows 6 per host), and later checks stall waiting for media.
+      await fetch(`http://127.0.0.1:${port}/json/close/${target.id}`).catch(() => undefined);
       ws.close();
       proc.kill();
     },

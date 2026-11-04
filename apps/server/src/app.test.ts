@@ -81,6 +81,8 @@ describe('ingest', () => {
   it('creates a readable project from the upload', () => {
     expect(project.id).toMatch(/^sample-clip-[0-9a-f]{4}$/);
     expect(project.context.movieTitle).toBe('Synthetic');
+    // Projects use one look.
+    expect(project.themeId).toBe('creator');
     expect(project.source).toMatchObject({
       file: 'source.mp4',
       originalName: 'Sample Clip.MP4',
@@ -158,6 +160,10 @@ describe('ingest', () => {
     expect((await tail.arrayBuffer()).byteLength).toBe(10);
     const past = await env.app.request(await signed(project.id, 'proxy.mp4'), { headers: { Range: 'bytes=999999999-' } });
     expect(past.status).toBe(416);
+    // Revalidation: the same file again is a 304.
+    const etag = res.headers.get('etag')!;
+    expect(etag).toMatch(/^".+"$/);
+    expect((await env.app.request(await signed(project.id, 'proxy.mp4'), { headers: { 'If-None-Match': etag } })).status).toBe(304);
   });
 
   it('crops a square portrait from one frame, serves it, and leaves the project unsaved', async () => {

@@ -31,6 +31,7 @@ import {
   type UploadPartsResult,
   type UploadRecord,
 } from '@als/schema';
+import { PROJECT_THEME_ID } from '@als/theme/themes';
 import type { AnalysisService } from './analysis/service.ts';
 import { ApiError, errorResponse } from './api/errors.ts';
 import { idempotency, type IdempotencyStore } from './api/idempotency.ts';
@@ -221,7 +222,7 @@ export function createApp(deps: AppDeps) {
         characters: names.map((name, i) => ({ id: `c-${i + 1}`, name, speakerLabels: [] })),
       },
       moments: [],
-      themeId: 'default',
+      themeId: PROJECT_THEME_ID,
       ingest: pendingIngest(),
       analysis: { status: 'idle', stages: [], models: {} },
     });
@@ -264,7 +265,10 @@ export function createApp(deps: AppDeps) {
   /** The last saved versions, newest first. */
   app.get('/projects/:id/history', async (c) => c.json(await repo.history(c.req.param('id'))));
 
-  /** Bring back an earlier version's moments, characters, theme, format, bar, subtitles and game review as a new version (the name stays). */
+  /**
+   * Bring back an earlier version's moments, characters, format, bar, subtitles
+   * and game review as a new version. The name and the look stay: projects use one look.
+   */
   app.post('/projects/:id/history/:version/restore', async (c) => {
     const id = c.req.param('id');
     const { version } = ProjectEditSchema.pick({ version: true }).parse(await c.req.json());
@@ -272,7 +276,6 @@ export function createApp(deps: AppDeps) {
     const saved = await repo.save(id, version, (p) => {
       p.moments = old.moments;
       p.context.characters = old.context.characters;
-      p.themeId = old.themeId;
       if (old.format) p.format = old.format;
       else delete p.format;
       if (old.evalBar) p.evalBar = old.evalBar;
@@ -394,13 +397,19 @@ export function createApp(deps: AppDeps) {
   const serveBlob = async (c: { req: { header(name: string): string | undefined } }, key: string, name: string, download?: string) => {
     const head = await blobs.head(key);
     if (!head) throw new NotFoundError('not found');
-    const range = parseRange(c.req.header('range'), head.size);
+    const etag = `"${head.version}"`;
     const headers = new Headers({
       'Content-Type': contentType(name),
       'Accept-Ranges': 'bytes',
       // Thumbnails change only when a re-ingest changes the shots; clients cache-bust with ?v=.
       'Cache-Control': 'no-cache',
+      // So the browser revalidates instead of fetching again (the old static server sent Last-Modified).
+      ETag: etag,
     });
+    if (c.req.header('if-none-match') === etag) return new Response(null, { status: 304, headers });
+    // A range of a file that changed since the client's copy is the whole new file.
+    const ifRange = c.req.header('if-range');
+    const range = ifRange && ifRange !== etag ? undefined : parseRange(c.req.header('range'), head.size);
     if (download) headers.set('Content-Disposition', `attachment; filename="${download.replace(/["\\\r\n]/g, '')}"`);
     if (range === 'unsatisfiable') {
       headers.set('Content-Range', `bytes */${head.size}`);

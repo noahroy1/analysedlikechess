@@ -42,7 +42,9 @@ try {
   const outFrames = await page.eval(`(() => { const t = document.querySelector('[data-testid=clock]').textContent; return t; })()`);
   console.log('holds', JSON.stringify(blocks), '| clock', outFrames);
   const fps = Number(process.argv[4] ?? 30);
-  const stops = blocks.map((b) => b.outStart + Math.min(b.frames - 1, Math.ceil(0.25 * fps)));
+  // Review mode stops when typing starts: the badge and card animating in, from the project's look (typeOutStartSec).
+  const typingSec = await page.eval(`(() => { const t = window.__alsEditor.getState().theme.timing; return t.badgeDelaySec + t.badgePopSec + t.cardInSec; })()`);
+  const stops = blocks.map((b) => b.outStart + Math.min(b.frames - 1, Math.ceil(typingSec * fps)));
 
   // 1. Timeline blocks line up with the holds the composition draws.
   {

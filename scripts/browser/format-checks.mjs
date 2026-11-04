@@ -29,13 +29,17 @@ const pick = (testid, value) =>
     Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(sel, '${value}');
     sel.dispatchEvent(new Event('change', { bubbles: true }));
   })()`);
-const pickTheme = (id) => pick('theme-picker', id);
+// Users get one look; the dev build keeps the others reachable for these checks.
+const pickTheme = (id) => page.eval(`window.__alsSetLook('${id}')`);
 
 try {
   await open();
 
   // 1. The look switches, follows the timing and survives a reload; undo switches back.
   {
+    // Projects open on the creator look (the only one users get); start from the internal default look.
+    await pickTheme('default');
+    await waitSaved();
     const before = await page.eval(`${E}.getState().doc.moments[0].holdSec`);
     await pickTheme('creator');
     await waitSaved();

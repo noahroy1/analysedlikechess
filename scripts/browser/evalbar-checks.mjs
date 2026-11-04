@@ -47,12 +47,11 @@ try {
 
   // 1. The creator look draws the bar; the default look does not.
   {
+    // Projects open on the creator look; the internal default look is reached through the dev hook.
+    await page.eval(`window.__alsSetLook('default')`);
+    await sleep(500);
     const before = await page.eval(`!!document.querySelector('[data-testid=eval-bar]')`);
-    await page.eval(`(() => {
-      const sel = document.querySelector('[data-testid=theme-picker]');
-      Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(sel, 'creator');
-      sel.dispatchEvent(new Event('change', { bubbles: true }));
-    })()`);
+    await page.eval(`window.__alsSetLook('creator')`);
     await sleep(500);
     const after = await bar();
     result('the creator look draws the bar between the two players; the default look has none', !before && after.label !== undefined, `default: ${before}, creator: ${after.label}`);

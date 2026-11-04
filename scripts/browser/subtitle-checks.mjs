@@ -43,11 +43,7 @@ const measure = () =>
     return { size: parseFloat(cs.fontSize) * to1080, width: el.getBoundingClientRect().width / scale, weight: cs.fontWeight, family: cs.fontFamily, stroke: cs.webkitTextStrokeWidth, paintOrder: cs.paintOrder };
   })()`);
 const setLook = (id) =>
-  page.eval(`(() => {
-    const sel = document.querySelector('[data-testid=theme-picker]');
-    Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(sel, '${id}');
-    sel.dispatchEvent(new Event('change', { bubbles: true }));
-  })()`);
+  page.eval(`window.__alsSetLook('${id}')`);
 const panelLines = () =>
   page.eval(`JSON.stringify([...document.querySelectorAll('[data-testid=subtitles-panel] input[aria-label="Subtitle text"]')].map((i) => i.value))`).then(JSON.parse);
 

@@ -18,11 +18,7 @@ const open = async () => {
 };
 const waitSaved = () => page.waitFor(`document.querySelector('[data-testid=save-status]').dataset.status === 'saved'`, 10000);
 const setLook = async (id) => {
-  await page.eval(`(() => {
-    const sel = document.querySelector('[data-testid=theme-picker]');
-    Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(sel, '${id}');
-    sel.dispatchEvent(new Event('change', { bubbles: true }));
-  })()`);
+  await page.eval(`window.__alsSetLook('${id}')`);
   await sleep(500);
 };
 const block = async () => JSON.parse(await page.eval(`JSON.stringify((() => { const b = document.querySelector('[data-testid=game-review-block]'); return b ? { start: +b.dataset.outStart, frames: +b.dataset.frames } : null; })())`));
@@ -68,6 +64,8 @@ try {
 
   // 1. Only the creator look has a review: a block after the clip's last frame, counted in the length.
   {
+    // Projects open on the creator look; the internal default look is reached through the dev hook.
+    await setLook('default');
     const none = await block();
     await setLook('creator');
     const b = await block();
