@@ -1,0 +1,7 @@
+{
+  "name": "als-spike-workflow",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-11-03",
+  "workflows": [{ "name": "als-spike-poll", "binding": "POLL", "class_name": "PollWorkflow" }],
+  "vars": { "BUILD": "v1" }
+}

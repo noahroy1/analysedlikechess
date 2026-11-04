@@ -81,7 +81,11 @@ Read this first in a new session. It says where the work stands, what to do next
   - **Housekeeping:** spike code lives in the session scratchpad. Every test Worker, the container app, the Hyperdrive link, the test tables and the uploaded footage were deleted. An empty R2 bucket `als-spike` would not delete yet ("not empty" with 0 objects); retry `wrangler r2 bucket delete als-spike`. The account also holds unrelated things (Workflows `saas-admin-template` and `lead-workflow`, the R2 bucket `jane-raw`); leave them alone.
 - **Checks at the tip:** `pnpm check` passes (310 tests, including the render test). The browser checks pass: `phase2-checks`, `phase3-checks`, `typeout-checks` (`m1`), `format-checks`, `evalbar-checks`, `sound-checks`, `subtitle-checks`, `render-checks` (on the creator-look sample and on a copy of BB1, holds and the game review), `placement-checks` and `review-checks`.
 
-### Next action: the user's review of short- and long-form, then Phase 5 (and iterations 5-7), then Phase 6
+### Next action: the cloud plan (`PLAN-CLOUD.md`), phase C1
+
+The user put the cloud backend and the mobile app ahead of Phase 6 and any further feature iterations (Nov 3). Read `PLAN-CLOUD.md` first: decisions, C0 findings and phases C1-C5. C0's spike code is in `spikes/cloud-c0/` (reference for C2 and C3). Open with the user: whether to run a small Capacitor trial of the Remotion Player on an iPhone before C1 (frame-exact holds, sound after a tap), and whether the default look should ship a font.
+
+The format notes below are kept for when feature work resumes; the reviews they wait on still stand.
 
 **Eval field and Backspace (Oct 16, the user's report).**
 - **Eval field:** "Bar after this move" and "Bar after the beat" now read the bar just before the change (`evalBeforeItem()` in `editor/doc.ts`) and, as you type, the new value and the swing as a share of the bar ("Before: +0.3 → +2.3 · White +17% of the bar"). An empty move eval shows "Empty: holds at +0.3". ↑/↓ step a pawn eval by 0.1 (Shift: 1.0), starting from the value before when empty; a mate is left alone. Esc now cancels: before, the blur it triggers committed the draft anyway (the Game review's accuracy fields had the same bug).

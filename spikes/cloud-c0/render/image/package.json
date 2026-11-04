@@ -1,0 +1,1 @@
+{ "name": "als-render-spike", "private": true, "type": "module", "dependencies": { "@remotion/renderer": "4.0.534" } }

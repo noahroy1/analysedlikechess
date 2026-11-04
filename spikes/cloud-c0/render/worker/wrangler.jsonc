@@ -1,0 +1,9 @@
+{
+  "name": "als-spike-render",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-11-04",
+  "containers": [{ "class_name": "Renderer", "image": "../image/Dockerfile", "instance_type": "standard-4", "max_instances": 3 }],
+  "durable_objects": { "bindings": [{ "name": "RENDERER", "class_name": "Renderer" }] },
+  "exports": { "Renderer": { "type": "durable-object", "storage": "sqlite" } },
+  "r2_buckets": [{ "binding": "BLOBS", "bucket_name": "als-spike" }]
+}

@@ -1,0 +1,2 @@
+{ "name": "als-spike-gemini", "main": "src/index.ts", "compatibility_date": "2026-11-04",
+  "r2_buckets": [{ "binding": "BLOBS", "bucket_name": "als-spike" }] }
