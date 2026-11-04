@@ -320,7 +320,7 @@ Move ffmpeg and Remotion into `apps/media` behind its HTTP API, and package its 
 **Phase C5: Mobile**
 
 - **Spike first:** the Remotion Player in iOS WKWebView and Android WebView. Check inline playback, frame-exact holds and Web Audio after a user gesture.
-- **iPhone trial (offered Nov 5; the user decides whether and when, any time before C5):**
+- **iPhone trial (planned Nov 5 for the user's iPhone 12 on iOS 26.6.1; the full plan is `spikes/capacitor-trial/PLAN.md`; summary below):**
   - **What:** a throwaway Capacitor 8 shell (`spikes/capacitor-trial/`, not linted or tested) that bundles the rights-free sample project (`fixtures/sample`) and the local sound files and plays `<Episode>` in the Player, with no backend, sign-in or network. It shows a report on screen: frames where each hold froze against the frame expected, when each sound started against `soundCues()`, and dropped frames.
   - **On this Mac (checked Nov 5):** Xcode 26.6 (Capacitor 8 needs 26.0 or later), Node 24.12 (needs 22 or later), iOS 26 simulators, and 35 GiB free. Swift Package Manager is Capacitor 8's default, so CocoaPods (not installed) is not needed. Capacitor is an approved dependency; pin `@capacitor/core`, `@capacitor/cli` and `@capacitor/ios` exactly.
   - **First pass, without the user:** the iOS Simulator, to catch layout, inline playback and the frame report. It runs macOS's WebKit and audio, not the phone's, so it can't settle sound after a tap or real-device performance.

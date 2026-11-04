@@ -113,7 +113,7 @@ The user put the cloud backend and the mobile app ahead of Phase 6 and any furth
 - **Dev (to build in C2; neither exists yet):** a `MEDIA_URL` setting that points the Node server at a local `apps/media` process (no Docker), and `pnpm dev` starting that process. Without `MEDIA_URL` the server keeps `LocalMediaRunner`, so the switch can land in small steps. Docker: `open -a Docker`; the `docker` command is at `/Applications/Docker.app/Contents/Resources/bin`.
 - **Lessons that bite here:** Remotion downloads its browser under the nearest `package.json` (about 580 MB a copy), so `apps/media` gets its own copy and the render test must `chdir` there; the bundle is rebuilt when composition, schema or theme sources change (`render/bundle.ts` fingerprints them); a cancel can land before rendering starts, so check `signal.aborted` before and after setup (fixed in C1).
 
-**Still open with the user (not blocking C2):** whether to run a small Capacitor trial of the Remotion Player on an iPhone before C5. What it needs is under Phase C5 in `PLAN-CLOUD.md`. Don't start it unasked: C2 comes first.
+**iPhone trial (planned Nov 5, not built):** the user asked for a plan for a throwaway Capacitor app that plays the sample episode in the Player on their iPhone 12 (iOS 26.6.1) and reports the decoding path, holds, sounds and smoothness. The plan is `spikes/capacitor-trial/PLAN.md`; it is self-contained. Build it when the user asks for the trial; otherwise the next step is C2. It doesn't block C2, and C2 doesn't block it.
 
 The format notes below are kept for when feature work resumes; the reviews they wait on still stand.
 
