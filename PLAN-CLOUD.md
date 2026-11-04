@@ -25,7 +25,8 @@ This plan moves the backend off the local Node server onto Cloudflare, with Supa
 
 7. **Spend (Nov 3):** build the cap logic as the frame for later work: per-user monthly caps, checked before every paid call, with the value in one place. Start at $2 a month. The user expects to tighten it well below that once spend becomes the bottleneck.
 8. **Sign-in (Nov 3):** OAuth (Google and Apple) is built at the same time as the app's own sign-in method, not added later. So C3 builds email codes and OAuth together, and C5 adds the native mobile flows for both.
-9. **Region (Nov 3):** the user is in Sydney, so latency is measured from there.
+9. **One backend (Nov 4, confirmed):** the cloud backend serves both front-ends. The desktop editor stays the development client, and in development talks to the same backend running locally (Wrangler plus local Supabase) or to staging. The mobile app uses the deployed backend. The Node server is retired at the end of C3. One repo.
+10. **Region (Nov 3):** the user is in Sydney, so latency is measured from there.
 
 ## Why Supabase for the data
 
