@@ -38,7 +38,7 @@ This plan moves the backend off the local Node server onto Cloudflare, with Supa
 | Inspection, migrations, backups | SQL migrations in `supabase/migrations/`, the dashboard, and daily backups on paid plans. | Wrangler migrations. Durable Object storage is opaque without our own tooling. | **Supabase** |
 | Local dev and tests | `supabase start` runs Postgres, Auth and Realtime in Docker. | Miniflare simulates Durable Objects and D1 in-process, with no Docker. | Cloudflare is lighter. The C1 interfaces keep unit tests in memory, so only integration checks need Docker. |
 | Portability | Plain Postgres. | Proprietary. | **Supabase** |
-| Fixed cost at our scale | The free plan pauses idle projects (confirm in C0), so production needs Pro (about $25 a month). | Pennies, inside Workers Paid, which Containers and Workflows need anyway. | **Cloudflare**. Accepted: it is a fixed cost, not a metric the product depends on. |
+| Fixed cost at our scale | The free plan pauses idle projects, so production needs Pro ($25 a month, no pausing; confirmed Nov 4 in Supabase's billing FAQ). | Pennies, inside Workers Paid, which Containers and Workflows need anyway. | **Cloudflare**. Accepted: it is a fixed cost, not a metric the product depends on. |
 
 **Stays on Cloudflare, and why:**
 - **Media in R2.** Video playback is all egress, and R2 charges none. These are files, not database data.
@@ -53,7 +53,7 @@ This plan moves the backend off the local Node server onto Cloudflare, with Supa
 | --- | --- | --- |
 | API | Hono on Node (`apps/server`) | **`apps/api`:** Hono on a Worker (`nodejs_compat`), served under `/api/v1` |
 | Project document, history, manifests, caches, render list, usage logs | JSON files per project folder, with in-process write locks | **Supabase Postgres.** Tables below. The Worker reaches it through Hyperdrive. |
-| Accounts | none | **Supabase Auth.** The Worker verifies the JWT against the project's JWKS (asymmetric signing keys; confirm in C0). |
+| Accounts | none | **Supabase Auth.** The Worker verifies the JWT against the project's JWKS (asymmetric ES256 keys, confirmed on the Sydney project Nov 4). |
 | Media: source, proxy, audio, thumbnails, portraits, MP4s, stage outputs | Files on disk | **R2** at `projects/<id>/…` (ownership lives in Postgres, not in the key) |
 | Chess sounds | `media/sounds/` | **R2** at `sounds/`, one bank for every user. Lengths are probed at upload and kept in a `sounds` table. |
 | Jobs | `JobQueue` + EventEmitter | **Workflows:** one per ingest, analysis run and render. Steps match today's stages. |
@@ -233,6 +233,18 @@ Sources are the Cloudflare and Supabase docs pages named below, read Nov 3, 2026
   - **One request:** a Worker streamed BB1's 16.5 MB proxy from R2 to Gemini's resumable upload in one request. It went up in 4.6 s, was ACTIVE after 7.4 s, and was deleted.
   - **Large files:** the 191 MB original failed that way ("Network connection lost"). Uploaded in 8 MiB chunks the way the SDK does it (`upload` with `X-Goog-Upload-Offset`, checking `x-goog-upload-status: active`, with `upload, finalize` last), each chunk read from R2 as a byte range, it went up in 39.6 s and was ACTIVE after 25.8 s. The proxy took 6.4 s and 7.3 s.
   - **Effect:** the Worker never holds more than one chunk, so the real describer uses `fetch` and chunks, not the SDK.
+- **Database spike (Nov 4, Sydney project, Postgres 17.11, through Hyperdrive):**
+  - **Isolation:** with `set_config('role', 'authenticated', true)` and the claims set inside each transaction, user A saw only A's row and updated 0 of B's, and B saw only B's. After the transaction, and on a fresh client from the pool, the role was back to `postgres` and the claims were empty. Transaction-local settings work through Hyperdrive and don't leak.
+  - **Save timing:** 50 saves after 10 warm-up saves, each with a 20 KB document, measured from this Mac in Sydney with a fresh TCP and TLS connection per request:
+
+    | Save | Client p50 / p95 | Without the connect | Transaction in the Worker p50 / p95 | Worker's own connect |
+    | --- | --- | --- | --- | --- |
+    | Five statements (select, version-checked update, history insert, trim) | 127 / 148 ms | 109 / 134 ms | 42 / 64 ms | 2-7 ms |
+    | One statement (CTE: update, insert, trim) | 107 / 135 ms | 91 / 117 ms | 26 / 49 ms | 2-7 ms |
+
+    Both pass the 150 ms gate. A browser reuses its connection, so real saves sit nearer the middle column. The real save is written as one statement.
+  - **Connection string:** the password contains `@`. `pg` parsed the raw string, but Hyperdrive is given it URL-encoded (`%40`).
+  - **Error 1042:** the first requests to a just-deployed Worker returned it, and it went away within seconds.
 - **Secrets from `.env`:** `GEMINI_API_KEY`'s line carries an inline `# comment`. Node's env-file parser drops it, so copying values into `wrangler secret` takes the first word only.
 
 ## Phases
@@ -246,7 +258,7 @@ Read the current docs for:
 Confirm every "(confirm in C0)" in this file. Record limits and prices in this file with their sources.
 
 - [x] BB1 renders in a Container. Time and cost are recorded, and the MP4 matches the Node render (`render-checks`' PSNR method, at least 27 dB). Passed Nov 4: every frame is at least 27.8 dB from the Mac render, with Liberation fonts in the image (details in the findings).
-- [ ] Autosave (one transaction with RLS claims set) through Hyperdrive to Supabase measures under 150 ms p95 from the user's location. Blocked Nov 4: the Sydney project's password in `.env` is refused (`28P01`); the test Worker is written (`spike-db`, session scratchpad).
+- [x] Autosave (one transaction with RLS claims set) through Hyperdrive to Supabase measures under 150 ms p95 from the user's location. Passed Nov 4: 135 ms p95 as one statement and 148 ms as five, each with a fresh connection from Sydney (details in the findings).
 - [x] A Workflow survives a 15-minute `step.sleep` poll loop and resumes after a deploy. Passed Nov 3 on Workers Free: 30 polls, 30 s sleeps, with a redeploy at 5 min.
 - [x] A frame and a 256 px portrait crop come out of the proxy without a container, or the warm-container fallback is costed. Settled Nov 4: Media Transformations doesn't fit, so the container does it (cold start and warm-up below).
 - [x] The Gemini file upload works from an R2 stream on Workers (else its REST upload is called with `fetch`). Passed Nov 4 with `fetch` and 8 MiB chunks.
@@ -288,7 +300,7 @@ Move ffmpeg and Remotion into `apps/media` behind its HTTP API, and package its 
 **Phase C4: Migration and deploy**
 
 - **Environments:** staging and production Cloudflare environments and Supabase projects, with secrets set by `wrangler secret`.
-- **CORS:** allow the web origin plus Capacitor's (`capacitor://localhost` on iOS, `https://localhost` on Android; confirm in C0).
+- **CORS:** allow the web origin plus Capacitor's (`capacitor://localhost` on iOS, `https://localhost` on Android: Capacitor's defaults `server.hostname` "localhost", `iosScheme` "capacitor" and `androidScheme` "https", confirmed Nov 4).
 - **Migration:** a script moves `projects/<id>/` folders into R2 and Postgres under Noah's account (BB1, the Private Property benchmark and its comparison runs) and leaves the local folders untouched.
 - **Prices:** `prices.ts` gains container seconds.
 
