@@ -1,6 +1,8 @@
 packages:
   - apps/*
   - packages/*
+  # Temporary: the iPhone trial (spikes/capacitor-trial/PLAN.md) depends on the workspace packages.
+  - spikes/capacitor-trial
 minimumReleaseAgeExclude:
   - '@anthropic-ai/sdk@0.133.0'
 

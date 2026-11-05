@@ -1,0 +1,14 @@
+# Build outputs and the user's media: never committed.
+node_modules/
+dist/
+public/media/
+public/sounds/
+reports/
+ios/App/App/public/
+ios/App/App/capacitor.config.json
+ios/App/App/config.xml
+ios/DerivedData/
+ios/App/build/
+ios/App/DerivedData/
+xcuserdata/
+*.xcuserstate

@@ -1,0 +1,32 @@
+{
+  "name": "@als/capacitor-trial",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "prepare:trial": "node prepare.mjs",
+    "build": "vite build",
+    "preview": "vite preview --host --port 4173",
+    "receive": "node receive.mjs",
+    "ios": "vite build && cap sync ios"
+  },
+  "dependencies": {
+    "@als/composition": "workspace:*",
+    "@als/editor-core": "workspace:*",
+    "@als/schema": "workspace:*",
+    "@als/theme": "workspace:*",
+    "@remotion/player": "4.0.534",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "remotion": "4.0.534"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.6.0",
+    "@capacitor/core": "8.6.0",
+    "@capacitor/ios": "8.6.0",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.1.2",
+    "vite": "8.3.4"
+  }
+}

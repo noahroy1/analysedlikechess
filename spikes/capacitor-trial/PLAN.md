@@ -75,3 +75,20 @@ Ask for each item when you reach it, not all at once (the user said: ad hoc). Us
 - A free Personal Team's signing lasts 7 days; after that the app stops opening until it is run from Xcode again. Free teams also have small limits on devices and new bundle IDs, so don't churn bundle IDs.
 - Android is not part of this trial; C5's spike still needs it.
 - The trial plays a local bundle: it says nothing about signed URLs, uploads or the backend (C5 covers those against the deployed API).
+
+## Running it again (built Nov 5; results under Phase C5 in `PLAN-CLOUD.md`)
+
+From `spikes/capacitor-trial/`, with the phone plugged in and unlocked:
+
+```sh
+pnpm prepare:trial                       # clip (audio stripped; TRIAL_KEEP_AUDIO=1 keeps it), project, sounds -> public/
+REPORT_URL=http://$(ipconfig getifaddr en0):8790 npx vite build
+npx cap sync ios
+node receive.mjs &                       # reports land in reports/
+cd ios/App && xcodebuild -project App.xcodeproj -scheme App -configuration Debug \
+  -destination id=<device id from `xcrun xctrace list devices`> -derivedDataPath build -allowProvisioningUpdates build
+xcrun devicectl device install app --device <device id> build/Build/Products/Debug-iphoneos/App.app
+xcrun devicectl device process launch --device <device id> com.noahroy.alstrial
+```
+
+The team (7FWNGJ8UGV) is set in `ios/App/App.xcodeproj`; `Info.plist` allows local networking for the receiver. `TRIAL_CLIP` and `TRIAL_PROJECT` point `prepare.mjs` at another clip and project (BB1's proxy only on the user's own phone, never committed). `mac-check.mjs` drives the same run in headless Chrome against `pnpm preview`; it was written but not run.
