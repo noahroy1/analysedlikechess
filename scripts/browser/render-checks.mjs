@@ -1,5 +1,6 @@
 // Render checks against a running `pnpm dev`, in headless Chrome.
 // usage: node scripts/browser/render-checks.mjs <scratchDir> <projectId> [--reuse]
+// Against a deployed environment: CHECK_ENV=staging CHECK_OWNER=<the project owner's email> (dev-api.mjs).
 // (--reuse compares the newest finished render instead of making a new one)
 // Renders the project from the editor's Render menu, then compares three holds (and the game review, if any)
 // in the MP4 with the same frames drawn by the Player. The Player plays the
@@ -10,7 +11,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { launch, sleep } from './cdp.mjs';
-import { projectFile } from './dev-api.mjs';
+import { APP_ORIGIN, projectFile, signIn } from './dev-api.mjs';
 
 const [S, projectId, flag] = process.argv.slice(2);
 const reuse = flag === '--reuse';
@@ -29,7 +30,8 @@ function psnrOf(a, b, width, height) {
 
 const page = await launch({ profile: `${S}/chrome-render`, width: 1680, height: 1150 });
 try {
-  await page.goto(`http://localhost:5173/#/projects/${projectId}`);
+  await signIn(page);
+  await page.goto(`${APP_ORIGIN}/#/projects/${projectId}`);
   await page.waitFor(`!!${P} && !!${E}`);
   await sleep(1500);
   await page.eval(`[...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Preview')?.click()`);

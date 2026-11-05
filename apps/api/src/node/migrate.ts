@@ -1,4 +1,4 @@
-import { readdir, readFile, stat } from 'node:fs/promises';
+import { open, readdir, readFile, stat } from 'node:fs/promises';
 import { join, relative, sep } from 'node:path';
 import { z } from 'zod';
 import type { Db } from '../db/db.ts';
@@ -19,11 +19,40 @@ const REPO_FILES = [/^project\.json$/, /^history\//, /^ingest\.json$/, /^analysi
 
 const Keys = z.object({ keys: z.record(z.string(), z.string()) });
 
+/**
+ * The default part size (MigrateTarget.partBytes): a deployed target's bucket is
+ * reached through a Worker, and one request to a Worker carries at most 100 MB
+ * (a 120 MB write hung, Nov 6).
+ */
+export const MIGRATE_PART_BYTES = 32 * 1024 * 1024;
+
+async function putInParts(blobs: BlobStore, key: string, file: string, size: number, partBytes: number): Promise<void> {
+  const uploadId = await blobs.createMultipart(key);
+  const handle = await open(file);
+  try {
+    const parts = [];
+    for (let offset = 0, partNumber = 1; offset < size; offset += partBytes, partNumber++) {
+      const chunk = new Uint8Array(Math.min(partBytes, size - offset));
+      await handle.read(chunk, 0, chunk.length, offset);
+      const etag = await blobs.uploadPart(key, uploadId, partNumber, new Response(chunk).body!);
+      parts.push({ partNumber, etag });
+    }
+    await blobs.completeMultipart(key, uploadId, parts);
+  } catch (error) {
+    await blobs.abortMultipart(key, uploadId).catch(() => undefined);
+    throw error;
+  } finally {
+    await handle.close();
+  }
+}
+
 export interface MigrateTarget {
   /** Run as the owner (`asUser`), so RLS checks every write. */
   repo: ProjectRepo;
   db: Db;
   blobs: BlobStore;
+  /** Files over twice this go up as a multipart upload in parts of this size (MIGRATE_PART_BYTES when absent). */
+  partBytes?: number;
 }
 
 export interface MigrateReport {
@@ -109,7 +138,9 @@ export async function migrateProject(source: FsProjectRepo, id: string, to: Migr
       skipped++;
       continue;
     }
-    await to.blobs.put(key, new Uint8Array(await readFile(join(dir, rel))));
+    const partBytes = to.partBytes ?? MIGRATE_PART_BYTES;
+    if (size > 2 * partBytes) await putInParts(to.blobs, key, join(dir, rel), size, partBytes);
+    else await to.blobs.put(key, new Uint8Array(await readFile(join(dir, rel))));
     copied++;
     bytes += size;
     if (size > 8 * 1024 * 1024) log(`  ${rel} (${Math.round(size / 1024 / 1024)} MB)`);

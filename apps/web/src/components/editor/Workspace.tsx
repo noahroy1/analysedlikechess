@@ -16,6 +16,7 @@ import { EditLayer } from './EditLayer.tsx';
 import { PortraitCropper } from './PortraitCropper.tsx';
 import { Kbd } from './Inspector.tsx';
 import { TranscriptDrawer } from './TranscriptDrawer.tsx';
+import { CHECK_HOOKS } from '../../lib/check-hooks.ts';
 
 /** The video's share of the centre column. */
 const STAGE_WIDTH = 0.8;
@@ -108,8 +109,8 @@ export function Workspace({ left, right }: WorkspaceProps) {
       prev = next;
       setFrame(next);
     };
-    // Dev-only handle for browser-driven checks.
-    if (import.meta.env.DEV) Object.assign(window, { __alsPlayer: p, __alsEditor: store });
+    // Handles for the browser checks (dev and staging builds).
+    if (CHECK_HOOKS) Object.assign(window, { __alsPlayer: p, __alsEditor: store });
     const onPlay = () => setPlaying(true);
     const onPause = () => setPlaying(false);
     p.addEventListener('frameupdate', onFrame);

@@ -446,3 +446,12 @@ enabled = true
 # formatted with uppercase keywords, indent 2, max width 180, trailing commas,
 # and column/key alignment. Set to "null" to emit raw, unformatted SQL.
 # format_options = "{\"keywordCase\":\"upper\",\"indent\":2,\"maxWidth\":180,\"commaStyle\":\"trailing\"}"
+
+# Deployed environments (`node apps/api/scripts/deploy.ts <env> auth` runs `supabase config push --remote=<ref>`).
+# Each remote takes the settings above, with these overrides. Production's project is not created yet (C4).
+[remotes.staging]
+project_id = "hijjabbahnbjzjzfozwh"
+
+[remotes.staging.auth]
+site_url = "https://als-web-staging.noahroyy1.workers.dev"
+additional_redirect_urls = ["https://als-web-staging.noahroyy1.workers.dev"]

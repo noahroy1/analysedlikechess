@@ -16,6 +16,7 @@ import { HeaderButton } from './HeaderButton.tsx';
 import { MomentsPanel } from './MomentsPanel.tsx';
 import { RenderMenu } from './RenderMenu.tsx';
 import { Workspace } from './Workspace.tsx';
+import { CHECK_HOOKS } from '../../lib/check-hooks.ts';
 
 export interface EditorRootProps {
   project: Project;
@@ -48,8 +49,8 @@ export function EditorRoot({ project, ingest, analysis, onAnalysisChange, onReru
       store.getState().amend((d) => adoptProjectLook(d, frame));
       store.getState().notify(`This project now uses the ${getTheme(PROJECT_THEME_ID).name} look.`);
     }
-    // Dev only: the other looks stay reachable for the browser checks, never from the UI.
-    if (import.meta.env.DEV) Object.assign(window, { __alsSetLook: (id: string) => store.getState().edit((d) => switchLook(d, id, frame)) });
+    // Checks only (dev and staging builds): the other looks stay reachable for them, never from the UI.
+    if (CHECK_HOOKS) Object.assign(window, { __alsSetLook: (id: string) => store.getState().edit((d) => switchLook(d, id, frame)) });
     const onBeforeUnload = (e: BeforeUnloadEvent) => {
       const status = store.getState().saveStatus;
       if (status === 'pending' || status === 'saving') {

@@ -62,7 +62,8 @@ describe.skipIf(!haveSupabase)('migrateProject', () => {
     await writeFile(join(from, id, '.DS_Store'), 'x');
 
     const blobs = new FsBlobStore({ projectsDir: to, soundsDir: to });
-    const target = { db, repo, blobs };
+    // Parts of one byte: the 4-byte proxy goes up as a multipart upload, the 2-byte render in one write.
+    const target = { db, repo, blobs, partBytes: 1 };
     const report = await asUser(alice.id, () => migrateProject(source, id, target));
     expect(report).toMatchObject({ versions: 2, stages: 5, renders: 1, files: 2, skippedFiles: 0 });
 
@@ -78,6 +79,8 @@ describe.skipIf(!haveSupabase)('migrateProject', () => {
       expect(await repo.renders(id)).toEqual([job]);
     });
     expect((await blobs.head(projectKey(id, 'proxy.mp4')))?.size).toBe(4);
+    expect([...new Uint8Array(await (await blobs.blob(projectKey(id, 'proxy.mp4')))!.arrayBuffer())]).toEqual([1, 2, 3, 4]);
+    expect([...new Uint8Array(await (await blobs.blob(projectKey(id, 'renders/v3-20261106-101500.mp4')))!.arrayBuffer())]).toEqual([5, 6]);
     expect(await blobs.head(projectKey(id, 'analysis/transcribe.json'))).toBeUndefined();
     expect(await blobs.head(projectKey(id, 'project.json'))).toBeUndefined();
 

@@ -45,5 +45,59 @@
     // Dev needs neither: Vite serves the editor and the API from one origin, and the local media service is free.
   },
   // Dev uses the local media process, so wrangler dev neither builds the image nor needs Docker for it.
-  "dev": { "port": 8790, "enable_containers": false }
+  "dev": { "port": 8790, "enable_containers": false },
+
+  // Deployed environments (`node apps/api/scripts/deploy.ts <env>`). Bindings and vars are not inherited from the
+  // top level, so each environment lists them all. No MEDIA_URL: the Container bindings are used. Secrets
+  // (SUPABASE_SECRET_KEY, MEDIA_URL_SECRET, the provider keys) are set by deploy.ts with `wrangler secret bulk`.
+  "env": {
+    "staging": {
+      // Supabase: C0's Sydney project (ap-southeast-2). R2: location hint Oceania.
+      "r2_buckets": [{ "binding": "MEDIA", "bucket_name": "als-media-staging" }],
+      // Query caching off: documents change on every save, and RLS reads are per user.
+      "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "ccf6e34156c4461f965d09a8b2c53884" }],
+      "workflows": [{ "name": "als-jobs-staging", "binding": "JOBS", "class_name": "JobWorkflow" }],
+      // TODO(open-decision): instance types, pool size and max_instances from real renders and the bill.
+      "containers": [
+        { "class_name": "MediaTasks", "image": "../media/Dockerfile", "image_build_context": "../..", "instance_type": "standard-4", "max_instances": 4 },
+        { "class_name": "MediaQuick", "image": "../media/Dockerfile", "image_build_context": "../..", "instance_type": "standard-1", "max_instances": 1 }
+      ],
+      "durable_objects": {
+        "bindings": [
+          { "name": "MEDIA_TASKS", "class_name": "MediaTasks" },
+          { "name": "MEDIA_QUICK", "class_name": "MediaQuick" }
+        ]
+      },
+      "vars": {
+        "SUPABASE_URL": "https://hijjabbahnbjzjzfozwh.supabase.co",
+        "API_ORIGIN": "https://als-api-staging.noahroyy1.workers.dev",
+        "WEB_ORIGINS": "https://als-web-staging.noahroyy1.workers.dev",
+        "MEDIA_INSTANCE_TYPE": "standard-4"
+      }
+    },
+    "production": {
+      // TODO(C4, production): the Supabase project is not created yet (the user's call, Nov 6: check its cost on
+      // the billing page first). Then: `wrangler r2 bucket create als-media-production --location oc`, a Hyperdrive
+      // config with caching disabled (its id below), SUPABASE_URL, and the remote in supabase/config.toml.
+      "r2_buckets": [{ "binding": "MEDIA", "bucket_name": "als-media-production" }],
+      "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "00000000000000000000000000000000" }],
+      "workflows": [{ "name": "als-jobs-production", "binding": "JOBS", "class_name": "JobWorkflow" }],
+      "containers": [
+        { "class_name": "MediaTasks", "image": "../media/Dockerfile", "image_build_context": "../..", "instance_type": "standard-4", "max_instances": 4 },
+        { "class_name": "MediaQuick", "image": "../media/Dockerfile", "image_build_context": "../..", "instance_type": "standard-1", "max_instances": 1 }
+      ],
+      "durable_objects": {
+        "bindings": [
+          { "name": "MEDIA_TASKS", "class_name": "MediaTasks" },
+          { "name": "MEDIA_QUICK", "class_name": "MediaQuick" }
+        ]
+      },
+      "vars": {
+        "SUPABASE_URL": "",
+        "API_ORIGIN": "https://als-api-production.noahroyy1.workers.dev",
+        "WEB_ORIGINS": "https://als-web-production.noahroyy1.workers.dev",
+        "MEDIA_INSTANCE_TYPE": "standard-4"
+      }
+    }
+  }
 }
