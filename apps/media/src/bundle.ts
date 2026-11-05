@@ -2,7 +2,7 @@ import { readdir, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const packages = fileURLToPath(new URL('../../../../packages', import.meta.url));
+const packages = fileURLToPath(new URL('../../../packages', import.meta.url));
 
 /** The composition's entry point and every package it draws from. */
 export const RENDER_ENTRY = join(packages, 'composition/src/render-entry.tsx');
@@ -11,13 +11,20 @@ const SOURCE_DIRS = ['composition/src', 'schema/src', 'theme/src'].map((dir) => 
 /**
  * The composition bundled for the renderer. It is bundled once, on first use,
  * and again only when a source file changes (in dev), so a render normally
- * starts at once.
+ * starts at once. A container image builds it in (`build-bundle.ts`) and
+ * passes its folder, which is then used as is.
  */
 export class EpisodeBundle {
   private current: { fingerprint: string; serveUrl: Promise<string> } | undefined;
+  private readonly prebuilt: string | undefined;
+
+  constructor(prebuilt?: string) {
+    this.prebuilt = prebuilt;
+  }
 
   /** The bundle's folder, rebuilt first if the sources changed since it was made. */
   async serveUrl(): Promise<string> {
+    if (this.prebuilt) return this.prebuilt;
     const fingerprint = await sourceFingerprint();
     if (this.current?.fingerprint !== fingerprint) {
       const serveUrl = build();
@@ -31,13 +38,15 @@ export class EpisodeBundle {
   }
 }
 
-async function build(): Promise<string> {
+/** Bundles the composition, into `outDir` when given (else a temporary folder). */
+export async function build(outDir?: string): Promise<string> {
   // Webpack is heavy; load it only when something is rendered.
   const { bundle } = await import('@remotion/bundler');
   return bundle({
     entryPoint: RENDER_ENTRY,
     rootDir: join(packages, 'composition'),
     enableCaching: true,
+    ...(outDir ? { outDir } : {}),
   });
 }
 

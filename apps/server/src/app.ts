@@ -6,6 +6,7 @@ import {
   CLIENT_VERSION_HEADER,
   CompleteUploadRequestSchema,
   CreateProjectRequestSchema,
+  MediaTaskEventSchema,
   EvaluateRequestSchema,
   MIN_CLIENT_VERSION,
   MEDIA_URL_TTL_SEC,
@@ -25,6 +26,7 @@ import {
   type CreateProjectResult,
   type Job,
   type MediaGrant,
+  type MediaTaskEvent,
   type Me,
   type Project,
   type ProjectSummary,
@@ -35,12 +37,12 @@ import { PROJECT_THEME_ID } from '@als/theme/themes';
 import type { AnalysisService } from './analysis/service.ts';
 import { ApiError, errorResponse } from './api/errors.ts';
 import { idempotency, type IdempotencyStore } from './api/idempotency.ts';
-import { SOUNDS_SCOPE, projectScope, uploadPartScope, type MediaSigner } from './api/media-urls.ts';
+import { SOUNDS_SCOPE, mediaInScope, mediaOutScope, mediaTaskScope, projectScope, uploadPartScope, type MediaSigner } from './api/media-urls.ts';
 import { contentType, parseRange } from './api/range.ts';
 import { pendingIngest } from './ingest/ingest.ts';
 import type { IngestService } from './ingest/service.ts';
-import { portraitFile } from './media/portrait.ts';
-import { SoundLibrary } from './media/sounds.ts';
+import { SoundLibrary } from './node/sounds.ts';
+import { portraitFile } from './portraits.ts';
 import { JobRunningError, NotFoundError, projectKey, soundKey, type BlobStore, type JobRunner, type MediaRunner, type ProjectRepo } from './ports.ts';
 import type { RenderService } from './render/renders.ts';
 import type { Spend } from './spend.ts';
@@ -61,6 +63,8 @@ export interface AppDeps {
   events?: { subscribe(userId: string, listener: (job: Job) => void): () => void };
   /** Who every request is from until sign-in exists (C3: the JWT's subject). */
   userId: string;
+  /** Hands a media task's callback to the call waiting for it (the HTTP media runner). */
+  mediaTasks?: { deliver(taskId: string, event: MediaTaskEvent): boolean };
 }
 
 /** Heartbeat of the dev event stream; clients reopen a stream that misses two. */
@@ -87,7 +91,8 @@ export function summarize(project: Project, media?: MediaGrant): ProjectSummary 
   };
 }
 
-const UPLOAD_PART_PATH = new RegExp(`^${API_PREFIX}/uploads/`);
+/** Signed URLs that carry raw bytes or a service's callback, not a client's intent: no idempotency key. */
+const UNKEYED_PATH = new RegExp(`^${API_PREFIX}/(?:uploads|media)/`);
 
 /** The v1 API (PLAN-CLOUD.md, "API contract"), on whatever the deps are backed by. */
 export function createApp(deps: AppDeps) {
@@ -105,8 +110,9 @@ export function createApp(deps: AppDeps) {
     c.set('userId', deps.userId);
     await next();
   });
-  // Upload parts are signed URLs carrying raw bytes; a repeated PUT of a part replaces it, so it needs no key.
-  app.use('*', idempotency(deps.idempotency, { skip: (path) => UPLOAD_PART_PATH.test(path) }));
+  // Upload parts and the media service's files are signed URLs carrying raw bytes (a repeated PUT replaces
+  // the file), and its callbacks report a task's state: none of them needs a key.
+  app.use('*', idempotency(deps.idempotency, { skip: (path) => UNKEYED_PATH.test(path) }));
 
   app.get('/health', (c) => c.json({ ok: true }));
 
@@ -430,6 +436,38 @@ export function createApp(deps: AppDeps) {
     const query = new URL(c.req.url).searchParams;
     if (!(await signer.verify(projectScope(id), query))) throw new ApiError(403, 'media_url_invalid', 'This media link has expired; fetch new ones.');
     return serveBlob(c, projectKey(id, name), name, query.get('download') ?? undefined);
+  });
+
+  // The media service's side of the API (C3: presigned R2 URLs and the Worker's callback route).
+  // Each URL is signed for one file or one task, so the service reaches nothing else.
+  const mediaFile = async (c: { req: { path: string; url: string; param(name: 'id'): string } }, kind: 'in' | 'out') => {
+    const id = c.req.param('id');
+    const file = decodeURIComponent(c.req.path.slice(`${API_PREFIX}/media/${kind}/${id}/`.length));
+    const scope = kind === 'in' ? mediaInScope(id, file) : mediaOutScope(id, file);
+    if (!(await signer.verify(scope, new URL(c.req.url).searchParams))) throw new ApiError(403, 'media_url_invalid', 'This media service link is not valid.');
+    return { id, file };
+  };
+
+  app.get('/media/in/:id/*', async (c) => {
+    const { id, file } = await mediaFile(c, 'in');
+    return serveBlob(c, projectKey(id, file), file);
+  });
+
+  app.put('/media/out/:id/*', async (c) => {
+    const { id, file } = await mediaFile(c, 'out');
+    const body = c.req.raw.body;
+    if (!body) throw new ApiError(400, 'invalid_request', 'empty file');
+    await blobs.put(projectKey(id, file), body);
+    return c.json({ ok: true });
+  });
+
+  /** A media task's progress or result, from the media service. 404 tells it nobody is waiting any more. */
+  app.post('/media/tasks/:task', async (c) => {
+    const taskId = c.req.param('task');
+    if (!(await signer.verify(mediaTaskScope(taskId), new URL(c.req.url).searchParams))) throw new ApiError(403, 'media_url_invalid', 'This callback link is not valid.');
+    const event = MediaTaskEventSchema.parse(await c.req.json());
+    if (event.id !== taskId || !deps.mediaTasks?.deliver(taskId, event)) throw new NotFoundError('no call is waiting for this task');
+    return c.json({ ok: true });
   });
 
   /** The chess sounds that exist, with their lengths and signed URLs, for the Player and the renderer. */

@@ -1,13 +1,14 @@
 // Dev seeding until the Analyst exists (Phase 4).
 //   node apps/server/src/seed.ts sample                      new project from fixtures/sample
 //   node apps/server/src/seed.ts moments <projectId> <file>  replace a project's moments and characters
+// `sample` asks the running server (`pnpm dev`, same PROJECTS_DIR; SEED_API overrides its origin) to
+// ingest the project, since ingest runs in the media service, which reads and writes through the API.
 import { copyFile, readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
-import { CharacterSchema, MomentSchema, ProjectSchema } from '@als/schema';
-import { pendingIngest, runIngest } from './ingest/ingest.ts';
+import { API_PREFIX, CharacterSchema, IDEMPOTENCY_HEADER, MomentSchema, ProjectSchema } from '@als/schema';
+import { pendingIngest } from './ingest/ingest.ts';
 import { projectKey } from './ports.ts';
-import { LocalMediaRunner } from './media/local-runner.ts';
 import { FsBlobStore } from './node/fs-blobs.ts';
 import { FsProjectRepo } from './node/fs-repo.ts';
 
@@ -15,7 +16,7 @@ const repo = (path: string) => fileURLToPath(new URL(`../../../${path}`, import.
 const projectsDir = process.env.PROJECTS_DIR ?? repo('projects');
 const store = new FsProjectRepo(projectsDir);
 const blobs = new FsBlobStore({ projectsDir, soundsDir: repo('media/sounds') });
-const media = new LocalMediaRunner(blobs);
+const api = `${process.env.SEED_API ?? 'http://127.0.0.1:8787'}${API_PREFIX}`;
 
 const MomentsFileSchema = z.object({
   characters: z.array(CharacterSchema),
@@ -35,8 +36,16 @@ async function seedSample() {
     shots: undefined,
     ingest: pendingIngest(),
   });
-  const ingest = await runIngest({ repo: store, blobs, media }, id, () => {});
-  console.log(`created ${id} (ingest ${ingest.status})`);
+  const started = await fetch(`${api}/projects/${id}/ingest`, { method: 'POST', headers: { [IDEMPOTENCY_HEADER]: `seed-${id}` } }).catch(() => undefined);
+  if (!started?.ok) throw new Error(`created ${id}, but the server at ${api} did not start its ingest (${started?.status ?? 'not running'}); start \`pnpm dev\` with the same PROJECTS_DIR`);
+  for (;;) {
+    const project = await store.read(id);
+    if (project.ingest.status === 'done' || project.ingest.status === 'error') {
+      console.log(`created ${id} (ingest ${project.ingest.status}${project.ingest.error ? `: ${project.ingest.error}` : ''})`);
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
 }
 
 async function seedMoments(id: string, file: string) {

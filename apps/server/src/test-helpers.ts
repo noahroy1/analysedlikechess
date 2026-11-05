@@ -1,8 +1,10 @@
+import type { AddressInfo } from 'node:net';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { serve } from '@hono/node-server';
+import { createMediaServer } from '@als/media/server';
 import { API_PREFIX, IDEMPOTENCY_HEADER } from '@als/schema';
 import { loadAnalysisConfig, type AnalysisConfig } from './analysis/config.ts';
-import type { Providers } from './analysis/providers/index.ts';
 import { createNodeServer, type NodeServerOptions } from './node/server.ts';
 
 /** Recorded provider responses for the dialogue fixture; tests never call cloud APIs. */
@@ -10,19 +12,34 @@ export const DIALOGUE_RECORDING = fileURLToPath(new URL('../../../fixtures/dialo
 
 export const TEST_MEDIA_SECRET = 'test-media-url-secret-0123456789abcdef';
 
+/** Serves a fetch handler on a free loopback port; the servers never keep a test process alive. */
+async function listen(fetch: (request: Request) => Response | Promise<Response>): Promise<string> {
+  const server = serve({ fetch, port: 0, hostname: '127.0.0.1' });
+  if (!server.listening) await new Promise((resolve) => server.once('listening', resolve));
+  server.unref();
+  return `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+}
+
 /**
  * The whole server against a scratch projects folder, with replayed providers.
- * Renders load media from `origin`, which only a test that serves the app sets.
+ * It listens on loopback beside its own media service (as `pnpm dev` runs
+ * them), since the service reads and writes through the API; tests still call
+ * the app directly with `call`.
  */
 export async function makeTestApp(
   root: string,
   overrides: Partial<AnalysisConfig> = {},
   soundsDir = join(root, 'sounds'),
-  origin = 'http://127.0.0.1:0',
-  options: { capUsd?: number; providers?: Providers; wrapMedia?: NodeServerOptions['wrapMedia'] } = {},
+  options: Pick<NodeServerOptions, 'capUsd' | 'providers' | 'wrapMedia' | 'renderSplit'> = {},
 ) {
   const config: AnalysisConfig = { ...loadAnalysisConfig({}), autoAnalyze: false, replayDir: DIALOGUE_RECORDING, ...overrides };
-  const server = await createNodeServer({ projectsDir: root, soundsDir, config, origin, mediaSecret: TEST_MEDIA_SECRET, ...options });
+  const media = createMediaServer({ workRoot: join(root, '.media-work') });
+  const mediaUrl = await listen(media.app.fetch);
+  // The API's port comes first: the server needs its own origin to sign the media service's URLs.
+  const api: { fetch?: (request: Request) => Response | Promise<Response> } = {};
+  const origin = await listen((request) => api.fetch!(request));
+  const server = await createNodeServer({ projectsDir: root, soundsDir, config, origin, mediaUrls: [mediaUrl], mediaSecret: TEST_MEDIA_SECRET, ...options });
+  api.fetch = server.app.fetch;
   let n = 0;
   /**
    * A v1 request: the path is under /api/v1, JSON bodies are encoded, and every

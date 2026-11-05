@@ -489,7 +489,7 @@ describe('a failing vendor', () => {
 
       const replay = makeProviders(env.analysis.config);
       const broke: typeof replay = { ...replay, describer: { describe: () => Promise.reject(new ProviderError('credits depleted')) } };
-      const failing = await makeTestApp(root, {}, undefined, undefined, { providers: broke });
+      const failing = await makeTestApp(root, {}, undefined, { providers: broke });
       await failing.analysis.start(LOCAL_USER, id);
       await failing.jobs.whenIdle();
 

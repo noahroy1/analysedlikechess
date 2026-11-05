@@ -14,7 +14,7 @@ export default defineConfig(
     },
   },
   {
-    files: ['apps/server/**', 'packages/schema/**', 'scripts/**', '*.config.{js,ts}'],
+    files: ['apps/server/**', 'apps/media/**', 'packages/schema/**', 'scripts/**', '*.config.{js,ts}'],
     languageOptions: { globals: globals.node },
   },
   {

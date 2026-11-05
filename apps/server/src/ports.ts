@@ -4,7 +4,9 @@ import type {
   JobKind,
   JobState,
   PortraitRequest,
+  ProbeResult,
   Project,
+  RenderEncoding,
   RenderJob,
   Shot,
   Source,
@@ -161,7 +163,7 @@ export interface UsageLog {
   projectTotals(projectId: string): Promise<ProjectUsage>;
 }
 
-export type ProbeResult = Pick<Source, 'fps' | 'durationSec' | 'width' | 'height' | 'hasAudio'>;
+export type { ProbeResult };
 
 /** A file in a project and where it goes. */
 export interface MediaFile {
@@ -169,20 +171,47 @@ export interface MediaFile {
   file: string;
 }
 
-export interface RenderInput {
+export interface MediaProgress {
+  progress: number;
+  stage?: string;
+}
+
+export interface RenderChunkInput {
   projectId: string;
-  /** Folder-relative output, e.g. `renders/<id>.mp4`. */
-  output: string;
-  /** `<Episode>` props, every URL absolute. */
+  /** `<Episode>` props, every URL absolute; the media service fetches them first. */
   props: unknown;
   scale: number;
-  onProgress: (progress: { progress: number; stage: string; frames?: number }) => void;
+  /** Output frames [from, to], inclusive. */
+  frameRange: [number, number];
+  encoding: RenderEncoding;
+  /** Folder-relative outputs: the H.264 transport stream and its AAC audio. */
+  video: string;
+  audio: string;
+  /** How many chunks of this render run at once. */
+  chunks: number;
+  onProgress: (progress: MediaProgress) => void;
+  signal: AbortSignal;
+}
+
+export interface CombineInput {
+  projectId: string;
+  /** Folder-relative chunk files, in order. */
+  videos: string[];
+  audios: string[];
+  /** Folder-relative MP4. */
+  output: string;
+  fps: number;
+  framesPerChunk: number;
+  durationInFrames: number;
+  encoding: RenderEncoding;
+  onProgress: (progress: MediaProgress) => void;
   signal: AbortSignal;
 }
 
 /**
- * ffmpeg and Remotion: the work that moves into the media container in C2.
- * Each call reads its inputs from the project's files and writes outputs beside them.
+ * ffmpeg and Remotion: the media service (`apps/media`), a local process on
+ * Node and a Container in the cloud. Each call reads its inputs from the
+ * project's files and writes outputs beside them.
  */
 export interface MediaRunner {
   /** Reads the video's size, rate, length and audio. Throws NotAVideoError for anything else. */
@@ -200,7 +229,10 @@ export interface MediaRunner {
   frame(input: MediaFile & { frame: number; fps: number }): Promise<Uint8Array>;
   /** Crops a square portrait from one frame into `output`. */
   portrait(input: MediaFile & { output: string; request: PortraitRequest; source: Pick<Source, 'width' | 'height' | 'durationSec'> }): Promise<void>;
-  render(input: RenderInput): Promise<{ sizeBytes: number }>;
+  /** Renders a range of an episode's frames, for `combine`. Returns the seconds it ran (what a container bills). */
+  renderChunk(input: RenderChunkInput): Promise<{ seconds: number }>;
+  /** Joins rendered chunks into the MP4. */
+  combine(input: CombineInput): Promise<{ sizeBytes: number; seconds: number }>;
   /** Gets the browser and bundle ready ahead of the first render. */
   warmUp(): void;
 }

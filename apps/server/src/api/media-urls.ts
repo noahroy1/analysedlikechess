@@ -17,6 +17,14 @@ export const projectScope = (projectId: string) => `projects/${projectId}/`;
 export const SOUNDS_SCOPE = 'sounds/';
 export const uploadPartScope = (projectId: string, uploadId: string, partNumber: number) => `upload/${projectId}/${uploadId}/${partNumber}`;
 
+// The media service's own URLs: one file to read, one file to write, one task's
+// callback. They stand in for presigned R2 URLs and the Worker's callback route.
+export const mediaInScope = (projectId: string, file: string) => `media-in/${projectId}/${file}`;
+export const mediaOutScope = (projectId: string, file: string) => `media-out/${projectId}/${file}`;
+export const mediaTaskScope = (taskId: string) => `media-task/${taskId}`;
+/** The principal media URLs are signed for (no user is involved). */
+export const MEDIA_PRINCIPAL = 'media';
+
 export class MediaSigner {
   private readonly key: Promise<CryptoKey>;
 

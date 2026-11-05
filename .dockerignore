@@ -1,0 +1,14 @@
+# Only what the media service's image needs (apps/media/Dockerfile, built from the repo root).
+*
+!package.json
+!pnpm-lock.yaml
+!pnpm-workspace.yaml
+!.npmrc
+!tsconfig.base.json
+!apps/media
+!packages/schema
+!packages/composition
+!packages/theme
+**/node_modules
+**/*.test.ts
+**/*.test.tsx

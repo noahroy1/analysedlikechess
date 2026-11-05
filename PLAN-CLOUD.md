@@ -90,6 +90,7 @@ This is the Node code that already works: `media/*.ts`, `ingest/ingest.ts`, `ren
 - **Rendering:** it downloads the source, portraits and sounds to its disk and serves them to Remotion on localhost. That is faster and more deterministic than reading over the network, and it keeps `disableWebSecurity` local.
 - **Bundle:** the Remotion bundle is built into the image. In dev, the local process keeps today's fingerprint rebuild.
 - **Dev versus production:** the Worker reaches it through `MediaRunner`. In dev that is a plain local Node process (`MEDIA_URL`, no Docker). In production it is the Container binding.
+- **Built in C2 (Nov 5):** see the C2 notes under Phases for the contract, the URLs and split renders.
 - **Interactive calls** (regions' frame grab and portrait crops) shouldn't wait for a container to start. C0 tests Media Transformations (frame extraction) plus the Images binding (crop). The fallback is one warm container.
 
 ### Media URLs
@@ -289,12 +290,25 @@ Confirm every "(confirm in C0)" in this file. Record limits and prices in this f
 - **Spend:** checked before every paid call, including mid-analysis before each paid stage; logged per call with model, usage and cost; UTC months. Renders log container seconds at $0 until C4 prices them.
 - **Live updates:** one `job` event shape (the `Job` schema) for SSE now and Realtime later; clients read `GET /jobs` on every (re)connect instead of the server sending a snapshot.
 
-**Phase C2: Media service** (next; the starting state and open choices are in `CLAUDE.md`, "Next action")
+**Phase C2: Media service** (done Nov 5)
 
 Move ffmpeg and Remotion into `apps/media` behind its HTTP API, and package its Container image. The Node server calls it through `MediaRunner`.
 
-- [ ] The render test passes in `apps/media`, and `render-checks` passes through the Node server calling it.
-- [ ] The image builds and renders the sample in local Docker.
+- [x] The render test passes in `apps/media`, and `render-checks` passes through the Node server calling it. Done Nov 5: the test renders the sample whole and in three chunks and checks the chunked MP4 against the whole one; `render-checks` passes on the creator-look sample split in 4 chunks (holds 27.1-30.2 dB, review 34.7 dB) and on a copy of BB1 split in 4 (holds 32.5-33.0 dB, review 36.1 dB, as before C2). Every other browser check passes too.
+- [x] The image builds and renders the sample in local Docker. Done Nov 5: `linux/amd64` (Cloudflare's), 579 MB, run under emulation on the Mac. Ingest through it gave the same shots, proxy and thumbnails; its split render of the sample matches the Mac's render of the same version on every frame at 32.0 dB or more (median 34.1; C0's bar was 27.8), and its audio matches to -100.9 dB.
+
+**C2 notes (Nov 5):**
+- **Contract** (`packages/schema/src/media.ts`; routes under `/v1`): `probe`, `frame` and `portrait` answer in the response. Everything else (`hash`, `proxy`, `audio`, `shots`, `thumbnails`, `render-chunk`, `combine`) is a task: `POST /v1/tasks` with an id the caller picks (a repeat returns the running task) and a callback URL, answered 202. Progress (at most every 0.4 s, and on every stage change) and the result are POSTed to the callback; the final one is retried for about 15 s, and a 404 means nobody is waiting. `GET /v1/tasks/:id` answers the same for an hour after a task ends, and `POST /v1/tasks/:id/cancel` stops one. Errors are `{ error, code }` (`not_a_video`, `invalid_request`, `cancelled`, `failed`, `not_found`). The ingest settings that are part of cache keys (`PROXY`, `THUMB_WIDTH`, `CUT_DETECTION`) live beside the contract.
+- **Inputs and outputs** (decision 1): the service never shares a disk with the API. Each input is a signed GET of one file (`/api/v1/media/in/<project>/<file>`, with Range), each output a signed PUT (`/api/v1/media/out/…`), each task's callback a signed POST (`/api/v1/media/tasks/<id>`); none needs an idempotency key. They stand in for presigned R2 URLs and the Worker's callback route. Probe, frame and portrait let ffmpeg read the URL directly (Range requests, only the bytes it needs); full passes (proxy, audio, cuts, thumbnails) download first. A render downloads every http(s) URL in the props (clip, portraits, sounds) and serves them to Chrome on localhost.
+- **Progress** (decision 2): the callback, as the plan said. The Node runner waits on it and also asks `GET /v1/tasks/:id` every 10 s, so a lost callback or a restarted service fails the call instead of hanging. In C3 a Workflow step waits for the callback as an event.
+- **Split renders** (decision 3, the user's call Nov 5: split now): `RenderService` cuts the episode into contiguous frame ranges (`chunkRanges()`: all the same length but the last, as `combineChunks` needs), renders them at once as `render-chunk` tasks (H.264 transport stream plus AAC, `forSeamlessAacConcatenation`, `compositionStart: 0`, per remotion.dev/docs/distributed-rendering), then one `combine` task joins them without re-encoding. One failed chunk stops the others; the chunks (`renders/<id>.parts/`) are deleted whatever happens. Usage records every chunk's seconds plus the join's. With several `MEDIA_URL`s the chunks are spread over them; chunks sharing one service split its CPU. This is the shape C3's Workflow takes: one step per chunk, then the join.
+  - **How many:** `DEFAULT_RENDER_SPLIT` is up to 4 chunks of at least 600 frames (BB1: 4; the sample: 2). `RENDER_CHUNKS` and `RENDER_CHUNK_MIN_FRAMES` override it. `TODO(open-decision)`: C4 sets the cloud values from real renders.
+  - **Measured on the Mac (Nov 5, BB1, 5350 frames):** 104 s in 4 chunks against 119 s in 1 (one machine gains little; the gain is in the cloud, one instance per chunk).
+  - **Seams:** a chunk starts with a keyframe, so a frozen frame is quantised afresh there. On the sample the step is 43.4-49.4 dB, the same as the keyframes x264 already puts in holds every 250 frames (44.2-48.7 dB), against about 30 dB for one frame of play. The audio across seams matches a whole render to below -60 dB.
+- **Seeding** is now an API client: `pnpm seed:sample` writes the project and asks the running server to ingest it, so it needs `pnpm dev` (same `PROJECTS_DIR`).
+- **Found on the way:** analysis started on its own after any ingest of a project whose analysis was idle, so a re-ingest (and now seeding) would have replaced a sample's moves (and, with keys, spent money). It now starts on its own only for a clip with no moves yet.
+- **Image** (`apps/media/Dockerfile`, built from the repo root with `.dockerignore`): `node:24-bookworm-slim`, Debian's ffmpeg 5.1 (its `scdet` found the same cuts), Chrome's libraries, `fonts-liberation`, the browser and the composition bundle built in (`build-bundle.ts`, `MEDIA_BUNDLE_DIR`). The bundle needs the packages' `tsconfig.json` (the JSX runtime comes from it). Listens on 8080.
+- **Not done here:** the Container binding and how instances are started per chunk (C3); container seconds priced (C4).
 
 **Phase C3: Supabase and the Worker**
 

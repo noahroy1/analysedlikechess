@@ -1,17 +1,18 @@
+import { execFile } from 'node:child_process';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { promisify } from 'node:util';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { SoundBankSchema } from '@als/schema';
 import { makeTestApp } from '../test-helpers.ts';
-import { run } from './run.ts';
 import { SoundLibrary } from './sounds.ts';
 
 let root: string;
 let dir: string;
 
 const tone = (file: string, sec: number) =>
-  run('ffmpeg', ['-v', 'error', '-f', 'lavfi', '-i', `sine=frequency=440:duration=${sec}`, '-ar', '48000', join(dir, file)]);
+  promisify(execFile)('ffmpeg', ['-v', 'error', '-f', 'lavfi', '-i', `sine=frequency=440:duration=${sec}`, '-ar', '48000', join(dir, file)]);
 
 beforeAll(async () => {
   root = await mkdtemp(join(tmpdir(), 'als-sounds-'));

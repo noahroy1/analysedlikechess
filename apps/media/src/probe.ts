@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { NotAVideoError, type ProbeResult } from '../ports.ts';
+import type { ProbeResult } from '@als/schema';
 import { run } from './run.ts';
 
 // The subset of ffprobe's JSON output we read.
@@ -19,7 +19,8 @@ const ProbeOutput = z.object({
   format: z.looseObject({ duration: z.string().optional() }),
 });
 
-export { NotAVideoError };
+/** A file ffprobe can't read as a video. */
+export class NotAVideoError extends Error {}
 
 /** "24000/1001" -> 23.976... */
 export function parseRate(rate: string | undefined): number {
@@ -54,10 +55,11 @@ export function readProbe(json: unknown): ProbeResult {
   };
 }
 
-export async function probe(file: string): Promise<ProbeResult> {
+/** Probes a file or an http(s) URL (ffprobe reads only what it needs, with Range requests). */
+export async function probe(input: string): Promise<ProbeResult> {
   let stdout: string;
   try {
-    stdout = await run('ffprobe', ['-v', 'error', '-print_format', 'json', '-show_streams', '-show_format', file]);
+    stdout = await run('ffprobe', ['-v', 'error', '-print_format', 'json', '-show_streams', '-show_format', input]);
   } catch {
     throw new NotAVideoError('ffprobe could not read the file');
   }

@@ -1,7 +1,8 @@
+import { execFile } from 'node:child_process';
 import { readdir, stat } from 'node:fs/promises';
 import { join } from 'node:path';
+import { promisify } from 'node:util';
 import { SoundIdSchema, type SoundBank } from '@als/schema';
-import { run } from './run.ts';
 
 /** Sound files the browser and the renderer can both decode. */
 export const SOUND_FILE = /^([a-z0-9-]+)\.(wav|mp3|ogg|m4a|aac|flac)$/;
@@ -44,7 +45,8 @@ export class SoundLibrary {
     const key = `${info.size}:${info.mtimeMs}`;
     const cached = this.durations.get(file);
     if (cached?.key === key) return cached.durationSec;
-    const out = await run('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', join(this.dir, file)]);
+    // C3 keeps the lengths in a `sounds` table, probed at upload, so this ffprobe goes with the Node server.
+    const { stdout: out } = await promisify(execFile)('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', join(this.dir, file)]);
     const durationSec = Number(out.trim());
     this.durations.set(file, { key, durationSec });
     return durationSec;

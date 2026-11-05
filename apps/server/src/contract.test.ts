@@ -66,14 +66,17 @@ describe('the same key, twice: the same response and one effect', { timeout: 30_
     };
     const wrapMedia = (media: MediaRunner): MediaRunner =>
       Object.assign(Object.create(media) as MediaRunner, {
-        // Renders wait until the test lets them, or are cancelled.
-        async render({ signal }: { signal: AbortSignal }) {
+        // Render chunks wait until the test lets them, or are cancelled.
+        async renderChunk({ signal }: { signal: AbortSignal }) {
           signal.throwIfAborted();
           await Promise.race([renderGate.opened, new Promise((_, reject) => signal.addEventListener('abort', () => reject(new Error('cancelled'))))]);
-          return { sizeBytes: 1 };
+          return { seconds: 1 };
+        },
+        async combine() {
+          return { sizeBytes: 1, seconds: 1 };
         },
       });
-    env = await makeTestApp(root, {}, undefined, undefined, { providers, wrapMedia });
+    env = await makeTestApp(root, {}, undefined, { providers, wrapMedia });
   });
 
   afterAll(async () => {
@@ -258,7 +261,7 @@ describe('contract rules', { timeout: 30_000 }, () => {
   beforeAll(async () => {
     root = await mkdtemp(join(tmpdir(), 'als-rules-'));
     // A cap so small that one paid call reaches it.
-    env = await makeTestApp(root, {}, undefined, undefined, { capUsd: 0.000001 });
+    env = await makeTestApp(root, {}, undefined, { capUsd: 0.000001 });
     const fixture = ProjectSchema.parse(JSON.parse(await readFile(new URL('../../../fixtures/sample/project.json', import.meta.url), 'utf8')));
     const id = await env.store.newId('rules');
     project = await env.store.create({ ...fixture, id, version: 1 });

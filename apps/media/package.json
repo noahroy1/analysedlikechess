@@ -1,0 +1,29 @@
+{
+  "name": "@als/media",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./server": "./src/server.ts"
+  },
+  "scripts": {
+    "dev": "node --watch src/index.ts",
+    "start": "node src/index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@als/composition": "workspace:*",
+    "@als/schema": "workspace:*",
+    "@hono/node-server": "2.1.4",
+    "@remotion/bundler": "4.0.534",
+    "@remotion/renderer": "4.0.534",
+    "hono": "4.13.13",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "remotion": "4.0.534",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@als/theme": "workspace:*"
+  }
+}

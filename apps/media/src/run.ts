@@ -4,6 +4,8 @@ import { createInterface } from 'node:readline';
 export interface RunOptions {
   /** Called with each stdout line as it arrives. */
   onLine?: (line: string) => void;
+  /** Kills the command when aborted. */
+  signal?: AbortSignal;
 }
 
 export class CommandError extends Error {
@@ -16,7 +18,7 @@ export class CommandError extends Error {
 /** Runs a command to completion and resolves with its stdout. */
 export function run(command: string, args: string[], options: RunOptions = {}): Promise<string> {
   return new Promise((resolve, reject) => {
-    const child = spawn(command, args, { stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = spawn(command, args, { stdio: ['ignore', 'pipe', 'pipe'], ...(options.signal ? { signal: options.signal } : {}) });
     const out: string[] = [];
     let stderr = '';
     createInterface({ input: child.stdout }).on('line', (line) => {
@@ -39,8 +41,9 @@ export function run(command: string, args: string[], options: RunOptions = {}): 
  * Runs ffmpeg with machine-readable progress on stdout, reporting 0-1 against
  * the expected output duration.
  */
-export function ffmpeg(args: string[], durationSec: number, onProgress?: (p: number) => void): Promise<string> {
+export function ffmpeg(args: string[], durationSec: number, onProgress?: (p: number) => void, signal?: AbortSignal): Promise<string> {
   return run('ffmpeg', ['-hide_banner', '-nostats', '-loglevel', 'error', '-y', '-progress', 'pipe:1', ...args], {
+    ...(signal ? { signal } : {}),
     onLine: (line) => {
       const match = /^out_time_us=(\d+)$/.exec(line);
       if (match && onProgress && durationSec > 0) {

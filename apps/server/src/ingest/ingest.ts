@@ -1,8 +1,6 @@
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
-import { shotThumbnailFile, type Ingest, type Project, type Stage } from '@als/schema';
-import { CUT_DETECTION } from '../media/cuts.ts';
-import { PROXY, THUMB_WIDTH } from '../media/settings.ts';
+import { CUT_DETECTION, PROXY, THUMB_WIDTH, shotThumbnailFile, type Ingest, type Project, type Stage } from '@als/schema';
 import { projectKey, type BlobStore, type MediaRunner, type ProjectRepo } from '../ports.ts';
 
 export const INGEST_STAGES = ['hash', 'probe', 'proxy', 'audio', 'shots', 'thumbnails'] as const;

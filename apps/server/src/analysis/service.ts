@@ -70,7 +70,8 @@ export class AnalysisService {
   async autoStart(userId: string, id: string): Promise<void> {
     if (!this.config.autoAnalyze || this.missingKeys().length) return;
     const project = await this.deps.repo.read(id).catch(() => undefined);
-    if (project?.analysis.status === 'idle') await this.start(userId, id).catch(() => undefined);
+    // Only a clip with no moves yet: a re-ingest (or a seeded sample) never replaces moves on its own.
+    if (project?.analysis.status === 'idle' && project.moments.length === 0) await this.start(userId, id).catch(() => undefined);
   }
 
   async regenerate(userId: string, id: string, moment: Moment, instruction?: string, format?: Format): Promise<RegenerateResult> {

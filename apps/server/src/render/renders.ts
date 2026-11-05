@@ -1,5 +1,7 @@
 import {
   ProjectSchema,
+  RENDER_ENCODING,
+  chunkRanges,
   episodeProps,
   gameReviewSec,
   presetSize,
@@ -13,7 +15,7 @@ import {
 import { buildTimeline } from '@als/composition/timeline';
 import { getTheme } from '@als/theme/themes';
 import type { MediaSigner } from '../api/media-urls.ts';
-import type { SoundLibrary } from '../media/sounds.ts';
+import type { SoundLibrary } from '../node/sounds.ts';
 import {
   JobRunningError,
   NotFoundError,
@@ -28,7 +30,29 @@ import {
 import type { Spend } from '../spend.ts';
 
 const snapshotFile = (id: string) => `renders/${id}.json`;
-const tmpFile = (id: string) => `renders/${id}.tmp.mp4`;
+/** A render's chunks while it runs; removed when it ends. */
+const partsDir = (id: string) => `renders/${id}.parts/`;
+const chunkFile = (id: string, index: number, ext: 'ts' | 'aac') => `${partsDir(id)}chunk-${String(index).padStart(4, '0')}.${ext}`;
+
+/**
+ * How a render is split by frame range, each chunk on its own media instance at
+ * once (C0: one cloud instance took about 6 min for BB1, the Mac 2), then joined.
+ */
+export interface RenderSplit {
+  /** At most this many chunks. */
+  maxChunks: number;
+  /** No chunk shorter than this, since each pays a fixed start (media download, browser, bundle). */
+  minChunkFrames: number;
+}
+
+// TODO(open-decision): measured locally only; C4 sets the cloud values from real renders.
+export const DEFAULT_RENDER_SPLIT: RenderSplit = { maxChunks: 4, minChunkFrames: 600 };
+
+/** How many chunks a render of `frames` frames gets. */
+export const chunkCount = (frames: number, split: RenderSplit) => Math.max(1, Math.min(split.maxChunks, Math.floor(frames / split.minChunkFrames)));
+
+/** Chunk stages in the order they happen; a split render shows its slowest chunk's. */
+const CHUNK_STAGES = ['Queued', 'Downloading media', 'Preparing the browser', 'Bundling', 'Rendering frames', 'Encoding', 'Uploading'];
 
 export class RenderPresetError extends Error {}
 
@@ -41,8 +65,9 @@ export interface RenderDeps {
   spend: Spend;
   sounds: SoundLibrary;
   signer: MediaSigner;
-  /** The API's own origin. The renderer's browser loads the clip, portraits and sounds from it over signed URLs. */
+  /** The API's origin as the media service reaches it. It fetches the clip, portraits and sounds from it over signed URLs. */
   origin: string;
+  split?: RenderSplit;
 }
 
 /**
@@ -66,7 +91,7 @@ export class RenderService {
           if (job.status !== 'pending' && job.status !== 'running') continue;
           Object.assign(job, { status: 'failed', error: 'The server stopped during this render.', finishedAt: now() });
           delete job.stage;
-          await this.deps.blobs.delete(projectKey(projectId, tmpFile(job.id)));
+          await this.deps.blobs.deletePrefix(projectKey(projectId, partsDir(job.id)));
         }
       });
     }
@@ -173,27 +198,21 @@ export class RenderService {
       if (persist) await this.update(projectId, live.id, change);
     };
     const started = performance.now();
+    let containerSec: number | undefined;
     try {
-      await report({ status: 'running', stage: 'Preparing the browser', progress: 0 });
+      await report({ status: 'running', stage: 'Preparing', progress: 0 });
       const snapshot = await this.deps.blobs.get(projectKey(projectId, snapshotFile(live.id)));
       if (!snapshot) throw new Error('The render snapshot is missing.');
       const project = ProjectSchema.parse(JSON.parse(await new Response(snapshot.body).text()));
       const props = await this.props(userId, projectId, project);
-      // Cancelled while getting ready: the runner only hears of an abort from now on.
+      // Cancelled while getting ready: the media service only hears of an abort from now on.
       signal.throwIfAborted();
-      const { sizeBytes } = await this.deps.media.render({
-        projectId,
-        output: live.file,
-        props,
-        scale: live.width / project.source.width,
-        signal,
-        onProgress: ({ progress, stage, frames }) => {
-          // Stage changes are saved; frame-by-frame progress is only broadcast.
-          const persist = stage !== live.stage || frames !== undefined;
-          void report({ progress, stage, ...(frames !== undefined ? { frames } : {}) }, persist);
-        },
+      const result = await this.renderChunks(projectId, live, props, project.source.width, signal, (change) => {
+        // Stage changes are saved; frame-by-frame progress is only broadcast.
+        void report(change, change.stage !== live.stage);
       });
-      await report({ status: 'done', stage: undefined, progress: 1, sizeBytes, finishedAt: now() });
+      containerSec = result.seconds;
+      await report({ status: 'done', stage: undefined, progress: 1, sizeBytes: result.sizeBytes, finishedAt: now() });
     } catch (error) {
       const cancelled = signal.aborted;
       if (!cancelled) console.error(`render ${projectId}/${live.id} failed:`, error);
@@ -204,9 +223,78 @@ export class RenderService {
         ...(cancelled ? {} : { error: error instanceof Error ? error.message : String(error) }),
       }).catch(() => undefined);
     } finally {
-      // Renders cost nothing on this machine; container seconds are priced in C4.
-      const containerSec = Math.round((performance.now() - started) / 100) / 10;
-      await this.deps.usage.record({ userId, projectId, call: 'render', costUsd: 0, containerSec }).catch(() => undefined);
+      // Renders cost nothing on this machine; container seconds (every chunk's, plus the join) are priced in C4.
+      containerSec ??= (performance.now() - started) / 1000;
+      await this.deps.usage.record({ userId, projectId, call: 'render', costUsd: 0, containerSec: Math.round(containerSec * 10) / 10 }).catch(() => undefined);
+    }
+  }
+
+  /**
+   * Renders the episode in frame-range chunks at once, then joins them. One
+   * failed chunk stops the others. The chunks are deleted whatever happens.
+   */
+  private async renderChunks(
+    projectId: string,
+    job: RenderJob,
+    props: RenderProps,
+    sourceWidth: number,
+    signal: AbortSignal,
+    report: (change: Partial<RenderJob>) => void,
+  ): Promise<{ sizeBytes: number; seconds: number }> {
+    const { media, blobs } = this.deps;
+    const { ranges, framesPerChunk } = chunkRanges(job.frames, chunkCount(job.frames, this.deps.split ?? DEFAULT_RENDER_SPLIT));
+    const stopOthers = new AbortController();
+    const chunkSignal = AbortSignal.any([signal, stopOthers.signal]);
+    const progress = ranges.map(() => 0);
+    const stages = ranges.map(() => 'Queued');
+    // Rendering is most of the time; the join is the last tenth.
+    const update = () => {
+      const stage = CHUNK_STAGES[Math.min(...stages.map((s) => Math.max(0, CHUNK_STAGES.indexOf(s))))]!;
+      report({ progress: 0.9 * (progress.reduce((a, b) => a + b, 0) / ranges.length), stage });
+    };
+    try {
+      const chunks = await Promise.all(
+        ranges.map((frameRange, i) =>
+          media
+            .renderChunk({
+              projectId,
+              props,
+              scale: job.width / sourceWidth,
+              frameRange,
+              encoding: RENDER_ENCODING,
+              video: chunkFile(job.id, i, 'ts'),
+              audio: chunkFile(job.id, i, 'aac'),
+              chunks: ranges.length,
+              signal: chunkSignal,
+              onProgress: ({ progress: p, stage }) => {
+                progress[i] = p;
+                if (stage) stages[i] = stage;
+                update();
+              },
+            })
+            .catch((error: unknown) => {
+              stopOthers.abort(error);
+              throw error;
+            }),
+        ),
+      );
+      signal.throwIfAborted();
+      report({ progress: 0.9, stage: 'Joining' });
+      const joined = await media.combine({
+        projectId,
+        videos: ranges.map((_, i) => chunkFile(job.id, i, 'ts')),
+        audios: ranges.map((_, i) => chunkFile(job.id, i, 'aac')),
+        output: job.file,
+        fps: job.fps,
+        framesPerChunk,
+        durationInFrames: job.frames,
+        encoding: RENDER_ENCODING,
+        signal,
+        onProgress: ({ progress: p }) => report({ progress: 0.9 + 0.09 * p, stage: 'Joining' }),
+      });
+      return { sizeBytes: joined.sizeBytes, seconds: chunks.reduce((sum, c) => sum + c.seconds, joined.seconds) };
+    } finally {
+      await blobs.deletePrefix(projectKey(projectId, partsDir(job.id))).catch(() => undefined);
     }
   }
 

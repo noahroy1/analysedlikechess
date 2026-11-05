@@ -16,3 +16,4 @@ export * from './analyst.ts';
 export * from './render.ts';
 export * from './regions.ts';
 export * from './contract.ts';
+export * from './media.ts';

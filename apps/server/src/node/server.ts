@@ -9,10 +9,9 @@ import { MemoryIdempotencyStore } from '../api/idempotency.ts';
 import { MediaSigner } from '../api/media-urls.ts';
 import { createApp } from '../app.ts';
 import { IngestService } from '../ingest/service.ts';
-import { LocalMediaRunner } from '../media/local-runner.ts';
-import { SoundLibrary } from '../media/sounds.ts';
+import { HttpMediaRunner } from '../media/http-runner.ts';
 import type { MediaRunner } from '../ports.ts';
-import { RenderService } from '../render/renders.ts';
+import { RenderService, type RenderSplit } from '../render/renders.ts';
 import { Spend } from '../spend.ts';
 import { FsBlobStore } from './fs-blobs.ts';
 import { FsProjectRepo } from './fs-repo.ts';
@@ -20,6 +19,7 @@ import { FsUsageLog } from './fs-usage.ts';
 import { LocalEventBus } from './local-events.ts';
 import { LocalJobRunner } from './local-jobs.ts';
 import { makeProviders } from './providers.ts';
+import { SoundLibrary } from './sounds.ts';
 
 /** The one user of the local server until sign-in exists (C3). */
 export const LOCAL_USER = 'local';
@@ -28,15 +28,19 @@ export interface NodeServerOptions {
   projectsDir: string;
   soundsDir: string;
   config: AnalysisConfig;
-  /** This server's origin; the renderer's browser loads media from it. */
+  /** This server's origin as the media service reaches it: it reads inputs, writes outputs and reports from there. */
   origin: string;
+  /** The media service (`apps/media`); several spread render chunks over themselves. */
+  mediaUrls: string[];
+  /** How renders are split into chunks. */
+  renderSplit?: RenderSplit;
   providers?: Providers;
   /** Signs media URLs. Absent: MEDIA_URL_SECRET, else a secret kept in the projects folder. */
   mediaSecret?: string;
   /** Monthly spend cap override (tests). */
   capUsd?: number;
   /** Wraps the media runner (tests). */
-  wrapMedia?: (media: LocalMediaRunner) => MediaRunner;
+  wrapMedia?: (media: MediaRunner) => MediaRunner;
 }
 
 /**
@@ -54,26 +58,26 @@ async function mediaSecret(projectsDir: string): Promise<string> {
   return secret;
 }
 
-/** The whole API on this machine: folders for data and media, jobs in this process, ffmpeg and Remotion as child processes. */
+/** The whole API on this machine: folders for data and media, jobs in this process, ffmpeg and Remotion in the media service. */
 export async function createNodeServer(options: NodeServerOptions) {
   const { projectsDir, soundsDir, config } = options;
   const repo = new FsProjectRepo(projectsDir);
   const blobs = new FsBlobStore({ projectsDir, soundsDir });
-  const local = new LocalMediaRunner(blobs);
-  const media = options.wrapMedia?.(local) ?? local;
   const events = new LocalEventBus();
   const jobs = new LocalJobRunner(events);
   const usage = new FsUsageLog(projectsDir);
   const spend = new Spend(usage, options.capUsd);
   const signer = new MediaSigner(options.mediaSecret ?? (await mediaSecret(projectsDir)));
+  const http = new HttpMediaRunner({ urls: options.mediaUrls, signer, blobs, origin: options.origin });
+  const media = options.wrapMedia?.(http) ?? http;
   const sounds = new SoundLibrary(soundsDir);
   const style = StyleCorpusSchema.parse(JSON.parse(await readFile(config.styleCorpusPath, 'utf8')));
   const providers = options.providers ?? makeProviders(config);
   const analysis = new AnalysisService({ repo, blobs, media, jobs, usage, spend, providers, config, style });
   const ingest = new IngestService({ repo, blobs, media, jobs, onDone: (userId, id) => void analysis.autoStart(userId, id) });
-  const renders = new RenderService({ repo, blobs, media, jobs, usage, spend, sounds, signer, origin: options.origin });
+  const renders = new RenderService({ repo, blobs, media, jobs, usage, spend, sounds, signer, origin: options.origin, ...(options.renderSplit ? { split: options.renderSplit } : {}) });
   const idempotency = new MemoryIdempotencyStore();
-  const app = createApp({ repo, blobs, media, jobs, ingest, analysis, renders, sounds, signer, idempotency, spend, events, userId: LOCAL_USER });
+  const app = createApp({ repo, blobs, media, jobs, ingest, analysis, renders, sounds, signer, idempotency, spend, events, userId: LOCAL_USER, mediaTasks: http });
 
   /** After a restart: fail interrupted renders and resume ingest and analysis (finished steps are cached). */
   const recover = async () => {

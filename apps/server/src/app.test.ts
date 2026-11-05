@@ -1,10 +1,14 @@
+import { execFile } from 'node:child_process';
 import { mkdtemp, readFile, readdir, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { promisify } from 'node:util';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { MediaGrantSchema, ProjectSchema, ProjectSummarySchema, grantUrl, type MediaGrant, type Project } from '@als/schema';
-import { run } from './media/run.ts';
 import { makeTestApp, uploadFile, type TestApp } from './test-helpers.ts';
+
+/** A command's stdout. */
+const run = async (command: string, args: string[]) => (await promisify(execFile)(command, args)).stdout;
 
 // End to end against real ffmpeg (local, no cloud calls) on the 10 s fixture clip,
 // which has hard cuts at 3.5 s and 7 s.

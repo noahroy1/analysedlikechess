@@ -1,28 +1,12 @@
-import type { Shot } from '@als/schema';
+import { CUT_DETECTION, type Shot } from '@als/schema';
+
+export { CUT_DETECTION };
 
 export interface FrameScore {
   time: number;
   score: number;
 }
 
-/**
- * Cut detection settings, tuned on dark, low-contrast film footage where real
- * cuts score only 5-10 while fast motion ramps smoothly through 2-5.
- * A cut is a frame that spikes well above its neighbours, or any huge jump.
- */
-export const CUT_DETECTION = {
-  /** Width frames are scaled to before scoring; scdet scores depend on it. */
-  scaleWidth: 320,
-  /** Ignore frames scoring below this (scdet's 0-100 scale). */
-  minScore: 4,
-  /** ...unless they score at least this many times every neighbour in the window. */
-  peakRatio: 2,
-  windowSec: 0.1,
-  /** Always a cut, whatever the neighbours do. */
-  hardScore: 10,
-  /** Two cuts closer than this keep only the stronger one. */
-  minShotSec: 0.2,
-};
 
 /** Parses `metadata=print` output from ffmpeg's scdet filter into per-frame scores. */
 export function parseScdet(output: string): FrameScore[] {
