@@ -1,5 +1,6 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { StyleCorpusSchema } from '@als/schema';
+import { z } from 'zod';
+import { StyleCorpusSchema, type Project } from '@als/schema';
 import corpus from '../../../style/corpus.json' with { type: 'json' };
 import { loadAnalysisConfig } from '../../server/src/analysis/config.ts';
 import { makeProviders } from '../../server/src/analysis/providers/make.ts';
@@ -40,6 +41,8 @@ export interface Env {
   API_ORIGIN: string;
   /** Names a bundled set of recordings to replay instead of calling providers (`dialogue`). */
   ANALYSIS_REPLAY_DIR?: string;
+  /** Dev only: `true` adds the seeding route (never set in a deployed environment). */
+  DEV_ROUTES?: string;
   [key: string]: unknown;
 }
 
@@ -96,6 +99,22 @@ export function buildCloud(env: Env) {
     authenticate: auth(verifier, { skip: (path) => SIGNED_PATH.test(path) }),
     runAs: (userId, work) => asUser(userId, work),
   });
+  if (env.DEV_ROUTES === 'true') {
+    /**
+     * Dev seeding (`pnpm seed:sample`, `pnpm seed:moments`): sets parts of a
+     * project's document the editor API doesn't (transcript, scene notes,
+     * characters, moves), as the seed scripts once wrote project.json. The
+     * owner only, like every route; never the source, ingest or analysis state.
+     */
+    const KEPT = ['id', 'version', 'createdAt', 'source', 'ingest', 'analysis'] as const;
+    app.put('/dev/projects/:id/seed', async (c) => {
+      const fields = z.record(z.string(), z.unknown()).parse(await c.req.json());
+      for (const key of KEPT) delete fields[key];
+      // The repo validates the merged document with ProjectSchema.
+      const project = await repo.update(c.req.param('id'), (p) => ({ ...p, ...fields }) as Project);
+      return c.json(project);
+    });
+  }
   return { app, db, repo, blobs, jobs, events, usage, spend, signer, sounds, analysis, ingest, renders };
 }
 

@@ -7,14 +7,14 @@
     "node": ">=24.12.0"
   },
   "scripts": {
-    "dev": "pnpm --parallel --filter \"./apps/*\" dev",
+    "dev": "pnpm --parallel --filter \"./apps/*\" --filter \"!@als/server\" dev",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint .",
     "typecheck": "pnpm -r typecheck",
     "check": "pnpm lint && pnpm typecheck && pnpm test",
-    "seed:sample": "node apps/server/src/seed.ts sample",
-    "seed:moments": "node apps/server/src/seed.ts moments"
+    "seed:sample": "node apps/api/scripts/seed.ts sample",
+    "seed:moments": "node apps/api/scripts/seed.ts moments"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

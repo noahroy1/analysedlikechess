@@ -80,7 +80,19 @@ export interface ClientOptions {
   storage?: KeyValueStore;
   /** Network retries per call, with the same idempotency key. */
   retries?: number;
+  /** The signed-in user's access token, sent as `Authorization: Bearer` (`createSession().token`). Absent: no header (the Node server). */
+  token?: () => Promise<string | undefined>;
+  /** Called on a 401 `unauthorized`: the sign-in has ended. */
+  onUnauthorized?: () => void;
+  /** How live job updates arrive (`createSession().liveJobs`, Realtime). Absent: the Node server's event stream. */
+  liveJobs?: LiveJobs;
 }
+
+/**
+ * A live-updates transport: calls `job` with each update and `connected` on
+ * every (re)connect (when the client reads the GET /jobs snapshot). Returns a stop function.
+ */
+export type LiveJobs = (handlers: { job(job: unknown): void; connected(): void }) => () => void;
 
 export interface ProjectEventHandlers {
   /** A live job update, and every live job again on (re)connect. */
@@ -128,12 +140,17 @@ export function createApiClient(options: ClientOptions = {}) {
     // One key per call, so its retries are the same intent.
     if (method !== 'GET') headers[IDEMPOTENCY_HEADER] = init.key ?? newKey();
     for (let attempt = 0; ; attempt++) {
+      // Each attempt asks again: a retry after a refresh carries the new token.
+      const token = await options.token?.();
+      if (token) headers.Authorization = `Bearer ${token}`;
       try {
-        return await fetch(absolute(`${API_PREFIX}${path}`), {
+        const res = await fetch(absolute(`${API_PREFIX}${path}`), {
           method,
           headers,
           ...(init.json !== undefined ? { body: JSON.stringify(init.json) } : {}),
         });
+        if (res.status === 401) options.onUnauthorized?.();
+        return res;
       } catch (error) {
         // A network failure (the request may or may not have arrived): the same key makes repeating it safe.
         if (attempt >= retries) throw new Error(`could not reach the server (${(error as Error).message})`, { cause: error });
@@ -185,6 +202,30 @@ export function createApiClient(options: ClientOptions = {}) {
   // Live jobs: the dev event stream now, Realtime Broadcast in C3. The snapshot comes from GET /jobs on every (re)connect.
 
   function subscribeJobs(handlers: ProjectEventHandlers): () => void {
+    if (options.liveJobs) {
+      let opened = false;
+      let closed = false;
+      const stop = options.liveJobs({
+        job: (raw) => {
+          const parsed = JobSchema.safeParse(raw);
+          if (parsed.success && !closed) handlers.job?.(parsed.data);
+        },
+        connected: () => {
+          void request('GET', '/jobs', JobSchema.array())
+            .catch(() => [])
+            .then((jobs) => {
+              if (closed) return;
+              for (const job of jobs) handlers.job?.(job);
+              if (opened) handlers.reconnect?.();
+              opened = true;
+            });
+        },
+      });
+      return () => {
+        closed = true;
+        stop();
+      };
+    }
     let source: EventSource | undefined;
     let lastHeard = 0;
     let opened = false;

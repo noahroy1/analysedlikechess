@@ -4,11 +4,12 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "dev": "pnpm db:start && node scripts/dev-setup.ts && wrangler dev --port 8790",
     "typecheck": "tsc --noEmit",
     "db:keys": "cd ../.. && (test -f supabase/signing_keys.json || (echo '[]' > supabase/signing_keys.json && supabase gen signing-key --algorithm ES256 --append))",
-    "db:start": "pnpm db:keys && supabase start --workdir ../..",
-    "db:stop": "supabase stop --workdir ../..",
-    "db:reset": "supabase db reset --workdir ../..",
+    "db:start": "pnpm db:keys && PATH=\"$PATH:/Applications/Docker.app/Contents/Resources/bin\" supabase start --workdir ../.. > /dev/null && echo 'local Supabase is up'",
+    "db:stop": "PATH=\"$PATH:/Applications/Docker.app/Contents/Resources/bin\" supabase stop --workdir ../..",
+    "db:reset": "PATH=\"$PATH:/Applications/Docker.app/Contents/Resources/bin\" supabase db reset --workdir ../..",
     "test:db": "node scripts/with-supabase.ts vitest run --root ../.. apps/api/src/db"
   },
   "dependencies": {

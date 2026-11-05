@@ -1,5 +1,6 @@
 import type { ProjectSummary } from '@als/schema';
 import { useEffect, useState } from 'react';
+import { AccountMenu } from '../components/SignIn.tsx';
 import { StatusBadge } from '../components/StageList.tsx';
 import { UploadPanel } from '../components/UploadPanel.tsx';
 import { fileUrl, listProjects } from '../lib/api.ts';
@@ -35,9 +36,12 @@ export function ProjectsPage() {
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
-      <header className="mb-6">
-        <h1 className="text-xl font-semibold tracking-tight">Analysed Like Chess Studio</h1>
-        <p className="mt-1 text-sm text-neutral-400">Upload a scene, review the moves, render the episode.</p>
+      <header className="mb-6 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-xl font-semibold tracking-tight">Analysed Like Chess Studio</h1>
+          <p className="mt-1 text-sm text-neutral-400">Upload a scene, review the moves, render the episode.</p>
+        </div>
+        <AccountMenu />
       </header>
 
       <UploadPanel />
