@@ -113,7 +113,7 @@ await db.query(`update app.profiles set role = 'admin' where user_id = $1`, [use
 // The sound bank: each file to local R2 (where `wrangler dev` reads it) and its length to the table.
 const soundsDir = resolve(ROOT, process.env.SOUNDS_DIR ?? 'media/sounds');
 const files = existsSync(soundsDir) ? readdirSync(soundsDir).filter((f) => SoundIdSchema.safeParse(SOUND_FILE.exec(f)?.[1]).success) : [];
-const platform = await getPlatformProxy<{ MEDIA: R2Bucket }>({ configPath: join(API_DIR, 'wrangler.jsonc') });
+const platform = await getPlatformProxy<{ MEDIA: R2Bucket }>({ configPath: join(API_DIR, 'wrangler.jsonc'), persist: { path: join(API_DIR, '.wrangler/state/v3') } });
 try {
   const loaded: string[] = [];
   for (const file of files.sort()) {
