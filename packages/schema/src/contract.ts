@@ -61,6 +61,12 @@ export const IDEMPOTENCY_HEADER = 'Idempotency-Key';
 /** Set on a response replayed from an earlier call with the same key. */
 export const IDEMPOTENT_REPLAY_HEADER = 'Idempotent-Replayed';
 export const CLIENT_VERSION_HEADER = 'X-Client-Version';
+/**
+ * Where the mobile app's pages come from: Capacitor's defaults (`server.hostname`
+ * "localhost", `iosScheme` "capacitor", `androidScheme` "https"; confirmed Nov 4).
+ * The deployed API allows them alongside the web app's origin.
+ */
+export const CAPACITOR_ORIGINS = ['capacitor://localhost', 'https://localhost'] as const;
 /** How long a key is remembered. */
 export const IDEMPOTENCY_TTL_MS = 24 * 60 * 60 * 1000;
 export const IdempotencyKeySchema = z.string().min(8).max(200);

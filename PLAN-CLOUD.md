@@ -331,6 +331,10 @@ Move ffmpeg and Remotion into `apps/media` behind its HTTP API, and package its 
 - [ ] BB1 opens in the deployed editor and renders, and `render-checks` passes against it.
 - [ ] The real cost per clip (providers, container seconds, R2) is measured and recorded here.
 
+**C4 notes (Nov 5; CORS and prices built ahead of C3's checks, the user's call):**
+- **CORS** (`crossOrigin()` in `apps/server/src/app.ts`, Hono's own `cors`): only when `corsOrigins` is set, so the Node server is unchanged. The Worker always allows `CAPACITOR_ORIGINS` (`packages/schema/src/contract.ts`) plus the comma-separated `WEB_ORIGINS` var (set per environment). It runs before sign-in, so preflights pass and errors (401, 426, 404) carry the header. No credentials mode (sign-in is a bearer token). Requests may send Authorization, Content-Type, Idempotency-Key, X-Client-Version, Range and If-None-Match; Content-Range, Accept-Ranges, Content-Length, ETag and Idempotent-Replayed are readable (the Player's ranged fetches, an upload part's ETag). Preflights are kept 600 s (WebKit's ceiling). Checked in `apps/server/src/cors.test.ts` and by hand against `wrangler dev`.
+- **Container seconds** (`containerCostUsd()` in `analysis/prices.ts`): each instance type's size times C0's rates, at full size and list price (the month's included usage is not subtracted, so the cap never counts on it); standard-4 is $0.000111 a second. A render logs its instance type as `model` and every chunk's seconds plus the join's at that rate. The Worker reads the type from `MEDIA_INSTANCE_TYPE`; absent (dev, the local media service) logs $0 as before. `TODO(open-decision)`: check against the real bill in C4, since one rate covers the join too and Cloudflare may bill CPU by use.
+
 **Phase C5: Mobile**
 
 - **Spike first:** the Remotion Player in iOS WKWebView and Android WebView. Check inline playback, frame-exact holds and Web Audio after a user gesture.

@@ -14,6 +14,7 @@ import {
 } from '@als/schema';
 import { buildTimeline } from '@als/composition/timeline';
 import { getTheme } from '@als/theme/themes';
+import { containerCostUsd, type ContainerType } from '../analysis/prices.ts';
 import type { MediaSigner } from '../api/media-urls.ts';
 import {
   JobRunningError,
@@ -69,6 +70,8 @@ export interface RenderDeps {
   /** The API's origin as the media service reaches it. It fetches the clip, portraits and sounds from it over signed URLs. */
   origin: string;
   split?: RenderSplit;
+  /** The Container instance type the media service's render tasks run on. Absent: a local media service, logged at $0. */
+  containerType?: ContainerType;
 }
 
 /**
@@ -224,9 +227,19 @@ export class RenderService {
         ...(cancelled ? {} : { error: error instanceof Error ? error.message : String(error) }),
       }).catch(() => undefined);
     } finally {
-      // Renders cost nothing on this machine; container seconds (every chunk's, plus the join) are priced in C4.
+      // Container seconds are every chunk's plus the join's, each on its own instance. A local media service costs nothing.
       containerSec ??= (performance.now() - started) / 1000;
-      await this.deps.usage.record({ userId, projectId, call: 'render', costUsd: 0, containerSec: Math.round(containerSec * 10) / 10 }).catch(() => undefined);
+      const type = this.deps.containerType;
+      await this.deps.usage
+        .record({
+          userId,
+          projectId,
+          call: 'render',
+          ...(type ? { model: type } : {}),
+          costUsd: type ? containerCostUsd(type, containerSec) : 0,
+          containerSec: Math.round(containerSec * 10) / 10,
+        })
+        .catch(() => undefined);
     }
   }
 

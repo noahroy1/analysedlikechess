@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { ProjectSchema, RenderJobSchema, type Project } from '@als/schema';
+import { containerCostUsd, type ContainerType } from '../analysis/prices.ts';
 import { projectKey, type MediaRunner } from '../ports.ts';
 import { makeTestApp } from '../test-helpers.ts';
 import { chunkCount, renderId } from './renders.ts';
@@ -64,13 +65,14 @@ describe('split renders', () => {
   type CombineCall = Parameters<MediaRunner['combine']>[0];
 
   /** A media runner whose chunks and join are recorded; `failChunk` makes one chunk fail and waits for the others to be stopped. */
-  async function splitApp(failChunk?: number) {
+  async function splitApp(failChunk?: number, containerType?: ContainerType) {
     const chunks: ChunkCall[] = [];
     const combines: CombineCall[] = [];
     const aborted: number[] = [];
     const dir = await mkdtemp(join(tmpdir(), 'als-split-'));
     const env = await makeTestApp(dir, {}, undefined, {
       renderSplit: { maxChunks: 3, minChunkFrames: 100 },
+      ...(containerType ? { containerType } : {}),
       wrapMedia: (media) =>
         Object.assign(Object.create(media) as MediaRunner, {
           async renderChunk(input: ChunkCall) {
@@ -119,6 +121,30 @@ describe('split renders', () => {
     const usage = (await readFile(join(dir, '.usage', 'usage.jsonl'), 'utf8')).trim().split('\n').map((line) => JSON.parse(line) as { call: string; containerSec?: number });
     expect(usage.find((u) => u.call === 'render')?.containerSec).toBe(7);
     await rm(dir, { recursive: true, force: true });
+  });
+
+  it('prices container seconds by the instance type, and a local media service at $0', async () => {
+    const usageOf = async (dir: string) =>
+      (await readFile(join(dir, '.usage', 'usage.jsonl'), 'utf8'))
+        .trim()
+        .split('\n')
+        .map((line) => JSON.parse(line) as { call: string; model?: string; costUsd: number; containerSec?: number })
+        .find((u) => u.call === 'render');
+    const local = await splitApp();
+    await local.env.call(`/projects/${local.project.id}/renders`, { json: { version: 1 } });
+    await local.env.jobs.whenIdle();
+    expect(await usageOf(local.dir)).toMatchObject({ costUsd: 0, containerSec: 7 });
+    expect((await usageOf(local.dir))?.model).toBeUndefined();
+    await rm(local.dir, { recursive: true, force: true });
+
+    const cloud = await splitApp(undefined, 'standard-4');
+    await cloud.env.call(`/projects/${cloud.project.id}/renders`, { json: { version: 1 } });
+    await cloud.env.jobs.whenIdle();
+    const entry = await usageOf(cloud.dir);
+    expect(entry).toMatchObject({ model: 'standard-4', containerSec: 7 });
+    // The usage log keeps costs to a millionth of a dollar.
+    expect(entry?.costUsd).toBeCloseTo(containerCostUsd('standard-4', 7), 6);
+    await rm(cloud.dir, { recursive: true, force: true });
   });
 
   it('stops the other chunks when one fails, and fails the render', async () => {

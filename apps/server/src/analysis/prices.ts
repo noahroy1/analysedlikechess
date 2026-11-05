@@ -44,3 +44,37 @@ export function costUsd(model: string, usage: Usage, surcharge = 0): number {
     perToken(usage.cacheWriteTokens, price.cacheWrite)
   );
 }
+
+/**
+ * Cloudflare Containers, Workers Paid (developers.cloudflare.com/containers/pricing,
+ * read Nov 3, 2026; PLAN-CLOUD.md, C0 findings): each instance type's size and
+ * the per-second rates for it.
+ */
+const CONTAINER_TYPES = {
+  lite: { vcpu: 1 / 16, memoryGiB: 0.25, diskGB: 2 },
+  basic: { vcpu: 1 / 4, memoryGiB: 1, diskGB: 4 },
+  'standard-1': { vcpu: 1 / 2, memoryGiB: 4, diskGB: 8 },
+  'standard-2': { vcpu: 1, memoryGiB: 6, diskGB: 12 },
+  'standard-3': { vcpu: 2, memoryGiB: 8, diskGB: 16 },
+  'standard-4': { vcpu: 4, memoryGiB: 12, diskGB: 20 },
+} as const;
+const CONTAINER_RATES = { vcpuSec: 0.00002, memoryGiBSec: 0.0000025, diskGBSec: 0.00000007 };
+
+export type ContainerType = keyof typeof CONTAINER_TYPES;
+
+export function isContainerType(name: string): name is ContainerType {
+  return Object.hasOwn(CONTAINER_TYPES, name);
+}
+
+/**
+ * What `seconds` of one instance of `type` cost, at its full size and list
+ * price: the month's included usage is not subtracted, so a spend cap never
+ * counts on it. standard-4 is $0.000111 a second (C0's BB1 render: 346 s, $0.039).
+ * TODO(open-decision): C4 checks this against the real bill; if Cloudflare bills
+ * CPU by use rather than by size, this is an upper bound.
+ */
+export function containerCostUsd(type: ContainerType, seconds: number): number {
+  const size = CONTAINER_TYPES[type];
+  const perSec = size.vcpu * CONTAINER_RATES.vcpuSec + size.memoryGiB * CONTAINER_RATES.memoryGiBSec + size.diskGB * CONTAINER_RATES.diskGBSec;
+  return seconds * perSec;
+}

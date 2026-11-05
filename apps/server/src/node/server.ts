@@ -10,6 +10,7 @@ import { MediaSigner } from '../api/media-urls.ts';
 import { createApp, fixedUser } from '../app.ts';
 import { IngestService } from '../ingest/service.ts';
 import { HttpMediaRunner } from '../media/http-runner.ts';
+import type { ContainerType } from '../analysis/prices.ts';
 import type { MediaRunner } from '../ports.ts';
 import { RenderService, type RenderSplit } from '../render/renders.ts';
 import { Spend } from '../spend.ts';
@@ -41,6 +42,10 @@ export interface NodeServerOptions {
   capUsd?: number;
   /** Wraps the media runner (tests). */
   wrapMedia?: (media: MediaRunner) => MediaRunner;
+  /** Origins allowed to call across origins (tests; the editor here is same-origin through Vite). */
+  corsOrigins?: readonly string[];
+  /** Prices renders as if on this Container instance type (tests). */
+  containerType?: ContainerType;
 }
 
 /**
@@ -75,9 +80,9 @@ export async function createNodeServer(options: NodeServerOptions) {
   const providers = options.providers ?? makeProviders(config);
   const analysis = new AnalysisService({ repo, blobs, media, jobs, usage, spend, providers, config, style });
   const ingest = new IngestService({ repo, blobs, media, jobs, onDone: (userId, id) => analysis.autoStart(userId, id) });
-  const renders = new RenderService({ repo, blobs, media, jobs, usage, spend, sounds, signer, origin: options.origin, ...(options.renderSplit ? { split: options.renderSplit } : {}) });
+  const renders = new RenderService({ repo, blobs, media, jobs, usage, spend, sounds, signer, origin: options.origin, ...(options.renderSplit ? { split: options.renderSplit } : {}), ...(options.containerType ? { containerType: options.containerType } : {}) });
   const idempotency = new MemoryIdempotencyStore();
-  const app = createApp({ repo, blobs, media, jobs, ingest, analysis, renders, sounds, signer, idempotency, spend, events, authenticate: fixedUser(LOCAL_USER), mediaTasks: http });
+  const app = createApp({ repo, blobs, media, jobs, ingest, analysis, renders, sounds, signer, idempotency, spend, events, authenticate: fixedUser(LOCAL_USER), mediaTasks: http, ...(options.corsOrigins ? { corsOrigins: options.corsOrigins } : {}) });
 
   /** After a restart: fail interrupted renders and resume ingest and analysis (finished steps are cached). */
   const recover = async () => {

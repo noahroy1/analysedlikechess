@@ -30,7 +30,7 @@ export async function makeTestApp(
   root: string,
   overrides: Partial<AnalysisConfig> = {},
   soundsDir = join(root, 'sounds'),
-  options: Pick<NodeServerOptions, 'capUsd' | 'providers' | 'wrapMedia' | 'renderSplit'> = {},
+  options: Pick<NodeServerOptions, 'capUsd' | 'providers' | 'wrapMedia' | 'renderSplit' | 'corsOrigins' | 'containerType'> = {},
 ) {
   const config: AnalysisConfig = { ...loadAnalysisConfig({}), autoAnalyze: false, replayDir: DIALOGUE_RECORDING, ...overrides };
   const media = createMediaServer({ workRoot: join(root, '.media-work') });

@@ -1,9 +1,12 @@
 import { Hono, type MiddlewareHandler } from 'hono';
+import { cors } from 'hono/cors';
 import { streamSSE } from 'hono/streaming';
 import {
   API_PREFIX,
   AnalyzeRequestSchema,
   CLIENT_VERSION_HEADER,
+  IDEMPOTENCY_HEADER,
+  IDEMPOTENT_REPLAY_HEADER,
   CompleteUploadRequestSchema,
   CreateProjectRequestSchema,
   MediaTaskEventSchema,
@@ -72,6 +75,28 @@ export interface AppDeps {
   runAs?: <T>(userId: string, work: () => Promise<T>) => Promise<T>;
   /** Hands a media task's callback to the call waiting for it (the HTTP media runner). */
   mediaTasks?: { deliver(taskId: string, event: MediaTaskEvent): boolean };
+  /**
+   * Other origins whose pages may call this API (the deployed web app, the
+   * mobile app). Absent: none, as on Node, where Vite serves the editor and
+   * the API from one origin.
+   */
+  corsOrigins?: readonly string[];
+}
+
+/**
+ * Cross-origin calls from the allowed origins. Sign-in travels in the
+ * Authorization header, never a cookie, so no credentials mode. The Player
+ * fetches signed media with Range and reads Content-Range; an upload part's
+ * PUT reads its ETag. WebKit keeps a preflight 10 minutes at most.
+ */
+function crossOrigin(origins: readonly string[]) {
+  return cors({
+    origin: [...origins],
+    allowMethods: ['GET', 'HEAD', 'PUT', 'POST', 'DELETE'],
+    allowHeaders: ['Authorization', 'Content-Type', IDEMPOTENCY_HEADER, CLIENT_VERSION_HEADER, 'Range', 'If-None-Match'],
+    exposeHeaders: ['Content-Range', 'Accept-Ranges', 'Content-Length', 'ETag', IDEMPOTENT_REPLAY_HEADER],
+    maxAge: 600,
+  });
 }
 
 /** Heartbeat of the dev event stream; clients reopen a stream that misses two. */
@@ -123,6 +148,9 @@ export function createApp(deps: AppDeps) {
 
   app.onError((error, c) => errorResponse(c, error));
   app.notFound((c) => errorResponse(c, new ApiError(404, 'not_found', 'not found')));
+
+  // First, so preflights need no sign-in and errors carry the headers too.
+  if (deps.corsOrigins?.length) app.use('*', crossOrigin(deps.corsOrigins));
 
   app.use('*', async (c, next) => {
     const version = c.req.header(CLIENT_VERSION_HEADER);

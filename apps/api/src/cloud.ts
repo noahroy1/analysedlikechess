@@ -1,11 +1,12 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { z } from 'zod';
-import { StyleCorpusSchema, type Project } from '@als/schema';
+import { CAPACITOR_ORIGINS, StyleCorpusSchema, type Project } from '@als/schema';
 import corpus from '../../../style/corpus.json' with { type: 'json' };
 import { loadAnalysisConfig } from '../../server/src/analysis/config.ts';
 import { makeProviders } from '../../server/src/analysis/providers/make.ts';
 import { recordingsFrom } from '../../server/src/analysis/providers/replay.ts';
 import { AnalysisService } from '../../server/src/analysis/service.ts';
+import { isContainerType } from '../../server/src/analysis/prices.ts';
 import { MediaSigner } from '../../server/src/api/media-urls.ts';
 import { createApp, SIGNED_PATH } from '../../server/src/app.ts';
 import { projectKey } from '../../server/src/ports.ts';
@@ -40,6 +41,10 @@ export interface Env {
   MEDIA_URL: string;
   /** This API's origin as the media service reaches it. */
   API_ORIGIN: string;
+  /** The web app's origins, comma-separated (C4: one per environment). The mobile app's are always allowed. */
+  WEB_ORIGINS?: string;
+  /** The Container instance type renders run on, which prices them. Absent: a local media service, at $0. */
+  MEDIA_INSTANCE_TYPE?: string;
   /** Names a bundled set of recordings to replay instead of calling providers (`dialogue`). */
   ANALYSIS_REPLAY_DIR?: string;
   /** Dev only: `true` adds the seeding route (never set in a deployed environment). */
@@ -83,7 +88,9 @@ export function buildCloud(env: Env) {
 
   const analysis = new AnalysisService({ repo, blobs, media, jobs, usage, spend, providers, config, style });
   const ingest = new IngestService({ repo, blobs, media, jobs, onDone: (userId, id) => analysis.autoStart(userId, id) });
-  const renders = new RenderService({ repo, blobs, media, jobs, usage, spend, sounds, signer, origin: env.API_ORIGIN });
+  const containerType = env.MEDIA_INSTANCE_TYPE;
+  if (containerType !== undefined && !isContainerType(containerType)) throw new Error(`MEDIA_INSTANCE_TYPE is not a Container instance type: ${containerType}`);
+  const renders = new RenderService({ repo, blobs, media, jobs, usage, spend, sounds, signer, origin: env.API_ORIGIN, ...(containerType ? { containerType } : {}) });
   const verifier = new TokenVerifier({ supabaseUrl: env.SUPABASE_URL });
   const app = createApp({
     repo,
@@ -99,6 +106,7 @@ export function buildCloud(env: Env) {
     spend,
     authenticate: auth(verifier, { skip: (path) => SIGNED_PATH.test(path) }),
     runAs: (userId, work) => asUser(userId, work),
+    corsOrigins: [...CAPACITOR_ORIGINS, ...(env.WEB_ORIGINS ?? '').split(',').map((o) => o.trim()).filter(Boolean)],
   });
   if (env.DEV_ROUTES === 'true') {
     /**

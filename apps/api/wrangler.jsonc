@@ -22,6 +22,9 @@
     // The local media service (`apps/media`) and this Worker as that service reaches it.
     "MEDIA_URL": "http://127.0.0.1:8788",
     "API_ORIGIN": "http://127.0.0.1:8790"
+    // C4, per environment: "WEB_ORIGINS" (the web app's origins, comma-separated; the mobile app's are always
+    // allowed) and "MEDIA_INSTANCE_TYPE" (the Container instance type, e.g. "standard-4", which prices renders).
+    // Dev needs neither: Vite serves the editor and the API from one origin, and the local media service is free.
   },
   "dev": { "port": 8790 }
 }
