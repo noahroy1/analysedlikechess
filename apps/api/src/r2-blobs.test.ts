@@ -1,7 +1,10 @@
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { getPlatformProxy } from 'wrangler';
-import { NotFoundError, UploadIncompleteError } from '../../server/src/ports.ts';
+import { z } from 'zod';
+import { handoffAnalyst, recorder } from './analysis/providers/replay.ts';
+import { devSetName, r2Files } from './dev-files.ts';
+import { NotFoundError, UploadIncompleteError } from './ports.ts';
 import { R2BlobStore } from './r2-blobs.ts';
 import type { R2Bucket } from './workers.ts';
 
@@ -101,5 +104,29 @@ describe('R2BlobStore', () => {
     await blobs.uploadPart(key, uploadId, 1, new Blob([new Uint8Array(10)]).stream() as ReadableStream<Uint8Array>);
     await blobs.abortMultipart(key, uploadId);
     expect((await platform.env.MEDIA.list({ prefix: 'projects/p4/' })).objects).toEqual([]);
+  });
+});
+
+describe('dev files in R2 (recording and hand-offs on the Worker)', () => {
+  it('records raw responses under the set prefix', async () => {
+    const files = r2Files(platform.env.MEDIA, 'dev/record/t1/');
+    await recorder(files)('openai-annotate', { output: { n: 1 } });
+    expect(JSON.parse((await files.read('openai-annotate.json'))!)).toEqual({ output: { n: 1 } });
+    expect((await platform.env.MEDIA.list({ prefix: 'dev/record/t1/' })).objects.map((o) => o.key)).toEqual(['dev/record/t1/openai-annotate.json']);
+  });
+
+  it('hands off: writes the request, then validates the hand-written answer', async () => {
+    const files = r2Files(platform.env.MEDIA, 'dev/handoff/t1/');
+    const analyst = handoffAnalyst(files);
+    const call = { name: 'speakers' as const, model: 'm', effort: 'low' as const, system: 's', context: 'c', task: 't', schema: z.object({ n: z.number() }) };
+    await expect(analyst.run(call)).rejects.toThrow('R2 dev/handoff/t1/claude-speakers.json');
+    expect(JSON.parse((await files.read('request-speakers.json'))!)).toMatchObject({ task: 't', schema: { type: 'object' } });
+    await files.write('claude-speakers.json', JSON.stringify({ output: { n: 3 } }));
+    expect(await analyst.run(call)).toMatchObject({ output: { n: 3 }, model: 'hand-written/claude-code-session', costUsd: 0 });
+  });
+
+  it('takes a set name, never a path', () => {
+    expect(devSetName('bb1-oct.v2')).toBe('bb1-oct.v2');
+    for (const bad of ['a/b', '..', '.x', '', 'a b']) expect(() => devSetName(bad)).toThrow();
   });
 });

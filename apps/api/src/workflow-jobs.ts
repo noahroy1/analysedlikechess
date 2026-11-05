@@ -1,6 +1,6 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { JobSchema, type Job, type JobKind, type JobState } from '@als/schema';
-import type { EventBus, JobHandler, JobRunner, StartJob } from '../../server/src/ports.ts';
+import type { EventBus, JobHandler, JobRunner, StartJob } from './ports.ts';
 import { asService, type Db } from './db/db.ts';
 
 /** What a job's Workflow instance is started with (event.payload). */

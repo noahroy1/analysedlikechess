@@ -17,14 +17,33 @@
   ],
   // One Workflow instance per job (ingest, analysis, render), named by the job's id.
   "workflows": [{ "name": "als-jobs", "binding": "JOBS", "class_name": "JobWorkflow" }],
+  // The media service (apps/media/Dockerfile, built from the repo root like `docker build -f apps/media/Dockerfile .`),
+  // used when MEDIA_URL is unset (src/media-container.ts): a pool for tasks and renders, and one warm instance for quick calls.
+  // TODO(open-decision): C4 sets instance types and max_instances from real renders.
+  "containers": [
+    { "class_name": "MediaTasks", "image": "../media/Dockerfile", "image_build_context": "../..", "instance_type": "standard-4", "max_instances": 4 },
+    { "class_name": "MediaQuick", "image": "../media/Dockerfile", "image_build_context": "../..", "instance_type": "standard-1", "max_instances": 1 }
+  ],
+  "durable_objects": {
+    "bindings": [
+      { "name": "MEDIA_TASKS", "class_name": "MediaTasks" },
+      { "name": "MEDIA_QUICK", "class_name": "MediaQuick" }
+    ]
+  },
+  "exports": {
+    "MediaTasks": { "type": "durable-object", "storage": "sqlite" },
+    "MediaQuick": { "type": "durable-object", "storage": "sqlite" }
+  },
   "vars": {
     "SUPABASE_URL": "http://127.0.0.1:54321",
-    // The local media service (`apps/media`) and this Worker as that service reaches it.
+    // The local media service (`apps/media`) and this Worker as that service reaches it. Deployed environments
+    // leave MEDIA_URL out, so the Worker uses the Container bindings.
     "MEDIA_URL": "http://127.0.0.1:8788",
     "API_ORIGIN": "http://127.0.0.1:8790"
     // C4, per environment: "WEB_ORIGINS" (the web app's origins, comma-separated; the mobile app's are always
     // allowed) and "MEDIA_INSTANCE_TYPE" (the Container instance type, e.g. "standard-4", which prices renders).
     // Dev needs neither: Vite serves the editor and the API from one origin, and the local media service is free.
   },
-  "dev": { "port": 8790 }
+  // Dev uses the local media process, so wrangler dev neither builds the image nor needs Docker for it.
+  "dev": { "port": 8790, "enable_containers": false }
 }

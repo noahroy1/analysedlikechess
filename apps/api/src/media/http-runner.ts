@@ -5,6 +5,8 @@ import { NotAVideoError, projectKey, type BlobStore, type MediaRunner } from '..
 export interface HttpMediaOptions {
   /** The media service's base URLs; tasks are spread over them in turn (one is the usual). */
   urls: string[];
+  /** Where quick calls (probe, frame, portrait) go; default the task URLs in turn. */
+  quickUrl?: string;
   signer: MediaSigner;
   blobs: BlobStore;
   /** The API's origin as the media service reaches it: inputs, outputs and callbacks are under it. */
@@ -36,7 +38,7 @@ interface Pending {
  * The media service over HTTP (contract in packages/schema/src/media.ts). It
  * never shares a disk with the API: every input is a signed GET of one file,
  * every output a signed PUT, and long tasks report to a signed callback that
- * `deliver()` hands back to the waiting call. The same calls reach a Container in C3.
+ * `deliver()` hands back to the waiting call. The Worker reaches the Containers the same way (`fetch`, media-container.ts).
  */
 export class HttpMediaRunner implements MediaRunner {
   private readonly options: HttpMediaOptions;
@@ -47,7 +49,7 @@ export class HttpMediaRunner implements MediaRunner {
 
   constructor(options: HttpMediaOptions) {
     if (!options.urls.length) throw new Error('no media service URL');
-    this.options = { ...options, urls: options.urls.map((u) => u.replace(/\/+$/, '')) };
+    this.options = { ...options, urls: options.urls.map((u) => u.replace(/\/+$/, '')), ...(options.quickUrl ? { quickUrl: options.quickUrl.replace(/\/+$/, '') } : {}) };
     this.fetchImpl = options.fetch ?? ((url, init) => fetch(url, init));
     this.pollMs = options.pollMs ?? (options.callbacks === false ? 1_000 : POLL_MS);
   }
@@ -88,7 +90,7 @@ export class HttpMediaRunner implements MediaRunner {
 
   /** A quick call answered in the response. */
   private async call(path: string, body: unknown): Promise<Response> {
-    const res = await this.request(this.pick(), path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    const res = await this.request(this.options.quickUrl ?? this.pick(), path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
     if (res.ok) return res;
     const error = (await res.json().catch(() => ({}))) as { error?: string; code?: string };
     if (error.code === 'not_a_video') throw new NotAVideoError(error.error ?? 'not a video');
@@ -111,6 +113,7 @@ export class HttpMediaRunner implements MediaRunner {
     const callback = this.options.callbacks === false ? undefined : await this.signed(`/media/tasks/${id}`, mediaTaskScope(id));
     return new Promise<MediaTaskResult>((resolve, reject) => {
       let settled = false;
+      let poll: ReturnType<typeof setInterval> | undefined;
       const finish = (settle: () => void) => {
         if (settled) return;
         settled = true;
@@ -130,8 +133,9 @@ export class HttpMediaRunner implements MediaRunner {
         finish(() => reject(signal!.reason));
         void this.request(base, `/tasks/${id}/cancel`, { method: 'POST' }).catch(() => undefined);
       };
-      // A safety net for a callback that never comes (the service restarted, or cannot reach us).
-      const poll = setInterval(() => {
+      // A safety net for a callback that never comes (the service restarted, or cannot reach us). It starts
+      // once the service has the task: a container still starting could otherwise answer a poll first, with 404.
+      const startPolling = () => setInterval(() => {
         void this.request(base, `/tasks/${id}`)
           .then(async (res) => {
             if (res.status === 404) return finish(() => reject(new MediaServiceError('The media service lost this task (did it restart?).')));
@@ -149,7 +153,7 @@ export class HttpMediaRunner implements MediaRunner {
           if (!res.ok) {
             const error = (await res.json().catch(() => ({}))) as { error?: string };
             finish(() => reject(new MediaServiceError(`media ${body.op}: ${error.error ?? res.status}`)));
-          }
+          } else if (!settled) poll = startPolling();
         })
         .catch((error: unknown) => finish(() => reject(error)));
     });

@@ -63,7 +63,7 @@ export function AnalysisPanel({ analysis, onStarted }: AnalysisPanelProps) {
     <div className="space-y-5 text-sm" data-testid="analysis-panel">
       {config && config.missingKeys.length > 0 && (
         <div className="rounded-md border border-amber-900/60 bg-amber-950/30 p-2.5 text-xs leading-relaxed text-amber-200">
-          Analysis needs {config.missingKeys.join(', ')} in <code>apps/server/.env</code>. Add them and restart <code>pnpm dev</code>.
+          Analysis needs {config.missingKeys.join(', ')} in <code>apps/api/.env</code>. Add them and restart <code>pnpm dev</code>.
         </div>
       )}
       {config?.replay && (

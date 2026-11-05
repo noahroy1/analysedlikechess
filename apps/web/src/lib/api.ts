@@ -3,16 +3,18 @@ import { session } from './session.ts';
 
 /**
  * The editor's API client. `VITE_API_ORIGIN` points it at another backend
- * (staging, production); empty is this page's origin, which Vite proxies to the local server.
- * Signed in, it sends the user's token and takes live updates from Realtime.
+ * (staging, production); empty is this page's origin, which Vite proxies to the Worker.
+ * It sends the signed-in user's token and takes live updates from Realtime.
  */
 const signedIn = session;
 export const api = createApiClient({
   origin: import.meta.env.VITE_API_ORIGIN ?? '',
-  ...(signedIn ? { token: signedIn.token, liveJobs: signedIn.liveJobs, onUnauthorized: () => void signedIn.signOut().catch(() => undefined) } : {}),
+  token: signedIn.token,
+  liveJobs: signedIn.liveJobs,
+  onUnauthorized: () => void signedIn.signOut().catch(() => undefined),
 });
 
-if (import.meta.env.DEV && signedIn) {
+if (import.meta.env.DEV) {
   // For the browser checks, which call the API from the page: fetch with the signed-in user's token.
   Object.assign(window, {
     __alsToken: () => signedIn.token(),

@@ -1,5 +1,5 @@
 import { SoundIdSchema, type SoundBank } from '@als/schema';
-import type { SoundSource } from '../../../server/src/ports.ts';
+import type { SoundSource } from '../ports.ts';
 import type { Db } from './db.ts';
 
 /**

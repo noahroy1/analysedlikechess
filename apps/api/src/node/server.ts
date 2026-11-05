@@ -82,7 +82,7 @@ export async function createNodeServer(options: NodeServerOptions) {
   const ingest = new IngestService({ repo, blobs, media, jobs, onDone: (userId, id) => analysis.autoStart(userId, id) });
   const renders = new RenderService({ repo, blobs, media, jobs, usage, spend, sounds, signer, origin: options.origin, ...(options.renderSplit ? { split: options.renderSplit } : {}), ...(options.containerType ? { containerType: options.containerType } : {}) });
   const idempotency = new MemoryIdempotencyStore();
-  const app = createApp({ repo, blobs, media, jobs, ingest, analysis, renders, sounds, signer, idempotency, spend, events, authenticate: fixedUser(LOCAL_USER), mediaTasks: http, ...(options.corsOrigins ? { corsOrigins: options.corsOrigins } : {}) });
+  const app = createApp({ repo, blobs, media, jobs, ingest, analysis, renders, sounds, signer, idempotency, spend, authenticate: fixedUser(LOCAL_USER), mediaTasks: http, ...(options.corsOrigins ? { corsOrigins: options.corsOrigins } : {}) });
 
   /** After a restart: fail interrupted renders and resume ingest and analysis (finished steps are cached). */
   const recover = async () => {

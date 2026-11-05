@@ -18,7 +18,6 @@ export function SignIn() {
   const [providers, setProviders] = useState<OAuthProvider[]>([]);
 
   useEffect(() => {
-    if (!session) return;
     void session
       .providers()
       .then((p) => setProviders((['google', 'apple'] as const).filter((name) => p[name])))
@@ -31,8 +30,6 @@ export function SignIn() {
     }
   }, []);
 
-  if (!session) return null;
-
   const run = (work: () => Promise<void>) => {
     setBusy(true);
     setError(null);
@@ -43,7 +40,7 @@ export function SignIn() {
 
   const sendCode = () =>
     run(async () => {
-      await session!.sendCode(email.trim());
+      await session.sendCode(email.trim());
       setSent(true);
     });
 
@@ -81,7 +78,7 @@ export function SignIn() {
           className="flex flex-col gap-3"
           onSubmit={(e) => {
             e.preventDefault();
-            run(() => session!.verifyCode(email.trim(), code));
+            run(() => session.verifyCode(email.trim(), code));
           }}
         >
           <p className="text-sm text-neutral-300">
@@ -122,7 +119,7 @@ export function SignIn() {
               key={provider}
               type="button"
               disabled={busy}
-              onClick={() => run(() => session!.signInWith(provider, window.location.origin + window.location.pathname))}
+              onClick={() => run(() => session.signInWith(provider, window.location.origin + window.location.pathname))}
               className="rounded-md border border-neutral-700 px-3 py-2 text-sm text-neutral-200 hover:border-neutral-500 disabled:opacity-50"
             >
               Continue with {PROVIDER_NAMES[provider]}
@@ -136,15 +133,15 @@ export function SignIn() {
   );
 }
 
-/** Who is signed in, and a way out (only when the backend has accounts). */
+/** Who is signed in, and a way out. */
 export function AccountMenu() {
   const [email, setEmail] = useState<string | undefined>();
-  useEffect(() => session?.onChange((s) => setEmail(s?.user.email)), []);
-  if (!session || !email) return null;
+  useEffect(() => session.onChange((s) => setEmail(s?.user.email)), []);
+  if (!email) return null;
   return (
     <div className="flex items-center gap-3 text-sm text-neutral-400">
       <span>{email}</span>
-      <button type="button" onClick={() => void session!.signOut()} className="hover:text-neutral-200">
+      <button type="button" onClick={() => void session.signOut()} className="hover:text-neutral-200">
         Sign out
       </button>
     </div>

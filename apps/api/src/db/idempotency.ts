@@ -1,5 +1,5 @@
 import { IDEMPOTENCY_TTL_MS } from '@als/schema';
-import type { Claim, IdempotencyStore, StoredResponse } from '../../../server/src/api/idempotency.ts';
+import type { Claim, IdempotencyStore, StoredResponse } from '../api/idempotency.ts';
 import type { Db } from './db.ts';
 
 interface KeyRow {
@@ -12,7 +12,7 @@ interface KeyRow {
 
 /**
  * Idempotency keys in `app.idempotency_keys`, shared by every Worker instance.
- * The rules are the middleware's (apps/server/src/api/idempotency.ts): a
+ * The rules are the middleware's (src/api/idempotency.ts): a
  * repeat replays, another body is a mismatch, a repeat while the first runs
  * waits (by polling the row), and a response not kept (5xx) frees the key.
  */

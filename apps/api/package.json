@@ -13,13 +13,20 @@
     "test:db": "node scripts/with-supabase.ts vitest run --root ../.. apps/api/src/db"
   },
   "dependencies": {
+    "@als/composition": "workspace:*",
     "@als/schema": "workspace:*",
+    "@als/theme": "workspace:*",
+    "@anthropic-ai/sdk": "0.133.0",
+    "@cloudflare/containers": "0.3.7",
+    "@google/genai": "2.28.0",
     "hono": "4.13.13",
     "pg": "8.23.1",
     "zod": "4.6.5"
   },
   "devDependencies": {
+    "@als/media": "workspace:*",
     "@cloudflare/workers-types": "5.20261104.1",
+    "@hono/node-server": "2.1.4",
     "@types/pg": "8.23.1",
     "supabase": "3.0.0",
     "wrangler": "4.157.0"

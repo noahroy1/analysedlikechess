@@ -310,16 +310,33 @@ Move ffmpeg and Remotion into `apps/media` behind its HTTP API, and package its 
 - **Image** (`apps/media/Dockerfile`, built from the repo root with `.dockerignore`): `node:24-bookworm-slim`, Debian's ffmpeg 5.1 (its `scdet` found the same cuts), Chrome's libraries, `fonts-liberation`, the browser and the composition bundle built in (`build-bundle.ts`, `MEDIA_BUNDLE_DIR`). The bundle needs the packages' `tsconfig.json` (the JSX runtime comes from it). Listens on 8080.
 - **Not done here:** the Container binding and how instances are started per chunk (C3); container seconds priced (C4).
 
-**Phase C3: Supabase and the Worker**
+**Phase C3: Supabase and the Worker** (done Nov 6)
 
 - **Database:** Supabase migrations for the tables and RLS policies, and Supabase implementations of `ProjectRepo` and `UsageLog`.
 - **Worker:** `apps/api` on Workers with R2 as the `BlobStore`, Workflows as the `JobRunner`, Realtime as the `EventBus`, and the Container binding. Auth runs on every route.
 - **Dev:** `pnpm dev` switches over, and the replay and handoff routes move with it.
 - **Cleanup:** delete `apps/server` once every check passes.
 
-- [ ] Every browser check passes against `wrangler dev` with local Supabase.
-- [ ] A second user sees none of the first user's projects, media URLs, jobs or broadcasts, checked both through the API and directly against RLS.
-- [ ] Killing `wrangler dev` mid-analysis and restarting it resumes the Workflow from its last finished step.
+- [x] Every browser check passes against `wrangler dev` with local Supabase. Done Nov 5 and again Nov 6 after `apps/server` was deleted: 79 results, render-checks on the sample in 4 chunks at holds 27.1-30.2 dB and review 34.7 dB (as in C2).
+- [x] A second user sees none of the first user's projects, media URLs, jobs or broadcasts, checked both through the API and directly against RLS. Done Nov 5: `apps/api/scripts/isolation-checks.ts` (404 from all 20 routes aimed at her project, none of her projects or jobs, her media closed to his grant and a forged one; it found history answering 200, fixed) and `apps/api/src/db/isolation.test.ts` (RLS, including her broadcast channel).
+- [x] Killing `wrangler dev` mid-analysis and restarting it resumes the Workflow from its last finished step. Done Nov 5: killed during annotate (replay slowed to 8 s an answer), restarted, finished from annotate in 32 s with 3 moves, each stage's spend logged once.
+
+**C3 notes (Nov 5-6):**
+- **Layout:** `apps/api` is the only API. The shared code moved from `apps/server/src` to `apps/api/src` unchanged in shape (analysis, ingest, render, routes in `app.ts`, ports); the cloud implementations sit beside it (`db/`, `r2-blobs.ts`, `workflow-jobs.ts`, `realtime.ts`, `auth.ts`, `media-container.ts`, wired in `cloud.ts`). `apps/server`'s entry point and folder seeding are gone; its filesystem implementations stay in `apps/api/src/node/` as the host the tests build (`makeTestApp()`) and for C4's migration, which reads `projects/` folders with them.
+- **Database** (`supabase/migrations/`): every table in an `app` schema the Data API does not expose, RLS on all of them; a project's owner is `app.project_ids.owner_id`. Each user request runs as that user (role and claims set per transaction); Workflows run as the service and take the owner from the job. Idempotency keys are a table, kept 24 h.
+- **Files:** R2 at `projects/<id>/…`; the Worker serves them itself behind the signed URLs (no presigning, so no S3 signer dependency). Resumable uploads keep part markers, since the binding can't list a multipart upload's parts.
+- **Jobs:** one Workflow instance per job; each ingest stage, analysis stage (its output and spend stored) and render chunk or join is one step. Steps time out at 30 min and retry once. Cancel is a status the step sees within 2 s. Local Workflows never resume the step a killed session was in (Cloudflare's engine does), so dev restarts such jobs from that step (`DEV_RESUME_JOBS`).
+- **Live updates:** Realtime Broadcast on `user:<uid>`; the client reads `GET /jobs` on every (re)subscribe. The SSE stream is gone.
+- **Sign-in:** Supabase email codes (6 digits), Google and Apple (buttons appear once their credentials are set; off in local config). The Worker verifies ES256 tokens against the JWKS with WebCrypto. In dev the web app signs the dev user in with a password on its own.
+- **Media service:** the runner polls a task's status every second (a callback would land on whichever isolate answers) and starts polling only once the service has accepted the task (a cold container answered an earlier poll with 404). `MEDIA_URL` set means a local process (dev); unset, the Worker uses the Container bindings (`media-container.ts`):
+  - `MediaTasks` (standard-4, a pool of 4 named instances, `sleepAfter` 30 s): ingest passes, render chunks (one per instance) and the join. The pool is shared by every user, so two renders at once share instances.
+  - `MediaQuick` (standard-1, one instance, `sleepAfter` 10 min): probe, frame grabs and portraits.
+  - The image is `apps/media/Dockerfile` built from the repo root (`image_build_context: "../.."`); `wrangler deploy --dry-run` builds it for both classes, the second from cache. `dev.enable_containers` is false, so `pnpm dev` needs no image.
+  - **Checked locally in Docker** (Nov 6, a temporary config with containers on): the sample uploaded, probed and ingested through them in 11 s; render-checks' render (2 chunks and the join, 28 s) matched the Mac render of the same version on every frame at 32.1 dB or more (median 34.1) with audio 91 dB below the signal; against the Player, hold 2 scored 26.8 dB, as C2's image did (Linux text smoothing).
+  - `TODO(open-decision)` for C4: instance types, pool size, `max_instances` and sleep times, from real renders and the bill; whether the quick instance should be woken when the editor opens a project (C0's plan; not built).
+- **Recording and hand-offs** (`ANALYSIS_RECORD_DIR`, `ANALYST_HANDOFF_DIR`, dev only) keep their files in local R2 under `dev/record/<name>/` and `dev/handoff/<name>/`; dev routes and `pnpm dev:files` move them to and from folders. Replay stays bundled JSON (`replay-fixtures.ts`). Checked Nov 6: a Pass A-C rerun by hand-off on the dialogue clip.
+- **Tests:** `pnpm check` runs the API's tests on the filesystem host and R2's on Wrangler's local R2 (the Workers Vitest pool needs vitest 4; the repo is on 5). The database tests (16) run against local Supabase with `pnpm --filter @als/api test:db`, outside `pnpm check`.
+- **Dev:** `pnpm dev` starts local Supabase, runs `dev-setup.ts` (the Worker's `.dev.vars` from `apps/api/.env`, the web app's Supabase settings, the dev user, the sound bank in R2), then `wrangler dev`, the media service and Vite. Seeding is an API client.
 
 **Phase C4: Migration and deploy**
 

@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { RenderJob, UploadRecord } from '@als/schema';
-import { NotFoundError, VersionConflictError } from '../../../server/src/ports.ts';
+import { NotFoundError, VersionConflictError } from '../ports.ts';
 import { asService, asUser } from './db.ts';
 import { HISTORY_LIMIT, PgProjectRepo } from './project-repo.ts';
 import { connect, createUser, haveSupabase, removeUser, sampleProject, type TestUser } from './supabase-test-env.ts';

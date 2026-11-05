@@ -80,11 +80,11 @@ export interface ClientOptions {
   storage?: KeyValueStore;
   /** Network retries per call, with the same idempotency key. */
   retries?: number;
-  /** The signed-in user's access token, sent as `Authorization: Bearer` (`createSession().token`). Absent: no header (the Node server). */
+  /** The signed-in user's access token, sent as `Authorization: Bearer` (`createSession().token`). Absent: no header (every route but the signed media URLs then answers 401). */
   token?: () => Promise<string | undefined>;
   /** Called on a 401 `unauthorized`: the sign-in has ended. */
   onUnauthorized?: () => void;
-  /** How live job updates arrive (`createSession().liveJobs`, Realtime). Absent: the Node server's event stream. */
+  /** How live job updates arrive (`createSession().liveJobs`, Realtime). Absent: jobs are read once, with no live updates. */
   liveJobs?: LiveJobs;
 }
 
@@ -101,9 +101,6 @@ export interface ProjectEventHandlers {
   reconnect?: () => void;
 }
 
-/** The server pings every 5 s; a stream this quiet is dead. */
-const EVENTS_STALE_MS = 12_000;
-const EVENTS_RETRY_MS = 2_000;
 /** Fetch new media URLs this long before the old ones expire. */
 const GRANT_REFRESH_MS = 60 * 60 * 1000;
 
@@ -199,7 +196,7 @@ export function createApiClient(options: ClientOptions = {}) {
   /** When the project's media URLs stop working. */
   const mediaExpiresAt = (projectId: string) => grants.get(projectId)?.expiresAt;
 
-  // Live jobs: the dev event stream now, Realtime Broadcast in C3. The snapshot comes from GET /jobs on every (re)connect.
+  // Live jobs: Realtime Broadcast (`liveJobs`). The snapshot comes from GET /jobs on every (re)connect.
 
   function subscribeJobs(handlers: ProjectEventHandlers): () => void {
     if (options.liveJobs) {
@@ -226,55 +223,15 @@ export function createApiClient(options: ClientOptions = {}) {
         stop();
       };
     }
-    let source: EventSource | undefined;
-    let lastHeard = 0;
-    let opened = false;
-    let retry: ReturnType<typeof setTimeout> | undefined;
+    // No live transport (a script, a test): the snapshot only.
     let closed = false;
-
-    const snapshot = async () => {
-      const jobs = await request('GET', '/jobs', JobSchema.array()).catch(() => []);
-      if (!closed) for (const job of jobs) handlers.job?.(job);
-    };
-
-    const connect = () => {
-      source?.close();
-      lastHeard = Date.now();
-      const current = new EventSource(absolute(`${API_PREFIX}/events`));
-      source = current;
-      const heard = () => {
-        lastHeard = Date.now();
-      };
-      current.addEventListener('open', () => {
-        heard();
-        void snapshot();
-        if (opened) handlers.reconnect?.();
-        opened = true;
+    void request('GET', '/jobs', JobSchema.array())
+      .catch(() => [])
+      .then((jobs) => {
+        if (!closed) for (const job of jobs) handlers.job?.(job);
       });
-      current.addEventListener('ping', heard);
-      current.addEventListener('job', (e) => {
-        heard();
-        const parsed = JobSchema.safeParse(JSON.parse((e as MessageEvent<string>).data));
-        if (parsed.success) handlers.job?.(parsed.data);
-      });
-      current.addEventListener('error', () => {
-        // A 502 while the server restarts closes the stream for good; anything else EventSource retries itself.
-        if (current.readyState === EventSource.CLOSED && current === source) {
-          clearTimeout(retry);
-          retry = setTimeout(connect, EVENTS_RETRY_MS);
-        }
-      });
-    };
-
-    connect();
-    const watchdog = setInterval(() => {
-      if (source && source.readyState !== EventSource.CLOSED && Date.now() - lastHeard > EVENTS_STALE_MS) connect();
-    }, EVENTS_STALE_MS / 4);
     return () => {
       closed = true;
-      clearInterval(watchdog);
-      clearTimeout(retry);
-      source?.close();
     };
   }
 

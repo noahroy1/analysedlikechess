@@ -1,6 +1,6 @@
 import { ProjectSchema, RenderJobSchema, UploadRecordSchema, type HistoryEntry, type Project, type RenderJob, type UploadRecord } from '@als/schema';
 // The ports move here from apps/server when the Node server is retired (end of C3).
-import { NotFoundError, VersionConflictError, type ProjectRepo, type StageEntry, type StageKind } from '../../../server/src/ports.ts';
+import { NotFoundError, VersionConflictError, type ProjectRepo, type StageEntry, type StageKind } from '../ports.ts';
 import { PG, pgCode, type Db, type Sql } from './db.ts';
 
 /** Saved versions kept per project, as on Node (`HISTORY_LIMIT` in fs-repo). */

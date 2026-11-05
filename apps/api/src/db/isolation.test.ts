@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Job } from '@als/schema';
-import { NotFoundError } from '../../../server/src/ports.ts';
+import { NotFoundError } from '../ports.ts';
 import { TokenVerifier } from '../auth.ts';
 import { RealtimeEventBus, userTopic } from '../realtime.ts';
 import { asService, asUser, type Sql } from './db.ts';

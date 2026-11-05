@@ -4,6 +4,9 @@ import { sizedBody } from './r2-blobs.ts';
 import type { ExecutionContext } from './workers.ts';
 import type { JobParams, StepRunner } from './workflow-jobs.ts';
 
+// The media service's Container classes (Durable Objects), bound in wrangler.jsonc.
+export { MediaQuick, MediaTasks } from './media-container.ts';
+
 let built: { env: Env; cloud: Cloud } | undefined;
 let resumed = false;
 

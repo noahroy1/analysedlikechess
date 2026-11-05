@@ -1,5 +1,5 @@
 import type { Job } from '@als/schema';
-import type { EventBus } from '../../server/src/ports.ts';
+import type { EventBus } from './ports.ts';
 
 /** The private channel a user's clients subscribe to (`{ config: { private: true } }`); RLS on realtime.messages admits only its owner. */
 export const userTopic = (userId: string) => `user:${userId}`;

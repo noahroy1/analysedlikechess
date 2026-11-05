@@ -1,6 +1,5 @@
 import { Hono, type MiddlewareHandler } from 'hono';
 import { cors } from 'hono/cors';
-import { streamSSE } from 'hono/streaming';
 import {
   API_PREFIX,
   AnalyzeRequestSchema,
@@ -28,7 +27,6 @@ import {
   shotThumbnailFile,
   type AnalysisConfigInfo,
   type CreateProjectResult,
-  type Job,
   type MediaGrant,
   type MediaTaskEvent,
   type Me,
@@ -62,8 +60,6 @@ export interface AppDeps {
   signer: MediaSigner;
   idempotency: IdempotencyStore;
   spend: Spend;
-  /** The dev transport for live job updates (C3: Realtime Broadcast, so no route). */
-  events?: { subscribe(userId: string, listener: (job: Job) => void): () => void };
   /**
    * Who a request is from: sets `userId`. On Node, the one local user
    * (`fixedUser`); on the Worker, the verified access token, run in that
@@ -99,9 +95,6 @@ function crossOrigin(origins: readonly string[]) {
   });
 }
 
-/** Heartbeat of the dev event stream; clients reopen a stream that misses two. */
-const SSE_HEARTBEAT_MS = 5_000;
-
 export function summarize(project: Project, media?: MediaGrant): ProjectSummary {
   const shots = project.shots ?? [];
   const thumbsReady = project.ingest.stages.some((s) => s.name === 'thumbnails' && (s.status === 'done' || s.status === 'cached'));
@@ -132,7 +125,7 @@ const UNKEYED_PATH = new RegExp(`^${API_PREFIX}/(?:uploads|media)/`);
  */
 export const SIGNED_PATH = new RegExp(`^${API_PREFIX}/(?:health$|uploads/|media/|sounds/[^/]+$|projects/[^/]+/files/)`);
 
-/** Every request is from one user: the Node server's local user, and tests. */
+/** Every request is from one user (the tests' host). */
 export const fixedUser =
   (userId: string): MiddlewareHandler<{ Variables: { userId: string } }> =>
   async (c, next) => {
@@ -367,7 +360,7 @@ export function createApp(deps: AppDeps) {
   /** Start analysis, or re-run it (`rerun: 'analyst'` keeps the transcript and scene notes). Returns the job. */
   app.post('/projects/:id/analyze', async (c) => {
     const missing = analysis.missingKeys();
-    if (missing.length) throw new ApiError(400, 'missing_keys', `Add ${missing.join(', ')} to apps/server/.env`);
+    if (missing.length) throw new ApiError(400, 'missing_keys', `Add ${missing.join(', ')} to the server's secrets (apps/api/.env in dev)`);
     const request = AnalyzeRequestSchema.parse(await c.req.json().catch(() => ({})));
     const { job, created } = await analysis.start(c.get('userId'), c.req.param('id'), request);
     return c.json(job, created ? 202 : 200);
@@ -533,32 +526,6 @@ export function createApp(deps: AppDeps) {
     if (!(await signer.verify(SOUNDS_SCOPE, new URL(c.req.url).searchParams))) throw new ApiError(403, 'media_url_invalid', 'This sound link has expired.');
     return serveBlob(c, soundKey(file), file);
   });
-
-  /**
-   * Dev transport for live job updates: one `job` event per update, a `ping`
-   * on connect and every 5 s. Clients read GET /jobs on (re)connect for the
-   * snapshot. The Worker has no stream: Realtime Broadcast carries the same events.
-   */
-  const { events } = deps;
-  if (events) {
-    app.get('/events', (c) =>
-      streamSSE(c, async (stream) => {
-        // Send something at once so the stream opens now: until the first write nothing reaches the browser,
-        // and a restart before then leaves it waiting forever behind the dev proxy. EventSource drops empty data.
-        const ping = () => stream.writeSSE({ event: 'ping', data: 'ok' }).catch(() => undefined);
-        await ping();
-        const detach = events.subscribe(c.get('userId'), (job) => {
-          void stream.writeSSE({ event: 'job', data: JSON.stringify(job) }).catch(() => undefined);
-        });
-        stream.onAbort(detach);
-        while (!stream.aborted) {
-          await stream.sleep(SSE_HEARTBEAT_MS);
-          if (!stream.aborted) await ping();
-        }
-        detach();
-      }),
-    );
-  }
 
   return app;
 }

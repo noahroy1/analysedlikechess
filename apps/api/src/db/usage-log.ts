@@ -1,5 +1,5 @@
 import { EDITOR_CALLS, UsageEntrySchema, type ProjectUsage, type UsageEntry } from '@als/schema';
-import type { UsageLog } from '../../../server/src/ports.ts';
+import type { UsageLog } from '../ports.ts';
 import type { Db } from './db.ts';
 
 const round6 = (n: number) => Math.round(n * 1e6) / 1e6;

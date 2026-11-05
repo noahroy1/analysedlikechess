@@ -1,7 +1,7 @@
 // Prepares local dev for the Worker (run by `pnpm dev` after `supabase start`):
 // - apps/api/.dev.vars: the Worker's dev secrets (Supabase secret key, a media URL
-//   secret kept across runs, provider keys carried over from apps/server/.env,
-//   ANALYSIS_REPLAY_DIR when set);
+//   secret kept across runs, provider keys carried over from apps/api/.env,
+//   ANALYSIS_REPLAY_DIR, ANALYSIS_RECORD_DIR and ANALYST_HANDOFF_DIR when set);
 // - apps/web/.env.development.local: Supabase's URL and publishable key, and the dev user;
 // - the dev user (an admin with a password, which the web app signs in with on its own);
 // - the chess sounds (SOUNDS_DIR, default media/sounds) in local R2 and `app.sounds`.
@@ -21,9 +21,9 @@ const API_DIR = fileURLToPath(new URL('..', import.meta.url));
 const ROOT = resolve(API_DIR, '../..');
 const DEV_VARS = join(API_DIR, '.dev.vars');
 const WEB_ENV = join(ROOT, 'apps/web/.env.development.local');
-const NODE_ENV_FILE = join(ROOT, 'apps/server/.env');
+const KEYS_FILE = join(API_DIR, '.env');
 const DEV_EMAIL = 'dev@als.local';
-/** Settings the Node server read from apps/server/.env that the Worker takes too (not the hosted Supabase ones). */
+/** Provider keys and settings in apps/api/.env (gitignored) that the Worker takes (not the hosted Supabase ones). */
 const CARRIED = /^(ANTHROPIC_API_KEY|OPENAI_API_KEY|GEMINI_API_KEY|ELEVENLABS_API_KEY|[A-Z]+_MODEL|AUTO_ANALYZE|SCENE_FPS|OPENAI_TIER)$/;
 
 const env = { ...process.env, PATH: [join(API_DIR, 'node_modules/.bin'), process.env.PATH, '/Applications/Docker.app/Contents/Resources/bin'].join(delimiter) };
@@ -59,7 +59,7 @@ if (!supabaseUrl || !secretKey || !publishableKey || !dbUrl) throw new Error('su
 
 // The Worker's dev secrets.
 const vars = readVars(DEV_VARS);
-const carried = readVars(NODE_ENV_FILE);
+const carried = readVars(KEYS_FILE);
 for (const [key, value] of carried) if (CARRIED.test(key) && !vars.has(key)) vars.set(key, value);
 vars.set('SUPABASE_SECRET_KEY', secretKey);
 if ((vars.get('MEDIA_URL_SECRET') ?? '').length < 32) vars.set('MEDIA_URL_SECRET', randomBytes(32).toString('hex'));
@@ -69,6 +69,19 @@ vars.set('DEV_ROUTES', 'true');
 const replay = process.env.ANALYSIS_REPLAY_DIR;
 if (replay) vars.set('ANALYSIS_REPLAY_DIR', basename(resolve(replay, '..')));
 else vars.delete('ANALYSIS_REPLAY_DIR');
+// Recording and hand-offs: on Node these named folders; the Worker keeps them in local R2 under
+// dev/record/<name>/ and dev/handoff/<name>/ (a path gives its last folder's name). `pnpm dev:files` moves them.
+// Render splitting and several media services, as the Node server took them from the shell.
+for (const key of ['RENDER_CHUNKS', 'RENDER_CHUNK_MIN_FRAMES', 'MEDIA_URL']) {
+  const value = process.env[key];
+  if (value) vars.set(key, value);
+  else vars.delete(key);
+}
+for (const key of ['ANALYSIS_RECORD_DIR', 'ANALYST_HANDOFF_DIR']) {
+  const value = process.env[key];
+  if (value) vars.set(key, basename(value));
+  else vars.delete(key);
+}
 if (process.env.ANALYSIS_REPLAY_DELAY_MS) vars.set('ANALYSIS_REPLAY_DELAY_MS', process.env.ANALYSIS_REPLAY_DELAY_MS);
 else vars.delete('ANALYSIS_REPLAY_DELAY_MS');
 writeVars(DEV_VARS, vars, '# Written by apps/api/scripts/dev-setup.ts (pnpm dev). Gitignored: provider keys live here in dev.');

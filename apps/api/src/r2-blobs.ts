@@ -1,5 +1,5 @@
 import type { UploadedPart } from '@als/schema';
-import { NotFoundError, UploadIncompleteError, type BlobBody, type BlobHead, type BlobRange, type BlobStore } from '../../server/src/ports.ts';
+import { NotFoundError, UploadIncompleteError, type BlobBody, type BlobHead, type BlobRange, type BlobStore } from './ports.ts';
 import type { R2Bucket } from './workers.ts';
 
 const SAFE_SEGMENT = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;

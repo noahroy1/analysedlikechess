@@ -14,7 +14,7 @@ export default defineConfig(
     },
   },
   {
-    files: ['apps/server/**', 'apps/media/**', 'packages/schema/**', 'scripts/**', '*.config.{js,ts}'],
+    files: ['apps/api/**', 'apps/media/**', 'packages/schema/**', 'scripts/**', '*.config.{js,ts}'],
     languageOptions: { globals: globals.node },
   },
   {
@@ -32,7 +32,7 @@ export default defineConfig(
         'error',
         {
           patterns: [
-            { group: ['**/apps/**', '@als/web', '@als/server'], message: 'composition must not import app code' },
+            { group: ['**/apps/**', '@als/web', '@als/api'], message: 'composition must not import app code' },
             { group: ['zustand', 'zustand/*'], message: 'composition must not read editor state' },
           ],
         },

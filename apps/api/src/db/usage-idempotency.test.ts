@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import type { StoredResponse } from '../../../server/src/api/idempotency.ts';
+import type { StoredResponse } from '../api/idempotency.ts';
 import { asService, asUser } from './db.ts';
 import { PgIdempotencyStore } from './idempotency.ts';
 import { PgProjectRepo } from './project-repo.ts';

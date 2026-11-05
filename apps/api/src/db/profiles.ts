@@ -1,4 +1,4 @@
-import type { Profile, ProfileStore } from '../../../server/src/ports.ts';
+import type { Profile, ProfileStore } from '../ports.ts';
 import type { Db } from './db.ts';
 
 /** `app.profiles`, made for every new user by a trigger. A user reads only their own. */
