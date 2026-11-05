@@ -5,12 +5,6 @@ packages:
   - spikes/capacitor-trial
 minimumReleaseAgeExclude:
   - '@anthropic-ai/sdk@0.133.0'
-  - '@supabase/auth-js@2.119.0'
-  - '@supabase/functions-js@2.119.0'
-  - '@supabase/postgrest-js@2.119.0'
-  - '@supabase/realtime-js@2.119.0'
-  - '@supabase/storage-js@2.119.0'
-  - '@supabase/supabase-js@2.119.0'
 
 # Reviewed install scripts: none is needed (a no-op preinstall, a CLI compatibility check, and
 # esbuild's and workerd's binary checks; their platform binaries come as optional dependencies).

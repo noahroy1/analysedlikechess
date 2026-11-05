@@ -11,7 +11,7 @@
   },
   "dependencies": {
     "@als/schema": "workspace:*",
-    "@supabase/supabase-js": "2.119.0",
+    "@supabase/supabase-js": "2.118.0",
     "zod": "4.6.5"
   }
 }
