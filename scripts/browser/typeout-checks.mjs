@@ -34,7 +34,7 @@ try {
   const holds = JSON.parse(await page.eval(`JSON.stringify([...document.querySelectorAll('[data-testid=hold-block]')].map((b) => ({ id: b.dataset.momentId, start: Number(b.dataset.outStart), frames: Number(b.dataset.frames) })))`));
   const hold = holds.find((h) => h.id === momentId);
   if (!hold) throw new Error(`no hold block for ${momentId}: ${JSON.stringify(holds)}`);
-  const fps = await page.eval(`fetch('/api/v1/projects/${projectId}').then((r) => r.json()).then((p) => p.source.fps)`);
+  const fps = await page.eval(`__alsFetch('/api/v1/projects/${projectId}').then((r) => r.json()).then((p) => p.source.fps)`);
 
   const read = async (sec) => {
     const frame = hold.start + Math.round(sec * fps);

@@ -117,6 +117,7 @@ export class FsProjectRepo implements ProjectRepo {
   }
 
   async history(id: string): Promise<HistoryEntry[]> {
+    await this.read(id);
     const dir = this.file(id, 'history');
     const files = await readdir(dir).catch(() => [] as string[]);
     const entries = await Promise.all(

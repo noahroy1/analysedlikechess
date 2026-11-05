@@ -8,6 +8,7 @@ import { recordingsFrom } from '../../server/src/analysis/providers/replay.ts';
 import { AnalysisService } from '../../server/src/analysis/service.ts';
 import { MediaSigner } from '../../server/src/api/media-urls.ts';
 import { createApp, SIGNED_PATH } from '../../server/src/app.ts';
+import { projectKey } from '../../server/src/ports.ts';
 import { IngestService } from '../../server/src/ingest/service.ts';
 import { HttpMediaRunner } from '../../server/src/media/http-runner.ts';
 import { RenderService } from '../../server/src/render/renders.ts';
@@ -113,6 +114,14 @@ export function buildCloud(env: Env) {
       // The repo validates the merged document with ProjectSchema.
       const project = await repo.update(c.req.param('id'), (p) => ({ ...p, ...fields }) as Project);
       return c.json(project);
+    });
+    /** Replaces one of the owner's project files (sound-checks swaps in a silent proxy, as it once did on disk). */
+    app.put('/dev/projects/:id/files/*', async (c) => {
+      const id = c.req.param('id');
+      await repo.read(id);
+      const file = decodeURIComponent(c.req.path.slice(`/api/v1/dev/projects/${id}/files/`.length));
+      await blobs.put(projectKey(id, file), new Uint8Array(await c.req.arrayBuffer()));
+      return c.json({ ok: true });
     });
   }
   return { app, db, repo, blobs, jobs, events, usage, spend, signer, sounds, analysis, ingest, renders };

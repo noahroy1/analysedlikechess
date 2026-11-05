@@ -134,9 +134,9 @@ try {
     const base = await page.eval(`${E}.getState().baseVersion`);
     // Someone else saves first.
     const other = await page.eval(`(async () => {
-      const p = await (await fetch('/api/v1/projects/${projectId}')).json();
+      const p = await (await __alsFetch('/api/v1/projects/${projectId}')).json();
       p.moments[2].moveLabel = 'Changed in another tab';
-      const res = await fetch('/api/v1/projects/${projectId}', { method: 'PUT', headers: { 'content-type': 'application/json', 'Idempotency-Key': crypto.randomUUID() },
+      const res = await __alsFetch('/api/v1/projects/${projectId}', { method: 'PUT', headers: { 'content-type': 'application/json', 'Idempotency-Key': crypto.randomUUID() },
         body: JSON.stringify({ version: p.version, moments: p.moments, characters: p.context.characters, themeId: p.themeId }) });
       return res.status;
     })()`);
@@ -145,7 +145,7 @@ try {
     await page.waitFor(`document.querySelector('[data-testid=toast]')?.textContent.includes('changed somewhere else')`, 10000);
     const m1 = await page.eval(`${moment('m1')}.moveLabel`);
     const m3 = await page.eval(`${moment('m3')}.moveLabel`);
-    const server = await page.eval(`(async () => (await (await fetch('/api/v1/projects/${projectId}')).json()).moments[0].moveLabel)()`);
+    const server = await page.eval(`(async () => (await (await __alsFetch('/api/v1/projects/${projectId}')).json()).moments[0].moveLabel)()`);
     result('a stale save gets a 409 and reloads', other === 200 && m3 === 'Changed in another tab' && m1 !== 'Stale local edit' && server !== 'Stale local edit',
       `base v${base}; other tab saved (${other}); editor now shows "${m3}"; server kept m1 "${server}"`);
   }

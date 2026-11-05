@@ -1,20 +1,21 @@
 // Chess sound checks against a running `pnpm dev`, in headless Chrome.
-// usage: node scripts/browser/sound-checks.mjs <scratchDir> <projectsDir> <projectId>
-// Use a project seeded from the fixture (`pnpm seed:sample`) and sounds in the
-// server's sounds folder (`media/sounds`). The check strips the audio from that
-// project's proxy, so every sound the Player schedules is a chess sound, then
+// usage: node scripts/browser/sound-checks.mjs <scratchDir> <projectId>
+// Use a project seeded from the fixture (`pnpm seed:sample`) and the sound bank
+// `pnpm dev` loads (`media/sounds`). The check strips the audio from that
+// project's proxy (through the dev file route), so every sound the Player schedules is a chess sound, then
 // plays the whole episode in Preview and compares what Web Audio was asked to
 // play, and when, with `soundCues()`. Headless Chrome cannot be listened to;
 // this checks the schedule.
 import { execFileSync } from 'node:child_process';
-import { renameSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { gameReviewSec } from '../../packages/schema/src/game-review.ts';
 import { buildTimeline } from '../../packages/composition/src/timeline.ts';
 import { soundCues } from '../../packages/composition/src/sounds.ts';
 import { launch, sleep } from './cdp.mjs';
+import { api, projectFile } from './dev-api.mjs';
 
-const [S, projectsDir, projectId] = process.argv.slice(2);
+const [S, projectId] = process.argv.slice(2);
 const P = 'window.__alsPlayer';
 const E = 'window.__alsEditor';
 const result = (name, ok, detail = '') => console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? `  (${detail})` : ''}`);
@@ -24,9 +25,10 @@ const SLACK = 3;
 const editorState = async () =>
   JSON.parse(await page.eval(`JSON.stringify((({ project, doc, theme }) => ({ source: project.source, moments: doc.moments, characters: doc.characters, theme }))(${E}.getState()))`));
 
-const proxy = join(projectsDir, projectId, 'proxy.mp4');
+const proxy = join(S, `${projectId}-proxy.mp4`);
+writeFileSync(proxy, await projectFile(projectId, 'proxy.mp4'));
 execFileSync('ffmpeg', ['-v', 'error', '-y', '-i', proxy, '-an', '-c', 'copy', `${proxy}.silent.mp4`]);
-renameSync(`${proxy}.silent.mp4`, proxy);
+await api(`/dev/projects/${projectId}/files/proxy.mp4`, { method: 'PUT', body: readFileSync(`${proxy}.silent.mp4`) });
 
 const page = await launch({ profile: `${S}/chrome-sounds`, width: 1500, height: 1150 });
 // Logs every buffer Web Audio is asked to play, with the Player frame it lands on.
@@ -55,7 +57,7 @@ try {
   await page.goto(`http://localhost:5173/#/projects/${projectId}`);
   await page.waitFor(`!!${P} && !!${E}`);
   await sleep(1000);
-  const sounds = await (await fetch('http://localhost:5173/api/v1/sounds')).json();
+  const sounds = await (await api('/sounds')).json();
 
   // 1. The server lists the sounds and serves them.
   {

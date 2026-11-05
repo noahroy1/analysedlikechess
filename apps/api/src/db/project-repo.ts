@@ -103,13 +103,16 @@ export class PgProjectRepo implements ProjectRepo {
   }
 
   async history(id: string): Promise<HistoryEntry[]> {
-    const { rows } = await this.db.tx((sql) =>
-      sql.query<{ version: number; saved_at: Date; moment_count: number }>(
+    const { rows } = await this.db.tx(async (sql) => {
+      // A project the caller can't see is not found, not an empty history.
+      const project = await sql.query('select 1 from app.projects where id = $1', [id]);
+      if (!project.rowCount) throw new NotFoundError(`project ${id} not found`);
+      return sql.query<{ version: number; saved_at: Date; moment_count: number }>(
         `select version, saved_at, coalesce(jsonb_array_length(doc->'moments'), 0) as moment_count
          from app.project_versions where project_id = $1 order by version desc`,
         [id],
-      ),
-    );
+      );
+    });
     return rows.map((r) => ({ version: r.version, savedAt: r.saved_at.toISOString(), momentCount: r.moment_count }));
   }
 

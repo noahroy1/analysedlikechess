@@ -56,6 +56,7 @@ export interface ProjectRepo {
   update(id: string, change: (project: Project) => Project | void, options?: { snapshot?: boolean }): Promise<Project>;
   /** An editor save: applies `change` only if the project is still at `baseVersion`, after putting the current version into history. */
   save(id: string, baseVersion: number, change: (project: Project) => Project | void): Promise<Project>;
+  /** Saved versions, newest first; a project that doesn't exist (or isn't the caller's) is a NotFoundError. */
   history(id: string): Promise<HistoryEntry[]>;
   readVersion(id: string, version: number): Promise<Project>;
   /** Deletes the project, its history, caches and every file. */

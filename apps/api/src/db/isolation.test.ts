@@ -135,7 +135,7 @@ describe.skipIf(!haveSupabase)('a second user', () => {
       await expect(repo.read(project)).rejects.toBeInstanceOf(NotFoundError);
       await expect(repo.save(project, 2, () => undefined)).rejects.toBeInstanceOf(NotFoundError);
       await expect(repo.update(project, () => undefined)).rejects.toBeInstanceOf(NotFoundError);
-      expect(await repo.history(project)).toEqual([]);
+      await expect(repo.history(project)).rejects.toBeInstanceOf(NotFoundError);
       await expect(repo.readVersion(project, 1)).rejects.toBeInstanceOf(NotFoundError);
       expect(await repo.getStage(project, 'analysis', 'annotate')).toBeUndefined();
       expect(await repo.getUpload(project)).toBeUndefined();

@@ -1,5 +1,5 @@
 // Render checks against a running `pnpm dev`, in headless Chrome.
-// usage: node scripts/browser/render-checks.mjs <scratchDir> <projectsDir> <projectId> [--reuse]
+// usage: node scripts/browser/render-checks.mjs <scratchDir> <projectId> [--reuse]
 // (--reuse compares the newest finished render instead of making a new one)
 // Renders the project from the editor's Render menu, then compares three holds (and the game review, if any)
 // in the MP4 with the same frames drawn by the Player. The Player plays the
@@ -7,10 +7,12 @@
 // size after a slight blur (sharp text edges otherwise dominate), with a
 // control showing the comparison tells a card from no card.
 import { execFileSync, spawnSync } from 'node:child_process';
+import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { launch, sleep } from './cdp.mjs';
+import { projectFile } from './dev-api.mjs';
 
-const [S, projectsDir, projectId, flag] = process.argv.slice(2);
+const [S, projectId, flag] = process.argv.slice(2);
 const reuse = flag === '--reuse';
 const P = 'window.__alsPlayer';
 const E = 'window.__alsEditor';
@@ -65,10 +67,11 @@ try {
     await clickText('Render');
   }
 
-  const renders = await page.eval(`fetch('/api/v1/projects/${projectId}/renders').then((r) => r.json())`);
+  const renders = await page.eval(`__alsFetch('/api/v1/projects/${projectId}/renders').then((r) => r.json())`);
   const job = renders.find((r) => r.status === 'done');
-  const mp4 = join(projectsDir, projectId, job.file);
-  const project = await page.eval(`fetch('/api/v1/projects/${projectId}').then((r) => r.json())`);
+  const mp4 = join(S, `${projectId}-${job.id}.mp4`);
+  writeFileSync(mp4, await projectFile(projectId, job.file));
+  const project = await page.eval(`__alsFetch('/api/v1/projects/${projectId}').then((r) => r.json())`);
   result('the render is of the saved version', job.projectVersion === project.version, `v${job.projectVersion}, project at v${project.version}`);
   const probe = JSON.parse(execFileSync('ffprobe', ['-v', 'error', '-select_streams', 'v:0', '-count_packets', '-show_entries', 'stream=nb_read_packets,width,height', '-of', 'json', mp4], { encoding: 'utf8' })).streams[0];
   result('the MP4 has every output frame', Number(probe.nb_read_packets) === job.frames, `${probe.nb_read_packets} frames, expected ${job.frames}`);
