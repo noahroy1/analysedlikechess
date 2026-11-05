@@ -16,3 +16,7 @@ projects/*
 
 # local demo footage: copyrighted, never committed
 /media/
+
+# Wrangler: local state and dev secrets
+.wrangler/
+.dev.vars

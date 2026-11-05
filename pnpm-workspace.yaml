@@ -7,8 +7,9 @@ minimumReleaseAgeExclude:
   - '@anthropic-ai/sdk@0.133.0'
 
 # Reviewed install scripts: none is needed (a no-op preinstall, a CLI compatibility check, and
-# esbuild's binary check; its platform binary comes as an optional dependency).
+# esbuild's and workerd's binary checks; their platform binaries come as optional dependencies).
 allowBuilds:
   '@google/genai': false
   protobufjs: false
   esbuild: false
+  workerd: false

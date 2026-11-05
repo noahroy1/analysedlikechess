@@ -26,6 +26,8 @@ export function clientVersionOk(version: string, min = MIN_CLIENT_VERSION): bool
 /** Stable error codes: clients act on these, never on the message. */
 export const API_ERROR_CODES = [
   'invalid_request',
+  /** No valid sign-in token (401): sign in again. */
+  'unauthorized',
   'not_found',
   'version_conflict',
   'job_running',

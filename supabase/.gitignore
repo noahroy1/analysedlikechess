@@ -1,0 +1,5 @@
+# Supabase CLI state
+.branches
+.temp
+# Local JWT signing keys (dev only, but keys stay out of git)
+signing_keys.json

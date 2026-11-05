@@ -1,0 +1,22 @@
+// The API Worker (PLAN-CLOUD.md, Architecture). Local dev: `wrangler dev` with
+// local Supabase (`pnpm db:start`); secrets for dev go in `.dev.vars` (gitignored).
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "als-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-11-04",
+  "compatibility_flags": ["nodejs_compat"],
+  "r2_buckets": [{ "binding": "MEDIA", "bucket_name": "als-media" }],
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      // Created in C4 (staging and production). Locally Wrangler connects straight to local Supabase.
+      "id": "00000000000000000000000000000000",
+      "localConnectionString": "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
+    }
+  ],
+  "vars": {
+    "SUPABASE_URL": "http://127.0.0.1:54321"
+  },
+  "dev": { "port": 8790 }
+}
