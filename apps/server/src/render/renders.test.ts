@@ -78,8 +78,12 @@ describe('split renders', () => {
             await env.blobs.put(projectKey(input.projectId, input.video), 'ts');
             if (index === failChunk) throw new Error('chunk exploded');
             if (failChunk === undefined) return { seconds: 2 };
-            // The others run until they are stopped.
-            await new Promise((_, reject) => input.signal.addEventListener('abort', () => (aborted.push(index), reject(new Error('stopped')))));
+            // The others run until they are stopped (perhaps already, as the real runner checks first).
+            await new Promise((_, reject) => {
+              const stop = () => (aborted.push(index), reject(new Error('stopped')));
+              if (input.signal.aborted) stop();
+              else input.signal.addEventListener('abort', stop);
+            });
             return { seconds: 0 };
           },
           async combine(input: CombineCall) {
