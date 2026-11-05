@@ -8,6 +8,7 @@ import type {
   Project,
   RenderEncoding,
   RenderJob,
+  SoundBank,
   Shot,
   Source,
   UploadedPart,
@@ -123,7 +124,19 @@ export interface JobContext<K extends JobKind> {
   signal: AbortSignal;
   /** Publishes the job's live state (throttled; status changes always go out). */
   report(state: JobState<K>): void;
+  /**
+   * One durable step of the job. On Node it just runs `work`. In a Workflow a
+   * finished step is not run again when the job resumes (after a restart or a
+   * deploy): its stored result is returned instead. Names are unique within a
+   * job; results are JSON and small (Workflows keep at most 1 MiB a step), so
+   * stages return what they need and keep their outputs in the stage cache.
+   */
+  step<T>(name: string, work: () => Promise<T>): Promise<T>;
 }
+
+/** `JobContext.step` for code that runs outside a job too. */
+export type Durable = <T>(name: string, work: () => Promise<T>) => Promise<T>;
+export const runNow: Durable = (_name, work) => work();
 
 export type JobHandler<K extends JobKind> = (context: JobContext<K>) => Promise<void>;
 
@@ -138,13 +151,13 @@ export interface StartJob<K extends JobKind> {
 export interface JobRunner {
   register<K extends JobKind>(kind: K, handler: JobHandler<K>): void;
   /** Starts a job, or returns the one of this kind already pending or running for the project (`created: false`). */
-  start<K extends JobKind>(kind: K, projectId: string, start: StartJob<K>): { job: Extract<Job, { kind: K }>; created: boolean };
+  start<K extends JobKind>(kind: K, projectId: string, start: StartJob<K>): Promise<{ job: Extract<Job, { kind: K }>; created: boolean }>;
   /** The pending or running job of this kind for the project. */
-  find<K extends JobKind>(kind: K, projectId: string): Extract<Job, { kind: K }> | undefined;
+  find<K extends JobKind>(kind: K, projectId: string): Promise<Extract<Job, { kind: K }> | undefined>;
   /** Every pending or running job of a user, for clients that just connected. */
-  list(userId: string): Job[];
+  list(userId: string): Promise<Job[]>;
   /** Stops a pending job before it starts, or aborts a running one. False if it is not live. */
-  cancel(jobId: string): boolean;
+  cancel(jobId: string): Promise<boolean>;
   /** Resolves once nothing is pending or running (tests and shutdown). */
   whenIdle(): Promise<void>;
 }
@@ -152,6 +165,24 @@ export interface JobRunner {
 /** Live job updates to a user's clients. */
 export interface EventBus {
   publish(userId: string, job: Job): void;
+}
+
+/** The chess sounds every project shares (Node: a folder; C3: the `sounds` table and R2). */
+export interface SoundSource {
+  /** The bank, with each file's URL from `src` (signed by the caller). */
+  bank(src: (file: string) => string): Promise<SoundBank>;
+}
+
+/** What only an admin changes about a user. */
+export interface Profile {
+  role: 'user' | 'admin';
+  /** Absent: the default cap (DEFAULT_MONTHLY_CAP_USD). */
+  monthlyCapUsd?: number;
+}
+
+/** Users' profiles (C3: `app.profiles`; on Node the one local user is an admin). */
+export interface ProfileStore {
+  get(userId: string): Promise<Profile>;
 }
 
 /** One paid call's spend, per user and project. */

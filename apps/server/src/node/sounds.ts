@@ -2,17 +2,15 @@ import { execFile } from 'node:child_process';
 import { readdir, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
-import { SoundIdSchema, type SoundBank } from '@als/schema';
-
-/** Sound files the browser and the renderer can both decode. */
-export const SOUND_FILE = /^([a-z0-9-]+)\.(wav|mp3|ogg|m4a|aac|flac)$/;
+import { SOUND_FILE, SoundIdSchema, type SoundBank } from '@als/schema';
+import type { SoundSource } from '../ports.ts';
 
 /**
  * The chess sounds in a folder (`<id>.<ext>`, see SOUND_IDS), with their
  * lengths. Probed lengths are cached by file size and time, so dropping a new
  * file in shows up on the next request. A missing folder is an empty bank.
  */
-export class SoundLibrary {
+export class SoundLibrary implements SoundSource {
   private readonly durations = new Map<string, { key: string; durationSec: number }>();
 
   readonly dir: string;
@@ -33,11 +31,6 @@ export class SoundLibrary {
       if (durationSec > 0) bank[id.data] = { src: src(file), durationSec };
     }
     return bank;
-  }
-
-  /** Whether a file name is one the bank serves. */
-  static servable(file: string): boolean {
-    return SoundIdSchema.safeParse(SOUND_FILE.exec(file)?.[1]).success;
   }
 
   private async duration(file: string): Promise<number> {

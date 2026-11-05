@@ -15,8 +15,13 @@
       "localConnectionString": "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
     }
   ],
+  // One Workflow instance per job (ingest, analysis, render), named by the job's id.
+  "workflows": [{ "name": "als-jobs", "binding": "JOBS", "class_name": "JobWorkflow" }],
   "vars": {
-    "SUPABASE_URL": "http://127.0.0.1:54321"
+    "SUPABASE_URL": "http://127.0.0.1:54321",
+    // The local media service (`apps/media`) and this Worker as that service reaches it.
+    "MEDIA_URL": "http://127.0.0.1:8788",
+    "API_ORIGIN": "http://127.0.0.1:8790"
   },
   "dev": { "port": 8790 }
 }

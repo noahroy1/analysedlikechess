@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import { CUT_DETECTION, PROXY, THUMB_WIDTH, shotThumbnailFile, type Ingest, type Project, type Stage } from '@als/schema';
-import { projectKey, type BlobStore, type MediaRunner, type ProjectRepo } from '../ports.ts';
+import { projectKey, runNow, type BlobStore, type Durable, type MediaRunner, type ProjectRepo } from '../ports.ts';
 
 export const INGEST_STAGES = ['hash', 'probe', 'proxy', 'audio', 'shots', 'thumbnails'] as const;
 type StageName = (typeof INGEST_STAGES)[number];
@@ -44,7 +44,7 @@ export async function sourceHash(repo: ProjectRepo, projectId: string): Promise<
  * Stage 1 of the pipeline: hash, probe, proxy, audio, cuts and shot thumbnails.
  * Each step is skipped when its inputs are unchanged and its outputs exist.
  */
-export async function runIngest({ repo, blobs, media }: IngestDeps, id: string, onUpdate: (ingest: Ingest) => void): Promise<Ingest> {
+export async function runIngest({ repo, blobs, media }: IngestDeps, id: string, onUpdate: (ingest: Ingest) => void, durable: Durable = runNow): Promise<Ingest> {
   let project = await repo.read(id);
   const file = (name: string) => ({ projectId: id, file: name });
   const exists = async (name: string) => (await blobs.head(projectKey(id, name))) !== undefined;
@@ -78,10 +78,12 @@ export async function runIngest({ repo, blobs, media }: IngestDeps, id: string, 
     await save();
     onUpdate(ingest);
     const started = performance.now();
-    const output = await work((p) => {
-      stage.progress = p;
-      onUpdate(ingest);
-    });
+    const output = await durable(`ingest:${name}`, () =>
+      work((p) => {
+        stage.progress = p;
+        onUpdate(ingest);
+      }),
+    );
     stage.status = 'done';
     delete stage.progress;
     stage.durationMs = Math.round(performance.now() - started);

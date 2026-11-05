@@ -1,4 +1,4 @@
-import { Hono } from 'hono';
+import { Hono, type MiddlewareHandler } from 'hono';
 import { streamSSE } from 'hono/streaming';
 import {
   API_PREFIX,
@@ -21,6 +21,7 @@ import {
   clientVersionOk,
   grantUrl,
   projectName,
+  servableSound,
   shotThumbnailFile,
   type AnalysisConfigInfo,
   type CreateProjectResult,
@@ -41,9 +42,8 @@ import { SOUNDS_SCOPE, mediaInScope, mediaOutScope, mediaTaskScope, projectScope
 import { contentType, parseRange } from './api/range.ts';
 import { pendingIngest } from './ingest/ingest.ts';
 import type { IngestService } from './ingest/service.ts';
-import { SoundLibrary } from './node/sounds.ts';
 import { portraitFile } from './portraits.ts';
-import { JobRunningError, NotFoundError, projectKey, soundKey, type BlobStore, type JobRunner, type MediaRunner, type ProjectRepo } from './ports.ts';
+import { JobRunningError, NotFoundError, projectKey, soundKey, type BlobStore, type JobRunner, type MediaRunner, type ProjectRepo, type SoundSource } from './ports.ts';
 import type { RenderService } from './render/renders.ts';
 import type { Spend } from './spend.ts';
 
@@ -55,14 +55,21 @@ export interface AppDeps {
   ingest: IngestService;
   analysis: AnalysisService;
   renders: RenderService;
-  sounds: SoundLibrary;
+  sounds: SoundSource;
   signer: MediaSigner;
   idempotency: IdempotencyStore;
   spend: Spend;
   /** The dev transport for live job updates (C3: Realtime Broadcast, so no route). */
   events?: { subscribe(userId: string, listener: (job: Job) => void): () => void };
-  /** Who every request is from until sign-in exists (C3: the JWT's subject). */
-  userId: string;
+  /**
+   * Who a request is from: sets `userId`. On Node, the one local user
+   * (`fixedUser`); on the Worker, the verified access token, run in that
+   * user's database scope. Paths matching SIGNED_PATH carry a signature
+   * instead and must be let through.
+   */
+  authenticate: MiddlewareHandler<{ Variables: { userId: string } }>;
+  /** Runs work as a user named by a signed URL rather than a token (upload parts). Default: just runs it. */
+  runAs?: <T>(userId: string, work: () => Promise<T>) => Promise<T>;
   /** Hands a media task's callback to the call waiting for it (the HTTP media runner). */
   mediaTasks?: { deliver(taskId: string, event: MediaTaskEvent): boolean };
 }
@@ -94,9 +101,24 @@ export function summarize(project: Project, media?: MediaGrant): ProjectSummary 
 /** Signed URLs that carry raw bytes or a service's callback, not a client's intent: no idempotency key. */
 const UNKEYED_PATH = new RegExp(`^${API_PREFIX}/(?:uploads|media)/`);
 
+/**
+ * Routes that carry a signature instead of a sign-in token: a `<video>` or the
+ * media service can't send one. Each checks its own signature.
+ */
+export const SIGNED_PATH = new RegExp(`^${API_PREFIX}/(?:health$|uploads/|media/|sounds/[^/]+$|projects/[^/]+/files/)`);
+
+/** Every request is from one user: the Node server's local user, and tests. */
+export const fixedUser =
+  (userId: string): MiddlewareHandler<{ Variables: { userId: string } }> =>
+  async (c, next) => {
+    c.set('userId', userId);
+    await next();
+  };
+
 /** The v1 API (PLAN-CLOUD.md, "API contract"), on whatever the deps are backed by. */
 export function createApp(deps: AppDeps) {
   const { repo, blobs, media, jobs, ingest, analysis, renders, sounds, signer, spend } = deps;
+  const runAs = deps.runAs ?? ((_userId, work) => work());
   const app = new Hono<{ Variables: { userId: string } }>().basePath(API_PREFIX);
 
   app.onError((error, c) => errorResponse(c, error));
@@ -107,9 +129,9 @@ export function createApp(deps: AppDeps) {
     if (version !== undefined && !clientVersionOk(version)) {
       throw new ApiError(426, 'client_too_old', `This app is too old for the server (needs ${MIN_CLIENT_VERSION} or later). Update it to carry on.`);
     }
-    c.set('userId', deps.userId);
     await next();
   });
+  app.use('*', deps.authenticate);
   // Upload parts and the media service's files are signed URLs carrying raw bytes (a repeated PUT replaces
   // the file), and its callbacks report a task's state: none of them needs a key.
   app.use('*', idempotency(deps.idempotency, { skip: (path) => UNKEYED_PATH.test(path) }));
@@ -118,12 +140,13 @@ export function createApp(deps: AppDeps) {
 
   app.get('/me', async (c) => {
     const userId = c.get('userId');
-    const me: Me = { user: { id: userId }, role: 'admin', ...(await spend.status(userId)) };
+    const { profile, monthToDateUsd, monthlyCapUsd } = await spend.status(userId);
+    const me: Me = { user: { id: userId }, role: profile.role, monthToDateUsd, monthlyCapUsd };
     return c.json(me);
   });
 
   /** The user's pending and running jobs: clients read this on connect and after every reconnect or resume. */
-  app.get('/jobs', (c) => c.json(jobs.list(c.get('userId'))));
+  app.get('/jobs', async (c) => c.json(await jobs.list(c.get('userId'))));
 
   app.get('/projects', async (c) => {
     const userId = c.get('userId');
@@ -185,7 +208,7 @@ export function createApp(deps: AppDeps) {
     const partNumber = Number(c.req.param('part'));
     const userId = await signer.verify(uploadPartScope(projectId, c.req.param('upload'), partNumber), new URL(c.req.url).searchParams);
     if (!userId) throw new ApiError(403, 'media_url_invalid', 'This upload link has expired; ask for new part URLs.');
-    const upload = await openUpload(projectId, c.req.param('upload'));
+    const upload = await runAs(userId, () => openUpload(projectId, c.req.param('upload')));
     const expected = partNumber < upload.partCount ? upload.partSize : upload.size - upload.partSize * (upload.partCount - 1);
     const length = Number(c.req.header('content-length'));
     if (length !== expected) throw new ApiError(400, 'invalid_request', `part ${partNumber} must be ${expected} bytes`);
@@ -233,7 +256,7 @@ export function createApp(deps: AppDeps) {
       analysis: { status: 'idle', stages: [], models: {} },
     });
     await repo.removeUpload(projectId);
-    ingest.start(c.get('userId'), project);
+    await ingest.start(c.get('userId'), project);
     return c.json(project, 201);
   });
 
@@ -350,7 +373,7 @@ export function createApp(deps: AppDeps) {
   app.delete('/projects/:id', async (c) => {
     const id = c.req.param('id');
     for (const kind of ['ingest', 'analysis', 'render'] as const) {
-      const job = jobs.find(kind, id);
+      const job = await jobs.find(kind, id);
       if (job) throw new JobRunningError(`Wait for the ${kind === 'render' ? 'render' : kind} to finish before deleting.`, job);
     }
     await repo.read(id);
@@ -478,7 +501,7 @@ export function createApp(deps: AppDeps) {
 
   app.get('/sounds/:file', async (c) => {
     const file = c.req.param('file');
-    if (!SoundLibrary.servable(file)) throw new NotFoundError('not found');
+    if (!servableSound(file)) throw new NotFoundError('not found');
     if (!(await signer.verify(SOUNDS_SCOPE, new URL(c.req.url).searchParams))) throw new ApiError(403, 'media_url_invalid', 'This sound link has expired.');
     return serveBlob(c, soundKey(file), file);
   });

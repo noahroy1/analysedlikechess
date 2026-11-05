@@ -7,7 +7,7 @@ import type { Providers } from '../analysis/providers/index.ts';
 import { AnalysisService } from '../analysis/service.ts';
 import { MemoryIdempotencyStore } from '../api/idempotency.ts';
 import { MediaSigner } from '../api/media-urls.ts';
-import { createApp } from '../app.ts';
+import { createApp, fixedUser } from '../app.ts';
 import { IngestService } from '../ingest/service.ts';
 import { HttpMediaRunner } from '../media/http-runner.ts';
 import type { MediaRunner } from '../ports.ts';
@@ -66,7 +66,7 @@ export async function createNodeServer(options: NodeServerOptions) {
   const events = new LocalEventBus();
   const jobs = new LocalJobRunner(events);
   const usage = new FsUsageLog(projectsDir);
-  const spend = new Spend(usage, options.capUsd);
+  const spend = new Spend(usage, options.capUsd === undefined ? {} : { capUsd: options.capUsd });
   const signer = new MediaSigner(options.mediaSecret ?? (await mediaSecret(projectsDir)));
   const http = new HttpMediaRunner({ urls: options.mediaUrls, signer, blobs, origin: options.origin });
   const media = options.wrapMedia?.(http) ?? http;
@@ -74,17 +74,17 @@ export async function createNodeServer(options: NodeServerOptions) {
   const style = StyleCorpusSchema.parse(JSON.parse(await readFile(config.styleCorpusPath, 'utf8')));
   const providers = options.providers ?? makeProviders(config);
   const analysis = new AnalysisService({ repo, blobs, media, jobs, usage, spend, providers, config, style });
-  const ingest = new IngestService({ repo, blobs, media, jobs, onDone: (userId, id) => void analysis.autoStart(userId, id) });
+  const ingest = new IngestService({ repo, blobs, media, jobs, onDone: (userId, id) => analysis.autoStart(userId, id) });
   const renders = new RenderService({ repo, blobs, media, jobs, usage, spend, sounds, signer, origin: options.origin, ...(options.renderSplit ? { split: options.renderSplit } : {}) });
   const idempotency = new MemoryIdempotencyStore();
-  const app = createApp({ repo, blobs, media, jobs, ingest, analysis, renders, sounds, signer, idempotency, spend, events, userId: LOCAL_USER, mediaTasks: http });
+  const app = createApp({ repo, blobs, media, jobs, ingest, analysis, renders, sounds, signer, idempotency, spend, events, authenticate: fixedUser(LOCAL_USER), mediaTasks: http });
 
   /** After a restart: fail interrupted renders and resume ingest and analysis (finished steps are cached). */
   const recover = async () => {
     const projects = await repo.list();
     await renders.recover(projects.map((p) => p.id));
     for (const project of projects) {
-      if (project.ingest.status === 'pending' || project.ingest.status === 'running') ingest.start(LOCAL_USER, project);
+      if (project.ingest.status === 'pending' || project.ingest.status === 'running') await ingest.start(LOCAL_USER, project);
       else if (project.analysis.status === 'pending' || project.analysis.status === 'running') {
         void analysis.start(LOCAL_USER, project.id).catch((error: unknown) => console.warn(`analysis of ${project.id} not resumed:`, error));
       }

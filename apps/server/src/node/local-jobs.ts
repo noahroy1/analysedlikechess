@@ -1,6 +1,6 @@
 import { EventEmitter } from 'node:events';
 import { JOB_KINDS, type Job, type JobKind, type JobState } from '@als/schema';
-import type { EventBus, JobHandler, JobRunner, StartJob } from '../ports.ts';
+import { runNow, type EventBus, type JobHandler, type JobRunner, type StartJob } from '../ports.ts';
 
 /** Minimum gap between progress broadcasts for one job. Status changes always go out. */
 const THROTTLE_MS = 150;
@@ -42,8 +42,8 @@ export class LocalJobRunner implements JobRunner {
     this.handlers.set(kind, handler as unknown as JobHandler<JobKind>);
   }
 
-  start<K extends JobKind>(kind: K, projectId: string, start: StartJob<K>): { job: Extract<Job, { kind: K }>; created: boolean } {
-    const existing = this.find(kind, projectId);
+  async start<K extends JobKind>(kind: K, projectId: string, start: StartJob<K>): Promise<{ job: Extract<Job, { kind: K }>; created: boolean }> {
+    const existing = this.live(kind, projectId);
     if (existing) return { job: existing, created: false };
     const job = { id: crypto.randomUUID(), kind, projectId, state: structuredClone(start.state) } as unknown as Extract<Job, { kind: K }>;
     this.entries.set(job.id, { job, userId: start.userId, request: start.request, controller: new AbortController() });
@@ -53,18 +53,22 @@ export class LocalJobRunner implements JobRunner {
     return { job: structuredClone(job), created: true };
   }
 
-  find<K extends JobKind>(kind: K, projectId: string): Extract<Job, { kind: K }> | undefined {
+  async find<K extends JobKind>(kind: K, projectId: string): Promise<Extract<Job, { kind: K }> | undefined> {
+    return this.live(kind, projectId);
+  }
+
+  private live<K extends JobKind>(kind: K, projectId: string): Extract<Job, { kind: K }> | undefined {
     for (const { job } of this.entries.values()) {
       if (job.kind === kind && job.projectId === projectId) return structuredClone(job) as Extract<Job, { kind: K }>;
     }
     return undefined;
   }
 
-  list(userId: string): Job[] {
+  async list(userId: string): Promise<Job[]> {
     return [...this.entries.values()].filter((e) => e.userId === userId).map((e) => structuredClone(e.job));
   }
 
-  cancel(jobId: string): boolean {
+  async cancel(jobId: string): Promise<boolean> {
     const entry = this.entries.get(jobId);
     if (!entry) return false;
     const queue = this.waiting.get(entry.job.kind)!;
@@ -97,6 +101,7 @@ export class LocalJobRunner implements JobRunner {
           userId: entry.userId,
           request: entry.request,
           signal: entry.controller.signal,
+          step: runNow,
           report: (state: JobState<JobKind>) => {
             entry.job = { ...entry.job, state: structuredClone(state) } as AnyJob;
             this.send(entry);

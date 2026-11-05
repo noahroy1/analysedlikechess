@@ -51,3 +51,9 @@ export type SoundFile = z.infer<typeof SoundFileSchema>;
 /** The sounds that exist, by id. */
 export const SoundBankSchema = z.partialRecord(SoundIdSchema, SoundFileSchema);
 export type SoundBank = z.infer<typeof SoundBankSchema>;
+
+/** Sound files the browser and the renderer can both decode: `<id>.<ext>`. */
+export const SOUND_FILE = /^([a-z0-9-]+)\.(wav|mp3|ogg|m4a|aac|flac)$/;
+
+/** Whether a file name is one the bank serves. */
+export const servableSound = (file: string): boolean => SoundIdSchema.safeParse(SOUND_FILE.exec(file)?.[1]).success;

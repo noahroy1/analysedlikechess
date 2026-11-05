@@ -40,8 +40,8 @@ export class AnalysisService {
     this.deps = deps;
     this.config = deps.config;
     const pipeline: AnalysisDeps = deps;
-    deps.jobs.register('analysis', async ({ job, userId, request, report }) => {
-      await runAnalysis(pipeline, job.projectId, (request ?? {}) as AnalysisOptions, { userId, check: () => deps.spend.check(userId) }, report);
+    deps.jobs.register('analysis', async ({ job, userId, request, report, step }) => {
+      await runAnalysis(pipeline, job.projectId, (request ?? {}) as AnalysisOptions, { userId, check: () => deps.spend.check(userId) }, report, step);
     });
   }
 
@@ -52,7 +52,7 @@ export class AnalysisService {
   /** Starts an analysis run, or returns the one already pending or running (`created: false`). */
   async start(userId: string, id: string, request: AnalyzeRequest = {}): Promise<{ job: JobOf<'analysis'>; created: boolean }> {
     const { repo, jobs, spend } = this.deps;
-    const running = jobs.find('analysis', id);
+    const running = await jobs.find('analysis', id);
     if (running) return { job: running, created: false };
     const project = await repo.read(id);
     if (project.ingest.status !== 'done') throw new NotReadyError('Wait for ingest to finish.');
@@ -71,7 +71,9 @@ export class AnalysisService {
     if (!this.config.autoAnalyze || this.missingKeys().length) return;
     const project = await this.deps.repo.read(id).catch(() => undefined);
     // Only a clip with no moves yet: a re-ingest (or a seeded sample) never replaces moves on its own.
-    if (project?.analysis.status === 'idle' && project.moments.length === 0) await this.start(userId, id).catch(() => undefined);
+    if (project?.analysis.status === 'idle' && project.moments.length === 0) {
+      await this.start(userId, id).catch((error: unknown) => console.warn(`analysis of ${id} did not start on its own:`, error));
+    }
   }
 
   async regenerate(userId: string, id: string, moment: Moment, instruction?: string, format?: Format): Promise<RegenerateResult> {

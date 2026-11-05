@@ -8,4 +8,5 @@ export type {
   R2Object,
   R2ObjectBody,
   R2UploadedPart,
+  Workflow,
 } from '@cloudflare/workers-types/index.ts';

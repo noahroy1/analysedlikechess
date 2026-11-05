@@ -21,7 +21,7 @@ import {
 } from '@als/schema';
 import { getTheme } from '@als/theme/themes';
 import { AUDIO_FILE, sourceHash as readSourceHash } from '../ingest/ingest.ts';
-import { HINTS_STAGE, projectKey, type BlobStore, type MediaRunner, type ProjectRepo, type UsageLog } from '../ports.ts';
+import { HINTS_STAGE, projectKey, runNow, type BlobStore, type Durable, type MediaRunner, type ProjectRepo, type UsageLog } from '../ports.ts';
 import type { AnalysisConfig } from './config.ts';
 import { applyEvaluation, evaluationItems, placeBeats } from './evaluate.ts';
 import { annotationTask, decisionPointsTask, evaluationTask, speakerNamingTask, systemPrompt, targetMoveCount } from './prompts.ts';
@@ -96,6 +96,7 @@ export async function runAnalysis(
   options: AnalysisOptions,
   payer: Payer,
   onUpdate: (analysis: Analysis) => void,
+  durable: Durable = runNow,
 ): Promise<Analysis> {
   const { repo, blobs, providers, config, style, usage } = deps;
   let project = await repo.read(id);
@@ -139,11 +140,20 @@ export async function runAnalysis(
     emit();
     await payer.check();
     const started = performance.now();
-    const result = await work();
-    await repo.putStage(id, 'analysis', name, key, result.value);
-    if (result.costUsd !== undefined) {
-      await usage.record({ userId: payer.userId, projectId: id, call: `analysis.${name}`, model: result.model, usage: result.usage, costUsd: result.costUsd });
-    }
+    // The paid work, its stored output and its spend are one durable step: a
+    // resumed job neither pays again nor logs the spend twice.
+    let ran: { value: T } | undefined;
+    const result = await durable(`analysis:${name}`, async () => {
+      const { value, ...meta } = await work();
+      await repo.putStage(id, 'analysis', name, key, value);
+      if (meta.costUsd !== undefined) {
+        await usage.record({ userId: payer.userId, projectId: id, call: `analysis.${name}`, model: meta.model, usage: meta.usage, costUsd: meta.costUsd });
+      }
+      ran = { value };
+      return meta;
+    });
+    // A step finished before a restart returns only its summary; its output is in the stage cache.
+    const value = ran ? ran.value : schema.parse((await repo.getStage(id, 'analysis', name))?.output);
     Object.assign(stage, {
       status: 'done',
       durationMs: Math.round(performance.now() - started),
@@ -153,7 +163,7 @@ export async function runAnalysis(
     });
     if (result.model) analysis.models[name] = result.model;
     emit();
-    return result.value;
+    return value;
   }
 
   const skip = (name: StageName) => {

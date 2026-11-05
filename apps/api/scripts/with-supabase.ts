@@ -2,9 +2,11 @@
 // (`supabase status`), e.g. the database tests: `pnpm test:db`.
 import { execFileSync, spawnSync } from 'node:child_process';
 import { delimiter } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const DOCKER_BIN = '/Applications/Docker.app/Contents/Resources/bin';
-const env = { ...process.env, PATH: [process.env.PATH, DOCKER_BIN].join(delimiter) };
+const LOCAL_BIN = fileURLToPath(new URL('../node_modules/.bin', import.meta.url));
+const env = { ...process.env, PATH: [LOCAL_BIN, process.env.PATH, DOCKER_BIN].join(delimiter) };
 
 let status: string;
 try {

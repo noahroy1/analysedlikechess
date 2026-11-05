@@ -9,6 +9,16 @@ export interface HttpMediaOptions {
   blobs: BlobStore;
   /** The API's origin as the media service reaches it: inputs, outputs and callbacks are under it. */
   origin: string;
+  /**
+   * Whether tasks report to a callback. The Worker turns them off: a callback
+   * lands on whichever instance answers, not the one waiting, so it polls the
+   * task's status instead (which carries progress too).
+   */
+  callbacks?: boolean;
+  /** How often a task's status is asked for: a safety net with callbacks, the only signal without. */
+  pollMs?: number;
+  /** How requests reach the service (the Worker's Container binding); default `fetch`. */
+  fetch?: (url: string, init?: RequestInit) => Promise<Response>;
 }
 
 /** A task the service lost (it restarted) is noticed within this long, even if no callback comes. */
@@ -30,12 +40,16 @@ interface Pending {
  */
 export class HttpMediaRunner implements MediaRunner {
   private readonly options: HttpMediaOptions;
+  private readonly fetchImpl: (url: string, init?: RequestInit) => Promise<Response>;
+  private readonly pollMs: number;
   private readonly pending = new Map<string, Pending>();
   private next = 0;
 
   constructor(options: HttpMediaOptions) {
     if (!options.urls.length) throw new Error('no media service URL');
     this.options = { ...options, urls: options.urls.map((u) => u.replace(/\/+$/, '')) };
+    this.fetchImpl = options.fetch ?? ((url, init) => fetch(url, init));
+    this.pollMs = options.pollMs ?? (options.callbacks === false ? 1_000 : POLL_MS);
   }
 
   private async signed(path: string, scope: string): Promise<string> {
@@ -61,7 +75,7 @@ export class HttpMediaRunner implements MediaRunner {
     const until = Date.now() + CONNECT_WAIT_MS;
     for (;;) {
       try {
-        return await fetch(`${base}/v1${path}`, init);
+        return await this.fetchImpl(`${base}/v1${path}`, init);
       } catch (error) {
         const code = (error as { cause?: { code?: string } }).cause?.code;
         if (code !== 'ECONNREFUSED' || Date.now() > until || init?.signal?.aborted) {
@@ -94,7 +108,7 @@ export class HttpMediaRunner implements MediaRunner {
     signal?.throwIfAborted();
     const id = crypto.randomUUID().replaceAll('-', '');
     const base = this.pick();
-    const callback = await this.signed(`/media/tasks/${id}`, mediaTaskScope(id));
+    const callback = this.options.callbacks === false ? undefined : await this.signed(`/media/tasks/${id}`, mediaTaskScope(id));
     return new Promise<MediaTaskResult>((resolve, reject) => {
       let settled = false;
       const finish = (settle: () => void) => {
@@ -122,14 +136,15 @@ export class HttpMediaRunner implements MediaRunner {
           .then(async (res) => {
             if (res.status === 404) return finish(() => reject(new MediaServiceError('The media service lost this task (did it restart?).')));
             const status = MediaTaskStatusSchema.parse(await res.json());
-            if (status.status === 'done') onEvent({ type: 'done', id, result: status.result! });
+            if (status.status === 'running' && !callback) onEvent({ type: 'progress', id, progress: status.progress, ...(status.stage ? { stage: status.stage } : {}) });
+            else if (status.status === 'done') onEvent({ type: 'done', id, result: status.result! });
             else if (status.status === 'failed') onEvent({ type: 'failed', id, error: status.error ?? 'failed', code: status.code ?? 'failed' });
           })
           .catch(() => undefined);
-      }, POLL_MS);
+      }, this.pollMs);
       this.pending.set(id, { onEvent });
       signal?.addEventListener('abort', abort, { once: true });
-      this.request(base, '/tasks', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id, callback, ...body }) })
+      this.request(base, '/tasks', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id, ...(callback ? { callback } : {}), ...body }) })
         .then(async (res) => {
           if (!res.ok) {
             const error = (await res.json().catch(() => ({}))) as { error?: string };

@@ -15,16 +15,17 @@ import {
 import { buildTimeline } from '@als/composition/timeline';
 import { getTheme } from '@als/theme/themes';
 import type { MediaSigner } from '../api/media-urls.ts';
-import type { SoundLibrary } from '../node/sounds.ts';
 import {
   JobRunningError,
   NotFoundError,
   VersionConflictError,
   projectKey,
   type BlobStore,
+  type Durable,
   type JobRunner,
   type MediaRunner,
   type ProjectRepo,
+  type SoundSource,
   type UsageLog,
 } from '../ports.ts';
 import type { Spend } from '../spend.ts';
@@ -63,7 +64,7 @@ export interface RenderDeps {
   jobs: JobRunner;
   usage: UsageLog;
   spend: Spend;
-  sounds: SoundLibrary;
+  sounds: SoundSource;
   signer: MediaSigner;
   /** The API's origin as the media service reaches it. It fetches the clip, portraits and sounds from it over signed URLs. */
   origin: string;
@@ -80,7 +81,7 @@ export class RenderService {
 
   constructor(deps: RenderDeps) {
     this.deps = deps;
-    deps.jobs.register('render', (context) => this.run(context.job, context.userId, context.signal, context.report));
+    deps.jobs.register('render', (context) => this.run(context.job, context.userId, context.signal, context.report, context.step));
   }
 
   /** Renders a restart interrupted are marked failed; their partial files are removed. */
@@ -99,7 +100,7 @@ export class RenderService {
 
   /** Every render of a project, newest first, with the live one's progress. */
   async list(projectId: string): Promise<RenderJob[]> {
-    const live = this.deps.jobs.find('render', projectId)?.state;
+    const live = (await this.deps.jobs.find('render', projectId))?.state;
     return (await this.deps.repo.renders(projectId)).map((job) => (live?.id === job.id ? live : job)).toReversed();
   }
 
@@ -109,7 +110,7 @@ export class RenderService {
    */
   async start(userId: string, projectId: string, request: RenderRequest): Promise<{ render: RenderJob; created: boolean }> {
     const { repo, blobs, jobs, spend } = this.deps;
-    const running = jobs.find('render', projectId);
+    const running = await jobs.find('render', projectId);
     if (running) {
       if (running.state.projectVersion === request.version && running.state.preset === request.preset) return { render: running.state, created: false };
       throw new JobRunningError('A render of this project is already running.', running);
@@ -140,7 +141,7 @@ export class RenderService {
     await repo.editRenders(projectId, (list) => {
       list.push(job);
     });
-    const started = jobs.start('render', projectId, { userId, state: job });
+    const started = await jobs.start('render', projectId, { userId, state: job });
     if (!started.created) {
       // Another request got in first; this one's entry goes again.
       await this.forget(projectId, id);
@@ -153,10 +154,10 @@ export class RenderService {
   /** Stops a queued or running render. */
   async cancel(projectId: string, id: string): Promise<void> {
     const job = await this.find(projectId, id);
-    const live = this.deps.jobs.find('render', projectId);
+    const live = await this.deps.jobs.find('render', projectId);
     if (live?.state.id !== id) return;
     const wasPending = live.state.status === 'pending';
-    this.deps.jobs.cancel(live.id);
+    await this.deps.jobs.cancel(live.id);
     // A pending render never ran, so nothing else records that it stopped.
     if (wasPending && job.status === 'pending') await this.update(projectId, id, { status: 'cancelled', stage: undefined, finishedAt: now() });
   }
@@ -165,7 +166,7 @@ export class RenderService {
   async remove(projectId: string, id: string): Promise<void> {
     const job = await this.find(projectId, id);
     if (job.status === 'pending' || job.status === 'running') {
-      const live = this.deps.jobs.find('render', projectId);
+      const live = await this.deps.jobs.find('render', projectId);
       if (live) throw new JobRunningError('Cancel the render before deleting it.', live);
     }
     await this.forget(projectId, id);
@@ -188,7 +189,7 @@ export class RenderService {
     });
   }
 
-  private async run(job: JobOf<'render'>, userId: string, signal: AbortSignal, onUpdate: (state: RenderJob) => void): Promise<void> {
+  private async run(job: JobOf<'render'>, userId: string, signal: AbortSignal, onUpdate: (state: RenderJob) => void, durable: Durable): Promise<void> {
     const { projectId } = job;
     const live: RenderJob = { ...job.state };
     const report = async (change: Partial<RenderJob>, persist = true) => {
@@ -207,7 +208,7 @@ export class RenderService {
       const props = await this.props(userId, projectId, project);
       // Cancelled while getting ready: the media service only hears of an abort from now on.
       signal.throwIfAborted();
-      const result = await this.renderChunks(projectId, live, props, project.source.width, signal, (change) => {
+      const result = await this.renderChunks(projectId, live, props, project.source.width, signal, durable, (change) => {
         // Stage changes are saved; frame-by-frame progress is only broadcast.
         void report(change, change.stage !== live.stage);
       });
@@ -239,6 +240,7 @@ export class RenderService {
     props: RenderProps,
     sourceWidth: number,
     signal: AbortSignal,
+    durable: Durable,
     report: (change: Partial<RenderJob>) => void,
   ): Promise<{ sizeBytes: number; seconds: number }> {
     const { media, blobs } = this.deps;
@@ -255,8 +257,8 @@ export class RenderService {
     try {
       const chunks = await Promise.all(
         ranges.map((frameRange, i) =>
-          media
-            .renderChunk({
+          durable(`render:chunk-${i}`, () =>
+            media.renderChunk({
               projectId,
               props,
               scale: job.width / sourceWidth,
@@ -271,8 +273,8 @@ export class RenderService {
                 if (stage) stages[i] = stage;
                 update();
               },
-            })
-            .catch((error: unknown) => {
+            }),
+          ).catch((error: unknown) => {
               stopOthers.abort(error);
               throw error;
             }),
@@ -280,7 +282,7 @@ export class RenderService {
       );
       signal.throwIfAborted();
       report({ progress: 0.9, stage: 'Joining' });
-      const joined = await media.combine({
+      const joined = await durable('render:combine', () => media.combine({
         projectId,
         videos: ranges.map((_, i) => chunkFile(job.id, i, 'ts')),
         audios: ranges.map((_, i) => chunkFile(job.id, i, 'aac')),
@@ -291,7 +293,7 @@ export class RenderService {
         encoding: RENDER_ENCODING,
         signal,
         onProgress: ({ progress: p }) => report({ progress: 0.9 + 0.09 * p, stage: 'Joining' }),
-      });
+      }));
       return { sizeBytes: joined.sizeBytes, seconds: chunks.reduce((sum, c) => sum + c.seconds, joined.seconds) };
     } finally {
       await blobs.deletePrefix(projectKey(projectId, partsDir(job.id))).catch(() => undefined);
