@@ -24,7 +24,15 @@ export const recordingsFrom =
     return responses[name];
   };
 
-export function replayProviders(readJson: Recordings): Providers {
+/**
+ * Providers that answer from recordings. `delayMs` makes each answer take that
+ * long, as a live call would (dev checks that need a job to be mid-run).
+ */
+export function replayProviders(read: Recordings, options: { delayMs?: number } = {}): Providers {
+  const readJson: Recordings = async (name) => {
+    if (options.delayMs) await new Promise((resolve) => setTimeout(resolve, options.delayMs));
+    return read(name);
+  };
   return {
     transcriber: {
       async transcribe(_audio, { durationSec }) {

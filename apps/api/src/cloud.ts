@@ -71,7 +71,10 @@ export function buildCloud(env: Env) {
   const config = loadAnalysisConfig({ ...vars, STYLE_CORPUS: 'bundled' });
   const replay = config.replayDir ? BUNDLED_RECORDINGS[config.replayDir] : undefined;
   if (config.replayDir && !replay) throw new Error(`ANALYSIS_REPLAY_DIR names no bundled recordings: ${config.replayDir}`);
-  const providers = makeProviders(config, replay ? { replay: recordingsFrom(replay, `the bundled ${config.replayDir} recordings`) } : {});
+  const providers = makeProviders(
+    config,
+    replay ? { replay: recordingsFrom(replay, `the bundled ${config.replayDir} recordings`), replayDelayMs: Number(vars.ANALYSIS_REPLAY_DELAY_MS ?? 0) } : {},
+  );
   const style = StyleCorpusSchema.parse(corpus);
 
   const analysis = new AnalysisService({ repo, blobs, media, jobs, usage, spend, providers, config, style });

@@ -10,6 +10,8 @@ import { ProviderError, type Analyst, type Providers } from './types.ts';
 export interface ProviderIo {
   /** Replays these instead of calling any API (ANALYSIS_REPLAY_DIR on Node). */
   replay?: Recordings;
+  /** Each replayed answer takes this long (ANALYSIS_REPLAY_DELAY_MS, for checks that need a job mid-run). */
+  replayDelayMs?: number;
   /** Saves every raw response (ANALYSIS_RECORD_DIR). */
   record?: (name: string, raw: unknown) => Promise<void>;
   /** Stands in for the LLM (ANALYST_HANDOFF_DIR, dev only). */
@@ -18,7 +20,7 @@ export interface ProviderIo {
 
 /** Live providers from the config, or recorded ones. Keys are checked per call, so a missing key fails the stage that needs it. */
 export function makeProviders(config: AnalysisConfig, io: ProviderIo = {}): Providers {
-  if (io.replay) return replayProviders(io.replay);
+  if (io.replay) return replayProviders(io.replay, io.replayDelayMs ? { delayMs: io.replayDelayMs } : {});
   const { record, handoff } = io;
   const need = (key: string | undefined, name: string) => {
     if (!key) throw new ProviderError(`Add ${name} to the server's secrets`);

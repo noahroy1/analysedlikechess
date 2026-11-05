@@ -15,7 +15,7 @@ export interface JobParams {
 /** The parts of the Workflow binding this uses. */
 export interface JobsBinding {
   create(options: { id: string; params: JobParams }): Promise<unknown>;
-  get(id: string): Promise<{ terminate(): Promise<void> }>;
+  get(id: string): Promise<{ restart(options?: { from?: { name: string } }): Promise<void> }>;
 }
 
 /** The parts of a Workflow step this uses. */
@@ -201,7 +201,10 @@ export class WorkflowJobRunner implements JobRunner {
           signal: controller.signal,
           report,
           // A step's callback runs outside this context (the service scope, the keep-alive collector): carry it in.
-          step: (name, work) => step.do(name, JOB_STEP, () => inContext(work)),
+          step: async (name, work) => {
+            await this.db.tx((sql) => sql.query('update app.jobs set step = $2 where id = $1', [jobId, name]));
+            return step.do(name, JOB_STEP, () => inContext(work));
+          },
         });
       } catch (error) {
         // Handlers record their own failures in project state; this is e.g. a project deleted mid-run.
@@ -214,6 +217,29 @@ export class WorkflowJobRunner implements JobRunner {
       await this.db.tx((sql) => sql.query(`update app.jobs set state = $2, updated_at = now() where id = $1`, [jobId, JSON.stringify(job.state)]));
       await this.finish(jobId, outcome);
       this.events.publish(userId, job);
+    });
+  }
+
+  /**
+   * Dev only: local Workflows don't pick up a step that was running when
+   * `wrangler dev` was killed (Cloudflare's engine retries it on its own). A
+   * fresh dev session restarts each job still marked running from the step it
+   * was in; the steps before it return their stored results.
+   */
+  resumeOrphans(): Promise<string[]> {
+    return asService(async () => {
+      const { rows } = await this.db.tx((sql) => sql.query<{ id: string; step: string | null }>(`select id, step from app.jobs where status = 'running'`));
+      const resumed: string[] = [];
+      for (const { id, step } of rows) {
+        try {
+          const instance = await this.binding.get(id);
+          await instance.restart(step ? { from: { name: step } } : undefined);
+          resumed.push(id);
+        } catch (error) {
+          console.warn(`job ${id} not resumed:`, error);
+        }
+      }
+      return resumed;
     });
   }
 

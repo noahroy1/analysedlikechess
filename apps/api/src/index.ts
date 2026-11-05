@@ -5,6 +5,7 @@ import type { ExecutionContext } from './workers.ts';
 import type { JobParams, StepRunner } from './workflow-jobs.ts';
 
 let built: { env: Env; cloud: Cloud } | undefined;
+let resumed = false;
 
 /** One set of services per isolate. */
 function cloudFor(env: Env): Cloud {
@@ -29,7 +30,12 @@ export default {
   fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     // Upload parts and the media service's outputs stream into R2 when their length is known.
     if (request.method === 'PUT') sizedBody(request);
-    const { app } = cloudFor(env);
+    const { app, jobs } = cloudFor(env);
+    // Dev only (DEV_RESUME_JOBS in .dev.vars): a new session picks up the jobs a killed one left running.
+    if (env.DEV_RESUME_JOBS === 'true' && !resumed) {
+      resumed = true;
+      ctx.waitUntil(jobs.resumeOrphans().then((ids) => ids.length && console.log(`resumed jobs: ${ids.join(', ')}`)));
+    }
     return keepAlive.run(
       (promise) => ctx.waitUntil(promise),
       async () => app.fetch(request, env, ctx),
