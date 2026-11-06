@@ -27,6 +27,7 @@ This plan moves the backend off the local Node server onto Cloudflare, with Supa
 8. **Sign-in (Nov 3):** OAuth (Google and Apple) is built at the same time as the app's own sign-in method, not added later. So C3 builds email codes and OAuth together, and C5 adds the native mobile flows for both.
 9. **One backend (Nov 4, confirmed):** the cloud backend serves both front-ends. The desktop editor stays the development client, and in development talks to the same backend running locally (Wrangler plus local Supabase) or to staging. The mobile app uses the deployed backend. The Node server is retired at the end of C3. One repo.
 10. **Region (Nov 3):** the user is in Sydney, so latency is measured from there.
+11. **iOS only (Nov 6):** the user's call: Android is dropped indefinitely. C5 builds and checks the iPhone app only; no Android shell, spike or device check. The API's CORS still allows Capacitor's Android origin (`https://localhost`, in `CAPACITOR_ORIGINS`): it costs nothing and means a later Android shell needs no API change. Google sign-in stays (it is OAuth, not Android).
 
 ## Why Supabase for the data
 
@@ -140,7 +141,7 @@ These rules hold for every route, so a client written once keeps working.
   - refreshing signed URLs
 - **`packages/editor-core` (new):** `editor/store.ts`, `editor/doc.ts`, undo and autosave. They are pure already, so both clients share them.
 - **`apps/web`:** the desktop editor, kept as the development client. `VITE_API_ORIGIN` points it at local dev, staging or production. It gains a sign-in screen; local dev signs in a seeded user automatically. "Show in Finder" becomes Download.
-- **`apps/mobile` (C5):** a Vite React app in Capacitor shells for iOS and Android. It has its own phone layout and shares `client`, `editor-core`, `composition`, `schema` and `theme`. Scope is the projects list, upload from the camera roll, reviewing drafts over the Player, light edits (text, rating, approve or delete), Render and Share. Deep editing stays on desktop.
+- **`apps/mobile` (C5):** a Vite React app in a Capacitor shell for iOS (Android is dropped indefinitely, decision 11). It has its own phone layout and shares `client`, `editor-core`, `composition`, `schema` and `theme`. Scope is the projects list, upload from the camera roll, reviewing drafts over the Player, light edits (text, rating, approve or delete), Render and Share. Deep editing stays on desktop.
 
 ## Local dev and tests
 
@@ -341,7 +342,7 @@ Move ffmpeg and Remotion into `apps/media` behind its HTTP API, and package its 
 **Phase C4: Migration and deploy** (done Nov 6 on staging; production deferred until real users)
 
 - **Environments:** staging and production Cloudflare environments and Supabase projects, with secrets set by `wrangler secret`.
-- **CORS:** allow the web origin plus Capacitor's (`capacitor://localhost` on iOS, `https://localhost` on Android: Capacitor's defaults `server.hostname` "localhost", `iosScheme` "capacitor" and `androidScheme` "https", confirmed Nov 4).
+- **CORS:** allow the web origin plus Capacitor's (`capacitor://localhost` on iOS, `https://localhost` on Android, kept though Android is dropped (decision 11): Capacitor's defaults `server.hostname` "localhost", `iosScheme` "capacitor" and `androidScheme` "https", confirmed Nov 4).
 - **Migration:** a script moves `projects/<id>/` folders into R2 and Postgres under Noah's account (BB1, the Private Property benchmark and its comparison runs) and leaves the local folders untouched.
 - **Prices:** `prices.ts` gains container seconds.
 
@@ -377,7 +378,7 @@ Move ffmpeg and Remotion into `apps/media` behind its HTTP API, and package its 
 
 **Phase C5: Mobile**
 
-- **Spike first:** the Remotion Player in iOS WKWebView and Android WebView. Check inline playback, frame-exact holds and Web Audio after a user gesture.
+- **Spike first:** the Remotion Player in iOS WKWebView (Android WebView is dropped, decision 11). Check inline playback, frame-exact holds and Web Audio after a user gesture.
 - **iPhone trial (done Nov 5; plan `spikes/capacitor-trial/PLAN.md`, code in `spikes/capacitor-trial/`):** a throwaway Capacitor 8.6.0 shell that bundles the sample project (moved onto the creator look as the editor does, 1320 frames at 30 fps, 3 holds, game review) and the user's sound files, plays `<Episode>` in the unchanged Player, measures itself and posts its report to the Mac (`receive.mjs`; reports in `spikes/capacitor-trial/reports/`, gitignored). Device: the user's iPhone 12 on iOS 26.6.1 (the web view reports "iPhone OS 18_7": iOS 26 freezes the user agent's version), ringer on. Two runs, each a full play, Restart then pause and resume, and a jump to move 2. The phone auto-locked twice in run 2. The user watched both: the video stayed in the page, every card froze cleanly, and the sounds played in time. The Mac and simulator passes were skipped (the user's call: the phone run answers the same questions).
   - **Decoding: WebCodecs.** `VideoDecoder` and `AudioDecoder` exist, `isConfigSupported` says yes to the sample's H.264 High 3.1, and every frame was drawn on `@remotion/media`'s `<canvas>`; the `<video>` fallback never ran. No console warnings or errors.
   - **Inline: PASS.** No fullscreen events. Capacitor's web view already sets `allowsInlineMediaPlayback = true` and `mediaTypesRequiringUserActionForPlayback = []` (`CAPBridgeViewController.swift`), so nothing native was needed.
@@ -387,10 +388,10 @@ Move ffmpeg and Remotion into `apps/media` behind its HTTP API, and package its 
   - **Review and font: PASS.** The game review drew from frame 1185 and Arimo loaded.
   - **The trial's own report wording:** run 2 shows FAIL on "one image per hold", the three sound lines and smoothness for the reasons above (empty premount canvas; cues scheduled while the context resumes; auto-lock). The numbers behind each are in the reports. The clip's own audio was stripped for run 2 (`prepare.mjs`, as sound-checks does); run 1 played it.
   - **For C5:** build `apps/mobile` on the Player as it is: WebCodecs, the holds, Web Audio after a tap and inline playback all work in Capacitor's WKWebView on an iPhone 12. Still to check: ringer off; a full-length clip (BB1's 720p proxy, optional, never committed); a dev build signed by a free team stops opening 7 days after install.
-  - **Android** is not part of this trial; C5's spike still needs it.
+  - **Android** was not part of this trial, and since Nov 6 is dropped indefinitely (decision 11), so the spike is complete.
 - **Then build** `apps/mobile` to the scope above. Sign-in is Supabase PKCE with deep links.
 
-- [ ] On an iPhone and an Android phone: sign in, upload a clip from the camera roll, watch the drafts with holds and sounds, approve and edit one card, render, and share the MP4.
+- [ ] On an iPhone: sign in, upload a clip from the camera roll, watch the drafts with holds and sounds, approve and edit one card, render, and share the MP4.
 - [ ] An upload interrupted by backgrounding the app resumes from its last part.
 
 ## Risks

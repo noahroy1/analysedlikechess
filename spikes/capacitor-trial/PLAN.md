@@ -73,7 +73,7 @@ Ask for each item when you reach it, not all at once (the user said: ad hoc). Us
 ## Known limits
 
 - A free Personal Team's signing lasts 7 days; after that the app stops opening until it is run from Xcode again. Free teams also have small limits on devices and new bundle IDs, so don't churn bundle IDs.
-- Android is not part of this trial; C5's spike still needs it.
+- Android is not part of this trial, and since Nov 6 is dropped indefinitely (PLAN-CLOUD.md, decision 11).
 - The trial plays a local bundle: it says nothing about signed URLs, uploads or the backend (C5 covers those against the deployed API).
 
 ## Running it again (built Nov 5; results under Phase C5 in `PLAN-CLOUD.md`)
