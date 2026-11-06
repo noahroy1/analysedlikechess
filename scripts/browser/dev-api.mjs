@@ -56,7 +56,8 @@ async function deployedSession() {
   return verified.json();
 }
 
-async function currentSession() {
+/** The check user's session (`access_token`, `refresh_token`): dev's password sign-in, or one minted on a deployed environment. */
+export async function currentSession() {
   session ??= await (deployed ? deployedSession() : devSession());
   return session;
 }

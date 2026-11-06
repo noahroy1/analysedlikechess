@@ -1,5 +1,6 @@
 import type { Theme } from '@als/schema';
-import { cardSettledFrame, type Hold, type Timeline } from '@als/composition';
+import { cardSettledFrame } from '@als/composition/card';
+import type { Hold, Timeline } from '@als/composition/timeline';
 
 export type PlaybackMode = 'review' | 'preview';
 

@@ -4,3 +4,4 @@
 export * from './doc.ts';
 export * from './store.ts';
 export * from './snapping.ts';
+export * from './playback.ts';

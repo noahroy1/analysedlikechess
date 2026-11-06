@@ -5,7 +5,7 @@ import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
 export default defineConfig(
-  { ignores: ['**/node_modules/**', '**/dist/**', '**/.wrangler/**', 'coverage/**', 'projects/**', 'spikes/**'] },
+  { ignores: ['**/node_modules/**', '**/dist/**', 'apps/mobile/ios/**', '**/.wrangler/**', 'coverage/**', 'projects/**', 'spikes/**'] },
   js.configs.recommended,
   tseslint.configs.recommended,
   {
@@ -14,11 +14,11 @@ export default defineConfig(
     },
   },
   {
-    files: ['apps/api/**', 'apps/media/**', 'packages/schema/**', 'scripts/**', '*.config.{js,ts}'],
+    files: ['apps/api/**', 'apps/media/**', 'apps/mobile/scripts/**', 'packages/schema/**', 'scripts/**', '*.config.{js,ts}'],
     languageOptions: { globals: globals.node },
   },
   {
-    files: ['apps/web/**/*.{ts,tsx}', 'packages/composition/**/*.{ts,tsx}', 'packages/theme/**/*.{ts,tsx}', 'packages/client/**/*.ts', 'packages/editor-core/**/*.ts'],
+    files: ['apps/web/**/*.{ts,tsx}', 'apps/mobile/src/**/*.{ts,tsx}', 'packages/composition/**/*.{ts,tsx}', 'packages/theme/**/*.{ts,tsx}', 'packages/client/**/*.ts', 'packages/editor-core/**/*.ts'],
     extends: [reactHooks.configs.flat.recommended],
     languageOptions: { globals: globals.browser },
   },

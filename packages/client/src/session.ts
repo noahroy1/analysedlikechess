@@ -47,9 +47,17 @@ export function createSession(options: SessionOptions) {
     return () => data.subscription.unsubscribe();
   }
 
-  /** Emails a 6-digit code (a new address gets an account). */
-  async function sendCode(email: string): Promise<void> {
-    check(await supabase.auth.signInWithOtp({ email, options: { shouldCreateUser: true } }));
+  /**
+   * Emails a 6-digit code (a new address gets an account). The email's link, where its template has one,
+   * comes back to `redirectTo` with a `code` for `exchangeCode` (the phone app's own URL scheme); absent, the site URL.
+   */
+  async function sendCode(email: string, redirectTo?: string): Promise<void> {
+    check(await supabase.auth.signInWithOtp({ email, options: { shouldCreateUser: true, ...(redirectTo ? { emailRedirectTo: redirectTo } : {}) } }));
+  }
+
+  /** Signs in with the `code` an email link or OAuth sign-in came back with (PKCE: only the device that asked can use it). */
+  async function exchangeCode(code: string): Promise<void> {
+    check(await supabase.auth.exchangeCodeForSession(code));
   }
 
   /** Signs in with the emailed code. */
@@ -60,6 +68,16 @@ export function createSession(options: SessionOptions) {
   /** Sends the browser to Google or Apple; it comes back to `redirectTo` signed in. */
   async function signInWith(provider: OAuthProvider, redirectTo: string): Promise<void> {
     check(await supabase.auth.signInWithOAuth({ provider, options: { redirectTo } }));
+  }
+
+  /**
+   * The provider's sign-in page, for an in-app browser (the phone app): it comes back to `redirectTo` with a
+   * `code` for `exchangeCode`, and this page stays where it is.
+   */
+  async function oauthUrl(provider: OAuthProvider, redirectTo: string): Promise<string> {
+    const { data } = check(await supabase.auth.signInWithOAuth({ provider, options: { redirectTo, skipBrowserRedirect: true } }));
+    if (!data.url) throw new Error(`no ${provider} sign-in URL`);
+    return data.url;
   }
 
   /** Dev only: the seeded local user signs in with a password, so the editor opens straight away. */
@@ -103,7 +121,7 @@ export function createSession(options: SessionOptions) {
     };
   };
 
-  return { supabase, token, session, onChange, sendCode, verifyCode, signInWith, signInWithPassword, signOut, providers, liveJobs };
+  return { supabase, token, session, onChange, sendCode, verifyCode, exchangeCode, signInWith, oauthUrl, signInWithPassword, signOut, providers, liveJobs };
 }
 
 export type ClientSession = ReturnType<typeof createSession>;

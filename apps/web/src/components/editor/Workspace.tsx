@@ -9,7 +9,7 @@ import { useAutoPlacement } from '../../editor/placement.ts';
 import { snapTime } from '@als/editor-core';
 import { createPortrait, fileUrl, getSoundBank, mediaExpiresAt } from '../../lib/api.ts';
 import { formatTime } from '../../lib/format.ts';
-import { adjacentHold, holdStopFrame, reviewStop, type PlaybackMode } from '../../lib/playback.ts';
+import { adjacentHold, holdStopFrame, reviewStop, type PlaybackMode } from '@als/editor-core';
 import { ShotStrip } from '../ShotStrip.tsx';
 import { Timeline } from '../Timeline.tsx';
 import { EditLayer } from './EditLayer.tsx';

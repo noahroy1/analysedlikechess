@@ -1,5 +1,5 @@
-import { buildTimeline } from '@als/composition';
-import { defaultTheme } from '@als/theme';
+import { buildTimeline } from '@als/composition/timeline';
+import { defaultTheme } from '@als/theme/themes';
 import { describe, expect, it } from 'vitest';
 import { adjacentHold, holdStopFrame, reviewStop } from './playback.ts';
 

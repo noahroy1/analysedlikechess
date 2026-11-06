@@ -239,10 +239,19 @@ export function createApiClient(options: ClientOptions = {}) {
 
   const uploadSlot = (file: File) => `als-upload:${file.name}:${file.size}:${file.lastModified}`;
 
+  const aborted = () => new DOMException('The upload was stopped.', 'AbortError');
+
   /** PUTs one part with XHR (fetch cannot report upload progress) and returns its etag. */
-  function putPart(url: string, body: Blob, onProgress: (loaded: number) => void): Promise<{ status: number; etag?: string }> {
+  function putPart(url: string, body: Blob, onProgress: (loaded: number) => void, signal?: AbortSignal): Promise<{ status: number; etag?: string }> {
     return new Promise((resolve, reject) => {
+      if (signal?.aborted) return reject(aborted());
       const xhr = new XMLHttpRequest();
+      const stop = () => {
+        xhr.abort();
+        reject(aborted());
+      };
+      signal?.addEventListener('abort', stop, { once: true });
+      xhr.onloadend = () => signal?.removeEventListener('abort', stop);
       xhr.open('PUT', absolute(url));
       xhr.responseType = 'json';
       xhr.upload.onprogress = (e) => onProgress(e.loaded);
@@ -258,8 +267,13 @@ export function createApiClient(options: ClientOptions = {}) {
   /**
    * Uploads a clip and returns the new project. Progress is kept per file, so
    * choosing the same file after a dropped upload carries on from the parts already stored.
+   * `signal` stops it (an AbortError); calling again with the same file resumes it (the phone app
+   * does this when it comes back from the background, where iOS drops its connections).
    */
-  async function uploadClip(file: File, context: UploadContext, onProgress: (p: number) => void): Promise<Project> {
+  async function uploadClip(file: File, context: UploadContext, onProgress: (p: number) => void, signal?: AbortSignal): Promise<Project> {
+    const checkSignal = () => {
+      if (signal?.aborted) throw aborted();
+    };
     const slot = uploadSlot(file);
     let progress = (() => {
       try {
@@ -296,8 +310,14 @@ export function createApiClient(options: ClientOptions = {}) {
       if (p.etags[n]) continue;
       const blob = file.slice((n - 1) * p.partSize, Math.min(n * p.partSize, file.size));
       for (let attempt = 0; ; attempt++) {
+        checkSignal();
         const url = parts.parts.find((x) => x.partNumber === n)?.url;
-        const result = url ? await putPart(url, blob, (loaded) => onProgress((done + loaded) / file.size)).catch(() => undefined) : undefined;
+        const result = url
+          ? await putPart(url, blob, (loaded) => onProgress((done + loaded) / file.size), signal).catch((error: unknown) => {
+              if (signal?.aborted) throw error;
+              return undefined;
+            })
+          : undefined;
         if (result?.status === 200 && result.etag) {
           p.etags[n] = result.etag.replaceAll('"', '');
           break;
@@ -313,6 +333,7 @@ export function createApiClient(options: ClientOptions = {}) {
     }
 
     const uploaded: UploadedPart[] = Object.entries(p.etags).map(([n, etag]) => ({ partNumber: Number(n), etag }));
+    checkSignal();
     try {
       const project = await request('POST', `/projects/${p.projectId}/upload/complete`, ProjectSchema, { json: { uploadId: p.uploadId, parts: uploaded } });
       storage?.removeItem(slot);

@@ -1,0 +1,38 @@
+{
+  "name": "@als/mobile",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:ios": "node scripts/ios.ts build",
+    "run:ios": "node scripts/ios.ts run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@als/client": "workspace:*",
+    "@als/composition": "workspace:*",
+    "@als/editor-core": "workspace:*",
+    "@als/schema": "workspace:*",
+    "@als/theme": "workspace:*",
+    "@capacitor/app": "8.1.2",
+    "@capacitor/browser": "8.0.5",
+    "@capacitor/core": "8.6.0",
+    "@capacitor/filesystem": "8.1.5",
+    "@capacitor/share": "8.0.3",
+    "@remotion/player": "4.0.534",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "remotion": "4.0.534",
+    "zustand": "5.0.15"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.6.0",
+    "@capacitor/ios": "8.6.0",
+    "@tailwindcss/vite": "4.3.3",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.1.2",
+    "tailwindcss": "4.3.3",
+    "vite": "8.3.4"
+  }
+}
