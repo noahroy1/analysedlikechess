@@ -9,8 +9,11 @@ import { Container, getContainer } from '@cloudflare/containers';
  *   instances bill until `sleepAfter`, so they sleep soon after the last call
  *   (the runner polls a task every second, which keeps its instance awake).
  * - `MediaQuick`: probe, frame grabs and portrait crops, answered in the
- *   response; one smaller instance kept warm, since a cold start (about 20 s in
- *   C0) would hold up card placement.
+ *   response; one smaller instance, awake 2 minutes after its last call (the
+ *   user's call, Nov 6). Measured on staging: a warm crop takes about 2 s and a
+ *   cold one 1-2 s more (C0's 20 s was a first start after a deploy, which pulls
+ *   the image); idle it bills only memory and disk ($0.00063 a minute, CPU is
+ *   billed by use), so a longer wait buys latency, not savings.
  * Dev runs the same service as a local process instead (`MEDIA_URL`).
  */
 export class MediaTasks extends Container {
@@ -21,7 +24,9 @@ export class MediaTasks extends Container {
 
 export class MediaQuick extends Container {
   override defaultPort = 8080;
-  override sleepAfter = '10m';
+  // Long enough for a burst (several portraits, a few retimes in a row). With many users it rarely sleeps; then one
+  // instance is the limit (calls queue), and the answer is more instances or a bigger type, not a longer wait.
+  override sleepAfter = '2m';
 }
 
 /** Render chunks go to this many task instances at most (DEFAULT_RENDER_SPLIT's cap). */

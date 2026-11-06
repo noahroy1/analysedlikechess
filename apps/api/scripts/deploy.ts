@@ -2,14 +2,16 @@
 //   node apps/api/scripts/deploy.ts <staging|production> [step...]
 // Steps, in order (all when none are named):
 //   db       the migrations in supabase/migrations (through the session pooler);
-//   auth     sign-in settings from supabase/config.toml's [remotes.<env>] (needs `supabase login`);
+//   auth     sign-in settings from supabase/config.toml's [remotes.<env>] (needs `supabase login`; email templates
+//            only with the environment's own mailer, see authWorkdir());
 //   api      the API Worker and its media Containers (`wrangler deploy --env <env>`; needs Docker);
 //   secrets  SUPABASE_SECRET_KEY, MEDIA_URL_SECRET and the provider keys in apps/api/.env;
 //   sounds   the chess sounds (SOUNDS_DIR, default media/sounds) into the bucket and `app.sounds`;
 //   web      the editor built against this environment, deployed as `als-web-<env>` (static files).
 // Settings come from wrangler.jsonc and apps/api/.env.<env> (see environments.ts).
 import { execFile, execFileSync } from 'node:child_process';
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import pg from 'pg';
@@ -32,9 +34,39 @@ const steps: readonly Step[] = named.length ? (named as Step[]) : STEPS;
 const run = (command: string, args: string[], options: { cwd?: string; input?: string; extraEnv?: Record<string, string> } = {}): void =>
   void execFileSync(command, args, { cwd: options.cwd ?? API_DIR, input: options.input, env: { ...TOOLS_ENV, ...options.extraEnv }, stdio: [options.input ? 'pipe' : 'inherit', 'inherit', 'inherit'] });
 
+/**
+ * The folder `config push` reads. Supabase refuses email templates on a project that sends through its own
+ * default mailer on the Free plan ("Email template modification is not available for free tier projects using
+ * the default email provider"), and the push then changes nothing at all. So unless the environment declares
+ * its own mailer (`[remotes.<env>.auth.email.smtp]`), it pushes a copy of the config without the template
+ * sections: the CLI leaves undeclared settings alone, and the project keeps Supabase's default email, whose
+ * link signs in as well as a code would (PKCE, `detectSessionInUrl`; the site URL is the editor).
+ */
+const authWorkdir = (e: Environment): string => {
+  const config = readFileSync(join(ROOT, 'supabase', 'config.toml'), 'utf8');
+  if (new RegExp(`^\\[remotes\\.${e.name}\\.auth\\.email\\.smtp\\]`, 'm').test(config)) return ROOT;
+  let skipping = false;
+  const kept = config.split('\n').filter((line) => {
+    if (/^\[/.test(line)) skipping = /^\[auth\.email\.template\./.test(line);
+    return !skipping;
+  });
+  const dir = mkdtempSync(join(tmpdir(), 'als-auth-'));
+  mkdirSync(join(dir, 'supabase'));
+  writeFileSync(join(dir, 'supabase', 'config.toml'), kept.join('\n'));
+  console.log(`(no mailer of its own for ${e.name}: email templates left as they are)`);
+  return dir;
+};
+
 const actions: Record<Step, (env: Environment) => Promise<void> | void> = {
   db: (e) => run('supabase', ['db', 'push', `--remote=${e.poolerUrl}`, '--yes', '--workdir', ROOT]),
-  auth: (e) => run('supabase', ['config', 'push', `--remote=${e.supabaseRef}`, '--yes', '--workdir', ROOT]),
+  auth: (e) => {
+    const workdir = authWorkdir(e);
+    try {
+      run('supabase', ['config', 'push', `--remote=${e.supabaseRef}`, '--yes', '--workdir', workdir]);
+    } finally {
+      if (workdir !== ROOT) rmSync(workdir, { recursive: true, force: true });
+    }
+  },
   api: (e) => run('wrangler', ['deploy', '--env', e.name]),
   secrets: (e) => {
     const shared = readVars(join(API_DIR, '.env'));

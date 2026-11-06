@@ -5,7 +5,8 @@ import { devUser, session } from '../lib/session.ts';
 const PROVIDER_NAMES: Record<OAuthProvider, string> = { google: 'Google', apple: 'Apple' };
 
 /**
- * Sign-in: a 6-digit code by email, or Google or Apple where they are turned
+ * Sign-in: a 6-digit code by email (or the email's link, where the project sends
+ * Supabase's default email, which has no code: staging on Free), or Google or Apple where they are turned
  * on (PLAN-CLOUD.md decision 8). In dev the seeded local user signs in on its own.
  */
 export function SignIn() {
@@ -82,7 +83,7 @@ export function SignIn() {
           }}
         >
           <p className="text-sm text-neutral-300">
-            We sent a 6-digit code to <span className="font-medium">{email.trim()}</span>.
+            We sent a sign-in email to <span className="font-medium">{email.trim()}</span>. Enter its 6-digit code, or open its link in this browser.
           </p>
           <input
             inputMode="numeric"
