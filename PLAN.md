@@ -420,22 +420,39 @@ Build the render job, progress and the render test.
 - [ ] The automated render test passes
 - [ ] Three spot-checked holds in the MP4 match the preview
 
-**Phase 6: Pitch build**
+**Phase 6: Quality assurance** (renamed from "Pitch build" on Nov 9, 2026, when the pitch fell through)
 
-Build the style corpus, the `creator` theme and two demo episodes (see Pitch strategy).
+The product is now for consumers, who analyse their own videos, such as arguments with friends or funny fails, as a chess game. Their footage has no script, the people in it aren't actors and often go unnamed, and it often has no dialogue. Drafts for footage like that have to be as good as drafts for film scenes. The creator's real cards stay the quality reference. What matters is how far they generalise to new kinds of footage without losing what makes them good.
 
-- [ ] Both demos render in the creator's look
+Proposed approach (Nov 9, not yet agreed):
+
+1. **Two layers per card.** Each corpus card gets an abstract layer that names no one and nothing from its scene:
+   - the situation (status contest, persuasion, concealment, physical attempt, and so on)
+   - the move's mechanism (overreach, concession, misdirection, self-incrimination, bluff, misjudged timing or distance)
+   - its effect on the game (initiative, material, a forced line appearing or disappearing)
+   - the payoff the second sentence lands
+   - why the rating fits
+
+   The card also records which words of its text fill which slot. The categories come from the creator's cards first and are then stretched by consumer clips; they are not invented up front.
+2. **Retrieval by structure, not by scene.** For each candidate move in a new clip, Pass A/B first assigns the same abstract layer. It then gets the corpus cards that share it, each shown with its abstraction, so the model sees how the creator turned that structure into words. It then puts the new clip's own facts into the same slots. At 20-100 cards, matching on those fields is enough, so no embeddings or vector store are needed.
+3. **Coverage map.** A grid of mechanism × rating shows which cells hold real creator cards. A move that lands in an empty cell falls back to the nearest one and is logged, so the gaps show which cards to collect next.
+4. **Fidelity is measured, not assumed:**
+   - **Round trip:** rebuild each creator card from its scene with that card left out of the corpus.
+   - **Abstraction only:** rebuild each card from its abstract layer plus its scene's facts alone. If these come out as good as the originals, the layer loses nothing.
+   - **Consumer test set:** rights-free clips, either the user's own or staged, covering arguments, fails, physical comedy with no words, and groups. Quality is measured as the share of each draft the user keeps, per cell.
+5. **Placeholders out.** The cards Claude wrote (`source: placeholder`, 6 of 11 in `style/corpus.json`) leave the corpus, or are kept where retrieval never takes them for the creator's.
+
+- [ ] Creator cards rebuilt in the round trip match the originals. TODO(open-decision): how this is judged and what score passes.
+- [ ] On the consumer test set, the share of each draft kept reaches a target. TODO(open-decision): the target.
 - [ ] Upload to render takes under 30 minutes including review, timed end to end
 
 **After v1: cloud backend and mobile**
 
 The plan for moving the backend to Cloudflare (Workers, Workflows, Containers, R2) with Supabase for data, auth and live events, for several users, and adding a Capacitor mobile app beside the desktop editor, is in [PLAN-CLOUD.md](PLAN-CLOUD.md) (phases C0-C5). It comes before Phase 6 and any further feature iterations (the user's call, Nov 3): the backend first, then the mobile app.
 
-## Pitch strategy, open decisions and risks
+## Open decisions and risks
 
-The pitch should show the tool doing the creator's job in their voice, not tell them about AI. Bring two demos: one that proves it understands their format, and one finished video they could post.
-
-**Pitch strategy**
+**Pitch strategy (retired Nov 9, 2026: the pitch fell through; kept for history)**
 
 1. **Parity demo.** Run a scene the creator has already published and put the tool's drafts next to their real breakdown. Matching moments show the AI finds what they find, and the editor shows how fast the rest gets fixed.
 2. **Gift demo.** A scene they have not covered yet, delivered as a finished MP4 in their look. A concrete, postable video lands harder than any feature list.
